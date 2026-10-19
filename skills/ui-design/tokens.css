@@ -1,0 +1,70 @@
+/* 设计变量起手模板：复制到设计目录，按品牌改。每屏 <link rel="stylesheet" href="tokens.css"> */
+:root {
+  /* 颜色：按角色定义（换主题只改这里） */
+  --color-bg: oklch(98.5% 0.006 85);          /* 页面背景（带一点主色色相的暖白） */
+  --color-surface: oklch(100% 0 0);           /* 卡片、弹层 */
+  --color-surface-2: oklch(96% 0.01 85);      /* 次一级表面、分组背景 */
+  --color-text: oklch(22% 0.02 60);           /* 正文 */
+  --color-muted: oklch(50% 0.02 60);          /* 次要文字（别再浅了，保证 4.5:1） */
+  --color-line: oklch(91% 0.01 85);           /* 边框、分割线 */
+  --color-primary: oklch(58% 0.15 45);        /* 主色：关键按钮、选中态 */
+  --color-primary-ink: oklch(99% 0 0);        /* 主色上的文字 */
+  --color-accent: oklch(70% 0.12 160);        /* 点睛色，少用 */
+  --color-success: oklch(62% 0.14 150);
+  --color-warning: oklch(75% 0.15 75);
+  --color-danger: oklch(58% 0.2 25);
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* 字号阶梯（1.25） */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 40px;
+  --text-4xl: 56px;
+
+  /* 间距（4 / 8 的倍数） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* 阴影（低透明度、大模糊、带一点主色调） */
+  --shadow-sm: 0 1px 2px oklch(30% 0.03 60 / 0.06), 0 2px 6px oklch(30% 0.03 60 / 0.05);
+  --shadow-md: 0 4px 12px oklch(30% 0.03 60 / 0.08), 0 12px 32px oklch(30% 0.03 60 / 0.08);
+
+  /* 动效 */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur: 200ms;
+}
+
+/* 深色版：<html data-theme="dark">。网页要跟随系统时，把选择器换成 @media (prefers-color-scheme: dark) { :root { … } } */
+[data-theme="dark"] {
+  --color-bg: oklch(18% 0.01 60);
+  --color-surface: oklch(22% 0.012 60);
+  --color-surface-2: oklch(26% 0.012 60);
+  --color-text: oklch(95% 0.005 85);
+  --color-muted: oklch(72% 0.01 85);
+  --color-line: oklch(32% 0.012 60);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0ms; }
+}

@@ -1,0 +1,4 @@
+# Bundle patch for dsh-design-studio
+- insert:
+    - id: dsh-design-studio
+      name: dsh-design-studio
