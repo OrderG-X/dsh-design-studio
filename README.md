@@ -1,6 +1,19 @@
-# dsh-design-studio · 设计工作台
+<div align="center">
 
-中文 | [English](README.en.md)
+<img src="assets/hero.svg" alt="dsh-design-studio — 设计工作台：模型画的界面摆上画布，点一下就改" width="760" />
+
+<p>
+  <a href="https://github.com/OrderG-X/dsh-design-studio/releases"><img src="https://img.shields.io/github/v/release/OrderG-X/dsh-design-studio?label=release&color=4D6BFE" alt="release" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin"><img src="https://img.shields.io/badge/DSH-plugin-4D6BFE" alt="DSH plugin" /></a>
+</p>
+
+<p>
+  <a href="README.md"><b>简体中文</b></a> ·
+  <a href="README.en.md">English</a>
+</p>
+
+</div>
 
 让 DSH（DeepSeek Harness）做界面设计时像 Google Stitch / Claude Code 桌面端那样：模型做网页、App 界面、海报、幻灯片时，右侧栏「设计工作台」实时显示——一屏一屏生成出来，在画布上并排摆好，套上手机 / 浏览器外框；看到哪里不对，点一下那个元素、或拖出一块区域，它就整理成一段文字放进输入框，补一句「改成橙色」发出去，模型照着源码改，改过的地方在预览里闪一下。
 

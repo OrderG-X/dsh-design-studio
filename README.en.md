@@ -1,6 +1,19 @@
-# dsh-design-studio · Design Studio
+<div align="center">
 
-[中文](README.md) | English
+<img src="assets/hero.svg" alt="dsh-design-studio — a design canvas for DSH" width="760" />
+
+<p>
+  <a href="https://github.com/OrderG-X/dsh-design-studio/releases"><img src="https://img.shields.io/github/v/release/OrderG-X/dsh-design-studio?label=release&color=4D6BFE" alt="release" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin"><img src="https://img.shields.io/badge/DSH-plugin-4D6BFE" alt="DSH plugin" /></a>
+</p>
+
+<p>
+  <a href="README.md">简体中文</a> ·
+  <a href="README.en.md"><b>English</b></a>
+</p>
+
+</div>
 
 A design workbench for DSH (DeepSeek Harness), in the spirit of Google Stitch. When the model builds a web page, an app screen, a poster or a slide deck, the **Design Studio** tab in the right sidebar shows it live. Screens appear one by one on a canvas, each inside a phone or browser frame. When something looks off, click the element or drag over an area. The plugin turns your pick into text in the chat input. Add "make it orange" and send. The model edits the source, and the change flashes in the preview.
 
