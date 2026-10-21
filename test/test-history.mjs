@@ -79,6 +79,80 @@ const l2 = h2.list(many)
 const objs = fs.readdirSync(path.join(h2.dirOf(many), 'objects')).length
 check('最多留 40 版，删掉的版本内容也清掉', l2.length === 40 && l2[l2.length - 1].label === 'v5' && objs === 40, `${l2.length} ${objs}`)
 
+// 满 40 版时回到最旧的一版：回退前存的那一版会把它裁掉，内容得先读出来，照样完整回过去
+fs.writeFileSync(path.join(many, 'a.html'), '<p>手改</p>')
+fs.writeFileSync(path.join(many, 'b.css'), 'p{}')
+const oldest = l2[l2.length - 1]
+const rOld = h2.restore(many, oldest.n)
+check('满 40 版回到最旧的一版：内容完整写回', fs.readFileSync(path.join(many, 'a.html'), 'utf8') === '<p>5</p>' && rOld.restored === 1, JSON.stringify(rOld))
+check('回退前的样子也存上了', rOld.saved && fs.readFileSync(h2.fileOf(many, rOld.saved.n, 'a.html'), 'utf8') === '<p>手改</p>')
+
+// 回退前存不下（目录太大）：拒绝回退，一个文件都不动
+{
+  const hb = path.join(tmp, 'grow')
+  fs.mkdirSync(hb)
+  fs.writeFileSync(path.join(hb, 'a.html'), '<p>v1</p>')
+  const h4 = createHistory({ base: path.join(tmp, 'store5') })
+  h4.snapshot(hb, 'v1')
+  fs.writeFileSync(path.join(hb, 'a.html'), '<p>没存过的改动</p>')
+  for (let i = 0; i < 320; i++) fs.writeFileSync(path.join(hb, `p${i}.html`), 'x')
+  let msg = ''
+  try { h4.restore(hb, 1) } catch (e) { msg = e.message }
+  check('回退前存不下 → 报错、不回退', /没有回退/.test(msg) && fs.readFileSync(path.join(hb, 'a.html'), 'utf8') === '<p>没存过的改动</p>', msg)
+}
+
+// 要被盖掉的文件现在超过 2MB（存档时被跳过）：整次不回，说明原因，文件原样留着
+{
+  const hg = path.join(tmp, 'huge')
+  fs.mkdirSync(hg)
+  fs.writeFileSync(path.join(hg, 'index.html'), '<p>v1 small</p>')
+  fs.writeFileSync(path.join(hg, 'a.css'), 'p{}')
+  const h7 = createHistory({ base: path.join(tmp, 'store8') })
+  const first = h7.snapshot(hg, 'v1')
+  const big = '<p>current work</p><img src="data:image/png;base64,' + 'A'.repeat(3 * 1024 * 1024) + '">'
+  fs.writeFileSync(path.join(hg, 'index.html'), big)
+  fs.writeFileSync(path.join(hg, 'a.css'), 'p{color:red}')
+  let msg = ''
+  try { h7.restore(hg, first.n) } catch (e) { msg = e.message }
+  check('要盖掉的文件超过 2MB 没进存档 → 报错、说清是哪个、一个都不写', /index\.html/.test(msg) && /2MB/.test(msg) && fs.readFileSync(path.join(hg, 'index.html'), 'utf8') === big && fs.readFileSync(path.join(hg, 'a.css'), 'utf8') === 'p{color:red}', msg)
+  fs.writeFileSync(path.join(hg, 'index.html'), '<p>small again</p>')
+  const ok = h7.restore(hg, first.n)
+  check('文件变小、存得下了 → 照常回退', ok.restored === 2 && fs.readFileSync(path.join(hg, 'index.html'), 'utf8') === '<p>v1 small</p>', JSON.stringify(ok))
+}
+
+// 父目录是指到项目外的软链接：不顺着写出去
+{
+  const proj = path.join(tmp, 'proj')
+  const outside = path.join(tmp, 'outside')
+  fs.mkdirSync(path.join(proj, 'theme'), { recursive: true })
+  fs.mkdirSync(outside)
+  fs.writeFileSync(path.join(proj, 'index.html'), '<p>old</p>')
+  fs.writeFileSync(path.join(proj, 'theme', 'config.json'), 'SNAPSHOT_INSIDE')
+  const h5 = createHistory({ base: path.join(tmp, 'store6') })
+  h5.snapshot(proj, 'v1') // 那时 theme 还是真目录
+  fs.rmSync(path.join(proj, 'theme'), { recursive: true })
+  fs.writeFileSync(path.join(outside, 'config.json'), 'OUTSIDE_KEEP')
+  fs.symlinkSync(outside, path.join(proj, 'theme')) // 现在 theme 指到项目外
+  fs.writeFileSync(path.join(proj, 'index.html'), '<p>now</p>')
+  const r5 = h5.restore(proj, 1)
+  check('父目录软链接到项目外：那个文件不写', fs.readFileSync(path.join(outside, 'config.json'), 'utf8') === 'OUTSIDE_KEEP', fs.readFileSync(path.join(outside, 'config.json'), 'utf8'))
+  check('别的文件照常回退', fs.readFileSync(path.join(proj, 'index.html'), 'utf8') === '<p>old</p>' && r5.restored === 1, JSON.stringify(r5))
+}
+
+// 版本里的文件名正好是 toString / constructor / __proto__：不摸到原型上去
+check('fileOf：原型上的名字 → null，不抛错', ['toString', 'constructor', '__proto__', 'hasOwnProperty'].every((k) => hist.fileOf(site, 1, k) === null))
+{
+  const bad = path.join(tmp, 'bad')
+  fs.mkdirSync(bad)
+  const h6 = createHistory({ base: path.join(tmp, 'store7') })
+  fs.mkdirSync(h6.dirOf(bad), { recursive: true })
+  fs.writeFileSync(path.join(h6.dirOf(bad), 'index.json'), JSON.stringify([{ n: 1, at: 1, label: '', files: { 'a.html': '../../../../etc/hosts', 'b.html': 'zz' } }]))
+  check('fileOf：哈希不是 40 位十六进制 → null', h6.fileOf(bad, 1, 'a.html') === null && h6.fileOf(bad, 1, 'b.html') === null)
+  let msg = ''
+  try { h6.restore(bad, 1) } catch (e) { msg = e.message }
+  check('restore：版本记录坏了 → 报错、不写', /不全/.test(msg) && !fs.existsSync(path.join(bad, 'a.html')), msg)
+}
+
 // 太大的目录（多半是整个项目）不存
 const big = path.join(tmp, 'big')
 fs.mkdirSync(big)
@@ -149,6 +223,9 @@ res = await get(`${origin}/__dsh_design__/v/1/login.html`)
 check('旧版本的 HTML 也注入 picker', res.status === 200 && res.body.includes('login v1') && res.body.includes('/__dsh_design__/picker.js'))
 res = await get(`${origin}/__dsh_design__/v/1/../../secret`)
 check('旧版本：跳不出去、没有的给 404', res.status === 404 && (await get(`${origin}/__dsh_design__/v/7/login.html`)).status === 404)
+const protoCodes = []
+for (const k of ['toString', 'constructor', '__proto__']) protoCodes.push((await get(`${origin}/__dsh_design__/v/1/${k}`)).status)
+check('旧版本：toString / constructor / __proto__ → 404，服务器不崩', protoCodes.every((c) => c === 404) && (await get(`${origin}/__dsh_design__/v/1/login.html`)).status === 200, protoCodes.join(','))
 
 fs.rmSync(path.join(site, 'exports'), { recursive: true, force: true })
 await sleep(150)

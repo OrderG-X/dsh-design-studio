@@ -8,7 +8,7 @@
 import http from 'node:http'
 import net from 'node:net'
 import { qrMatrix, qrPath, formatBits } from '../lib/qr.js'
-import { createPhone, lanAddress, phoneHtml, PHONE } from '../lib/phone.js'
+import { createPhone, lanAddress, phoneHtml, PHONE, encodePath } from '../lib/phone.js'
 
 let pass = 0
 let fail = 0
@@ -94,20 +94,41 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
   check('没 body 也接在最后', phoneHtml('<p>hi</p>').endsWith('follow.js"></script>'))
 }
 
+// ── 路径编码：已经编码过的不再编码一次 ─────────────────────────────────────────
+
+check('encodePath：& # ? + 空格（已编码）原样', encodePath('/a%26b%20%23%3F%2B.html') === '/a%26b%20%23%3F%2B.html', encodePath('/a%26b%20%23%3F%2B.html'))
+check('encodePath：没编码的中文、& 编一次', encodePath('/首页 & 我.html') === '/%E9%A6%96%E9%A1%B5%20%26%20%E6%88%91.html', encodePath('/首页 & 我.html'))
+check('encodePath：查询串留着，只编空格中文', encodePath('/s?q=a%26b&x=中') === '/s?q=a%26b&x=%E4%B8%AD', encodePath('/s?q=a%26b&x=中'))
+check('encodePath：坏的 % 不报错', encodePath('/100%.html') === '/100%25.html' && encodePath('/') === '/')
+
 // ── 局域网入口 ──────────────────────────────────────────────────────────────
 
 // 假的预览服务器：HTML、CSS、跳转、回显请求头、WebSocket 回显
 const seenHeaders = []
+const upSse = { open: 0, closed: 0 }
+const upWs = { open: 0, closed: 0 }
+const BIG = '<html><body>' + 'x'.repeat(9 * 1024 * 1024) + '<p>THE-END</p></body></html>' // 超过 8MB 的 HTML
 const upstream = http.createServer((req, res) => {
   seenHeaders.push({ url: req.url, ...req.headers })
   if (req.url.startsWith('/a.css')) { res.writeHead(200, { 'Content-Type': 'text/css' }); return res.end('h1{color:red}') }
   if (req.url === '/go') { res.writeHead(302, { Location: `http://127.0.0.1:${upstream.address().port}/b.html` }); return res.end() }
+  if (req.url === '/sse') { // 预览服务器的 SSE：手机断了要跟着断
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' })
+    res.write(': hi\n\n')
+    upSse.open++
+    req.on('close', () => upSse.closed++)
+    return
+  }
+  if (req.url === '/big') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(BIG) }
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '41' })
   res.end('<html><head></head><body>hi</body></html>')
 })
 upstream.on('upgrade', (req, socket) => {
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n')
   socket.on('data', (d) => socket.write('echo:' + d))
+  upWs.open++
+  socket.on('end', () => upWs.closed++) // 手机入口那头关了（收到 FIN）
+  socket.on('error', () => {})
 })
 await new Promise((r) => upstream.listen(0, '127.0.0.1', r))
 const upOrigin = `http://127.0.0.1:${upstream.address().port}`
@@ -187,6 +208,52 @@ let cookie = ''
 }
 
 {
+  // 二维码 / 链接指到电脑上现在这一屏，不是第一次打开的那一屏
+  check('换屏后链接跟着换（口令不变）', phone.status('s1').url === `${base}/%E8%AE%BE%E7%BD%AE.html?k=${token}`, phone.status('s1').url)
+  const again = await phone.start('s1', '/b.html')
+  check('右侧栏再要一次（换了屏）：链接指到新的一屏', again.url === `${base}/b.html?k=${token}` && again.port === st.port, again.url)
+  // 手机没连着的时候换了屏：连上先补发一次；没错过就不发（免得手机上自己点链接换页又被拉回去）
+  const firstEvents = () => new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port: st.port, path: PHONE + 'events', headers: { host: `127.0.0.1:${st.port}`, cookie } }, (res) => {
+      let buf = ''
+      res.on('data', (c) => { buf += c })
+      setTimeout(() => { req.destroy(); resolve(buf) }, 150)
+    })
+    req.on('error', () => resolve(''))
+    req.end()
+  })
+  await wait(50) // 上面那条事件流断干净
+  phone.follow('s1', '/c.html')
+  const missed = await firstEvents()
+  check('手机连上：补发错过的那次换屏', missed.includes('event: goto') && missed.includes('"path":"/c.html"'), missed)
+  await wait(50)
+  const quiet = await firstEvents()
+  check('没错过：连上不发跳转', !quiet.includes('event: goto'), quiet)
+  // 文件名带 & # ? + 空格的屏：链接里只编码一次，手机打开时预览服务器拿到的路径对得上
+  const odd = '/a%26b%20%23%3F%2B.html'
+  phone.follow('s1', odd)
+  check('特殊字符的屏：链接不重复编码', phone.status('s1').url === `${base}${odd}?k=${token}`, phone.status('s1').url)
+  const r = await get(base + odd, { headers: { cookie, accept: 'text/html' } })
+  check('特殊字符的屏：转到预览服务器的路径原样', r.status === 200 && seenHeaders.at(-1).url === odd, seenHeaders.at(-1).url)
+}
+
+{
+  // 手机断了：往预览服务器的连接也断（SSE 长连接和心跳不越积越多）
+  await new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port: st.port, path: '/sse', headers: { host: `127.0.0.1:${st.port}`, cookie } }, (res) => {
+      res.once('data', () => { req.destroy(); resolve() })
+    })
+    req.on('error', () => {})
+    req.end()
+    setTimeout(resolve, 2000)
+  })
+  await wait(200)
+  check('手机断了，上游的 SSE 连接也断', upSse.open === 1 && upSse.closed === 1, JSON.stringify(upSse))
+  const big = await get(base + '/big', { headers: { cookie, accept: 'text/html' } })
+  check('超过 8MB 的 HTML 原样整份给出（不截断）', big.status === 200 && big.body === BIG, `${big.body.length} vs ${BIG.length}`)
+}
+
+{
   // WebSocket：带 Cookie 才转，转过去能来回说话
   const talk = (withCookie) => new Promise((resolve) => {
     const c = net.connect(st.port, '127.0.0.1', () => {
@@ -217,7 +284,19 @@ let cookie = ''
 }
 
 {
+  // 手机的 WebSocket（热更新）连着时停掉入口：往预览服务器的那条也关
+  const ws = await new Promise((resolve) => {
+    const c = net.connect(st.port, '127.0.0.1', () => {
+      c.write(`GET /hmr HTTP/1.1\r\nHost: 127.0.0.1:${st.port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nCookie: ${cookie}\r\n\r\n`)
+    })
+    c.on('error', () => {})
+    c.once('data', () => resolve(c))
+    setTimeout(() => resolve(c), 1500)
+  })
   phone.stop('s1')
+  await wait(200)
+  check('停掉入口：往预览服务器的 WebSocket 也关了（一条不剩）', upWs.open >= 1 && upWs.closed === upWs.open, JSON.stringify(upWs))
+  ws.destroy()
   check('关掉后状态是 off', phone.status('s1').on === false)
   let refused = false
   try { await get(base + '/a.html', { headers: { cookie } }) } catch { refused = true }

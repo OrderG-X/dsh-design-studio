@@ -349,8 +349,47 @@ check('改字：改前改后各存一版', snaps.length === 2 && snaps[0] === ''
 er = tE.editText('sE', { key: 'b.html', before: 'B', after: 'BB' })
 check('改字：画布上的另一屏', er.ok && fs.readFileSync(path.join(editDir, 'b.html'), 'utf8') === '<h1>BB</h1>')
 check('改字：目录外的文件不改', tE.editText('sE', { key: '../index.html', before: 'x', after: 'y' }).reason === 'no-screen' && tE.editText('sE', { key: 'notes.txt', before: 'x', after: 'y' }).reason === 'no-screen')
+fs.writeFileSync(path.join(tmp, 'outside.html'), '<p>外面</p>')
+fs.symlinkSync(path.join(tmp, 'outside.html'), path.join(editDir, 'link.html'))
+er = tE.editText('sE', { key: 'link.html', before: '外面', after: '被改' })
+check('改字：软链接指到目录外的不改', er.reason === 'no-screen' && fs.readFileSync(path.join(tmp, 'outside.html'), 'utf8') === '<p>外面</p>', JSON.stringify(er))
+tE.observe('sE', { type: 'turn/start', time: Date.now(), data: {} })
+er = tE.editText('sE', { key: 'b.html', before: 'BB', after: 'CC' })
+check('改字：模型正在干活时不改（免得被它整份重写盖掉）', er.ok === false && er.reason === 'busy' && fs.readFileSync(path.join(editDir, 'b.html'), 'utf8') === '<h1>BB</h1>', JSON.stringify(er))
+tE.observe('sE', { type: 'turn/end', time: Date.now(), data: {} })
+check('改字：这轮干完又能改', tE.editText('sE', { key: 'b.html', before: 'BB', after: 'CC' }).ok === true)
 await tE.setTarget('sE', parseTarget('5173'), { source: 'tool' })
 check('改字：开发服务器不在这里改', tE.editText('sE', { key: '/', before: 'x', after: 'y' }).reason === 'not-file')
+
+// 预览服务器被关了（开的太多，旧的先关）：轮询状态时发现没了就重开，地址换成新的
+{
+  const live = new Set()
+  let port = 50000
+  let taken = false // 原来的端口被别人占了
+  const asked = []
+  const tR = createTracker({
+    open: async (_t, opts = {}) => {
+      asked.push(opts.port || 0)
+      const o = `http://127.0.0.1:${opts.port && !taken ? opts.port : ++port}`
+      live.add(o)
+      return { origin: o }
+    },
+    alive: (o) => live.has(o),
+  })
+  await tR.setTarget('sR', parseTarget(path.join(editDir, 'a.html')), { source: 'tool' })
+  const first = tR.snapshot('sR').origin
+  check('重开：服务器还在时地址不变', tR.snapshot('sR').origin === first)
+  live.delete(first)
+  tR.snapshot('sR')
+  await wait()
+  check('重开：先要原来的端口，地址不变', asked.at(-1) === Number(new URL(first).port) && tR.snapshot('sR').origin === first, JSON.stringify(asked))
+  live.delete(first)
+  taken = true
+  tR.snapshot('sR')
+  await wait()
+  const s2 = tR.snapshot('sR')
+  check('重开：原来的端口要不到 → 换成新地址', s2.origin !== first && live.has(s2.origin) && s2.url.startsWith(s2.origin + '/') && s2.screens.every((x) => x.url.startsWith(s2.origin)), JSON.stringify(s2))
+}
 
 fs.rmSync(tmp, { recursive: true, force: true })
 console.log(`\n${pass} 通过，${fail} 失败`)
