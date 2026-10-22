@@ -15,6 +15,12 @@
 
 </div>
 
+> **一句话**：DeepSeek Harness（DSH）插件，模型做网页、App 界面、海报、幻灯片时，右侧栏画布实时显示每一屏，套上手机 / 浏览器外框；点一下元素或框一块区域，补一句话就改。每轮自动存版本，能导出展示图、手机扫码看。
+>
+> **什么时候用**：「做个落地页」「设计一个 App 界面」「做张海报」「做几页幻灯片」。
+>
+> **安装**：`dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`，重启 DSH。
+
 让 DSH（DeepSeek Harness）做界面设计时像 Google Stitch / Claude Code 桌面端那样：模型做网页、App 界面、海报、幻灯片时，右侧栏「设计工作台」实时显示——一屏一屏生成出来，在画布上并排摆好，套上手机 / 浏览器外框；看到哪里不对，点一下那个元素、或拖出一块区域，它就整理成一段文字放进输入框，补一句「改成橙色」发出去，模型照着源码改，改过的地方在预览里闪一下。
 
 ![demo](assets/demo.gif)

@@ -15,6 +15,12 @@
 
 </div>
 
+> **What it is:** a DeepSeek Harness (DSH) plugin that shows the model's web pages, app screens, posters and slides live on a canvas in the right sidebar, in phone or browser frames. Click an element or drag a region, add a sentence, and the model edits it. Versions are saved every turn; export showcase images or preview on a phone.
+>
+> **Use it for:** "make a landing page", "design an app screen", "make a poster", "make a few slides".
+>
+> **Install:** `dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`, then restart DSH.
+
 A design workbench for DSH (DeepSeek Harness), in the spirit of Google Stitch. When the model builds a web page, an app screen, a poster or a slide deck, the **Design Studio** tab in the right sidebar shows it live. Screens appear one by one on a canvas, each inside a phone or browser frame. When something looks off, click the element or drag over an area. The plugin turns your pick into text in the chat input. Add "make it orange" and send. The model edits the source, and the change flashes in the preview.
 
 ![demo](assets/demo.gif)
