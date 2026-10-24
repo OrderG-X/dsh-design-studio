@@ -1,6 +1,7 @@
 # 自动发版：推一个 v* 标签（用 _ci/release.sh）→ 测试 → 在最新版 DSH 上实装实跑 → npm 发布 → GitHub Release 挂上 tgz。
-# npm 走可信发布（GitHub OIDC，不存 token）：每个包要先在 npmjs.com 的包设置里加一次 Trusted Publisher（仓库 + release.yml）。
+# npm 走可信发布（GitHub OIDC，不存 token）：每个包在 npm 上登记过一次「OrderG-X/<仓库> 的 release.yml 可以发我」。
 # 每一步都能重跑：npm 上已有这个版本就跳过，Release 已存在就只覆盖附件。
+# 手动点 Run workflow 不填标签 = 演练：照常测试、打包、实跑，再向 npm 验一次身份，但不发布、不建 Release。
 name: Release
 
 on:
@@ -9,8 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '要（重新）发布的标签，例如 v1.2.3'
-        required: true
+        description: '要重新发布的标签（例如 v1.2.3）；留空 = 只演练，不发布'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -24,12 +26,13 @@ jobs:
   release:
     runs-on: macos-latest
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.tag == '' }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ env.TAG || github.ref }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -38,12 +41,13 @@ jobs:
         run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
       - name: Check tag matches package.json
         run: |
-          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           NAME=$(node -p "require('./$PKG_DIR/package.json').name")
           VERSION=$(node -p "require('./$PKG_DIR/package.json').version")
-          [ "$TAG" = "v$VERSION" ] || { echo "::error::标签 $TAG 和 $PKG_DIR/package.json 的版本 $VERSION 对不上"; exit 1; }
           echo "NAME=$NAME" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if [ "$DRY" = true ]; then echo "演练：$NAME $VERSION，不发布"; exit 0; fi
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          [ "$TAG" = "v$VERSION" ] || { echo "::error::标签 $TAG 和 $PKG_DIR/package.json 的版本 $VERSION 对不上"; exit 1; }
       - name: Test
         run: bash -ec "$TEST_CMD"
       - name: Pack
@@ -59,13 +63,21 @@ jobs:
       - name: Publish to npm
         run: |
           npm install -g npm@^11.5.1 --silent
-          if [ "$(npm view "$NAME@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+          if [ "$DRY" = true ]; then
+            # 演练：拿 GitHub 的身份证明去换 npm 的临时发布凭证，换得到就说明可信发布配好了（凭证不用、不打印）
+            ID=$(curl -sfS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" | node -p 'JSON.parse(require("fs").readFileSync(0)).value')
+            ESC=$(node -p 'process.argv[1].replace("/", "%2f")' "$NAME")
+            CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $ID" "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$ESC")
+            [ "$CODE" = 201 ] || { echo "::error::npm 不认这个仓库的发布身份（HTTP $CODE）：检查 npm 上的 Trusted Publisher 设置"; exit 1; }
+            echo "npm 可信发布：身份验证通过（演练，不发布）"
+          elif [ "$(npm view "$NAME@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
             echo "npm 上已有 $NAME@$VERSION，跳过"
           else
             case "$VERSION" in *-*) DIST=next ;; *) DIST=latest ;; esac
             npm publish "$PKG_TGZ" --access public --provenance --tag "$DIST"
           fi
       - name: GitHub Release
+        if: env.DRY != 'true'
         run: |
           SUBJECT=$(git for-each-ref "refs/tags/$TAG" --format='%(contents:subject)')
           git for-each-ref "refs/tags/$TAG" --format='%(contents:body)' > "$RUNNER_TEMP/notes.md"
