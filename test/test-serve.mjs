@@ -96,7 +96,9 @@ const sse = await new Promise((resolve) => {
   })
 })
 check('文件：改了 CSS → SSE 推 change', sse.includes('event: change') && sse.includes('a.css'), JSON.stringify(sse))
-check('文件：改动也通知到 hub（让右侧栏知道）', changes.some((c) => c.key === 'file:' + site && c.file.endsWith('a.css')), JSON.stringify(changes))
+const hubGot = () => changes.some((c) => c.key === 'file:' + site && c.file.endsWith('a.css'))
+for (let i = 0; i < 40 && !hubGot(); i++) await new Promise((r) => setTimeout(r, 50)) // hub 的通知可能比 SSE 晚到一点（CI 机器上见过）
+check('文件：改动也通知到 hub（让右侧栏知道）', hubGot(), JSON.stringify(changes))
 
 // ── 开发服务器 ──
 const devSse = { open: 0, closed: 0 }
