@@ -1,4 +1,5 @@
 # 日常检查：推送 / PR 时跑测试；外加每天一次在 macOS 和 Windows 上、最新版和预览版 DSH 里实装实跑（DSH 升级把插件弄坏时会在这里先红）。
+# plugin.env 里写了 E2E_CMD 的仓库，还会在 macOS / Windows / Linux 的真机上跑一遍端到端测试（比如浏览器桥连真 Chrome）。
 # 模板在 dsh-plugins/_ci/，用 _ci/sync.sh 同步进五个仓库；每个仓库的差异只在 .github/plugin.env。
 name: CI
 
@@ -20,13 +21,18 @@ concurrency:
 jobs:
   test:
     runs-on: macos-latest
+    outputs:
+      e2e: ${{ steps.env.outputs.e2e }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 24
       - name: Load plugin settings
-        run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
+        id: env
+        run: |
+          grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
+          if grep -q '^E2E_CMD=.' .github/plugin.env; then echo e2e=true >> "$GITHUB_OUTPUT"; fi
       - name: Test
         run: bash -ec "$TEST_CMD"
       - name: Pack
@@ -64,3 +70,25 @@ jobs:
         shell: bash
         continue-on-error: ${{ !contains(env.PLATFORMS, runner.os) }}
         run: node .github/dsh-compat.mjs .pkg/*.tgz --dsh ${{ matrix.dsh }}
+
+  e2e:
+    needs: test
+    if: needs.test.outputs.e2e == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    name: E2E · ${{ matrix.os == 'windows-latest' && 'Windows' || matrix.os == 'ubuntu-latest' && 'Linux' || 'macOS' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Load plugin settings
+        shell: bash
+        run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
+      - name: End-to-end on a real machine
+        shell: bash
+        continue-on-error: ${{ !contains(env.PLATFORMS, runner.os) }}
+        run: bash -ec "$E2E_CMD"
