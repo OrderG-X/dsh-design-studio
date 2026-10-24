@@ -1,4 +1,4 @@
-# 日常检查：推送 / PR 时跑测试；外加每天一次在最新版和预览版 DSH 上实装实跑（DSH 升级把插件弄坏时会在这里先红）。
+# 日常检查：推送 / PR 时跑测试；外加每天一次在 macOS 和 Windows 上、最新版和预览版 DSH 里实装实跑（DSH 升级把插件弄坏时会在这里先红）。
 # 模板在 dsh-plugins/_ci/，用 _ci/sync.sh 同步进五个仓库；每个仓库的差异只在 .github/plugin.env。
 name: CI
 
@@ -40,20 +40,27 @@ jobs:
 
   dsh:
     needs: test
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [macos-latest, windows-latest]
         dsh: [latest, next]
-    name: DSH ${{ matrix.dsh }}
+    name: ${{ matrix.os == 'windows-latest' && 'Windows' || 'macOS' }} · DSH ${{ matrix.dsh }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Load plugin settings
+        shell: bash
+        run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           name: package
-          path: ${{ runner.temp }}/pkg
+          path: .pkg
+      # plugin.env 的 PLATFORMS 之外的系统只作参考：失败会在摘要里标出来，但不让整次检查变红
       - name: Install and boot in a fresh DSH
-        run: node .github/dsh-compat.mjs "$(ls "$RUNNER_TEMP"/pkg/*.tgz | head -1)" --dsh ${{ matrix.dsh }}
+        shell: bash
+        continue-on-error: ${{ !contains(env.PLATFORMS, runner.os) }}
+        run: node .github/dsh-compat.mjs .pkg/*.tgz --dsh ${{ matrix.dsh }}

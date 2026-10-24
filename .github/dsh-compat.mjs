@@ -25,6 +25,8 @@ for (const d of [env.DSH_HOME, env.HOME, path.join(tmp, 'cli')]) fs.mkdirSync(d,
 
 const problems = []
 const notes = []
+const OS = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' }[process.platform] || process.platform
+const WIN = process.platform === 'win32'
 let server = null
 let chrome = null
 
@@ -32,20 +34,25 @@ function run(cmd, argv, opts = {}) {
   const r = spawnSync(cmd, argv, { env, encoding: 'utf8', maxBuffer: 64 << 20, ...opts })
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') }
 }
+// Windows 上 kill() 只结束进程本身，DSH 和 Chrome 的子进程要连根拔掉，不然临时目录删不掉
+function stop(p, signal) {
+  if (!p || p.exitCode !== null) return
+  try { WIN ? spawnSync('taskkill', ['/pid', String(p.pid), '/T', '/F']) : p.kill(signal) } catch {}
+}
 function finish() {
-  try { server && server.kill('SIGTERM') } catch {}
-  try { chrome && chrome.kill('SIGKILL') } catch {}
+  stop(server, 'SIGTERM')
+  stop(chrome, 'SIGKILL')
   const ok = problems.length === 0
   const lines = [
-    `## DSH ${dshVersion || dshSpec} · ${pkgName || path.basename(tgz)}`,
+    `## ${OS} · DSH ${dshVersion || dshSpec} · ${pkgName || path.basename(tgz)}`,
     ok ? '✅ 兼容：装得上、后端启动、前端无报错' : '❌ 不兼容',
     ...problems.map((p) => `- ❌ ${p}`),
     ...notes.map((n) => `- ℹ️ ${n}`),
   ]
   console.log('\n' + lines.join('\n'))
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n\n')
-  if (!keep) fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 3 })
-  else console.log('临时目录保留在', tmp)
+  if (keep) console.log('临时目录保留在', tmp)
+  else try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }) } catch (e) { console.log('临时目录没删干净：', e.message) }
   process.exit(ok ? 0 : 1)
 }
 let dshVersion = ''
@@ -53,9 +60,10 @@ let pkgName = ''
 
 // 1. 装指定版本的 DSH 命令行，外加它装插件要用的 pnpm（GitHub 的机器上默认没有）
 fs.writeFileSync(path.join(tmp, 'cli', 'package.json'), '{"private":true}')
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-const inst = run(npm, ['i', `@deepseek-ai/dsh@${dshSpec}`, 'pnpm@11', `--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error'], { cwd: path.join(tmp, 'cli') })
-env.PATH = `${path.join(tmp, 'cli', 'node_modules', '.bin')}${path.delimiter}${env.PATH}`
+const npm = WIN ? 'npm.cmd' : 'npm'
+const inst = run(npm, ['i', `@deepseek-ai/dsh@${dshSpec}`, 'pnpm@11', `--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error'], { cwd: path.join(tmp, 'cli'), shell: WIN })
+const PATH_KEY = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH' // Windows 上叫 Path
+env[PATH_KEY] = `${path.join(tmp, 'cli', 'node_modules', '.bin')}${path.delimiter}${env[PATH_KEY]}`
 if (inst.code !== 0) { problems.push(`装不上 @deepseek-ai/dsh@${dshSpec}（npm 退出码 ${inst.code}）\n\n${inst.out.slice(-2000)}`); finish() }
 const cliDir = path.join(tmp, 'cli', 'node_modules', '@deepseek-ai', 'dsh')
 dshVersion = JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8')).version
@@ -99,6 +107,8 @@ for (const b of failed) (mentions(b) ? problems : notes).push(`启动日志：${
 const chromeBin = process.env.CHROME_BIN || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser',
+  ...[process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean)
+    .flatMap((d) => [path.join(d, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(d, 'Microsoft', 'Edge', 'Application', 'msedge.exe')]),
 ].find((p) => fs.existsSync(p))
 if (!chromeBin) { notes.push('没找到 Chrome，跳过前端检查'); finish() }
 chrome = spawn(chromeBin, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--no-sandbox',
