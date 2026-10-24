@@ -1,0 +1,34 @@
+name: 报告问题 / Bug report
+description: 插件出错、不工作，或者和说明不一致 / Something is broken or not working as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 谢谢反馈！中文、英文都行。/ Thanks for the report! Chinese or English is fine.
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么 / What happened
+      description: 你做了什么、看到了什么、本来应该怎样 / What you did, what you saw, what you expected
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: 版本 / Versions
+      description: DSH 版本和插件版本，DSH 的插件页能看到 / DSH and plugin versions, shown on the DSH Plugins page
+      placeholder: DSH 0.2.1-rc.2, plugin 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: 系统 / OS
+      placeholder: macOS 15.5
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图或日志 / Screenshots or logs
+      description: 可选。贴日志前先删掉密钥和隐私信息 / Optional. Remove keys and private info first.

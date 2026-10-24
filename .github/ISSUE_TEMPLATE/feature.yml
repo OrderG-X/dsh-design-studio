@@ -1,0 +1,16 @@
+name: 提需求 / Feature request
+description: 想要的新功能或改进 / A new idea or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: want
+    attributes:
+      label: 想要什么 / What you want
+      description: 想做成什么事，现在卡在哪 / What you are trying to do, and what gets in the way
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充 / Anything else
+      description: 可选。截图、类似工具的做法都欢迎 / Optional. Screenshots or how other tools do it.
