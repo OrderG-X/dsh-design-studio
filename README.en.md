@@ -90,6 +90,10 @@ node test/test-history.mjs
 node test/test-phone.mjs
 ```
 
+## Feedback
+
+Found a bug or want a feature? [Open an issue](https://github.com/OrderG-X/dsh-design-studio/issues/new/choose). Including your DSH and plugin versions helps a lot.
+
 ## License
 
 MIT
