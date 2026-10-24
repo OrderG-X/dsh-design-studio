@@ -5,7 +5,8 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { createTracker, parseTarget, serverUrlIn, devServerIn, replaceText, urlFor, labelOf, parseKind, parseSize, listScreens } from '../lib/core.js'
+import { pathToFileURL } from 'node:url'
+import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, urlFor, labelOf, parseKind, parseSize, listScreens } from '../lib/core.js'
 
 let pass = 0
 let fail = 0
@@ -22,6 +23,10 @@ fs.writeFileSync(index, '<h1>x</h1>')
 fs.writeFileSync(path.join(site, 'notes.txt'), 'x')
 
 // ── parseTarget ──
+check('Git Bash 路径 /c/Users/… → C:\\Users\\…（Windows）', fromBashPath('/c/Users/张三/a b/x.html', 'win32') === 'C:\\Users\\张三\\a b\\x.html', fromBashPath('/c/Users/张三/a b/x.html', 'win32'))
+check('Git Bash 路径：只有盘符 /d → D:\\', fromBashPath('/d', 'win32') === 'D:\\')
+check('Git Bash 路径：不是盘符开头的不动', fromBashPath('/Users/x/a.mp4', 'win32') === '/Users/x/a.mp4')
+check('Git Bash 路径：别的系统不动', fromBashPath('/c/x.html', 'darwin') === '/c/x.html')
 let t = parseTarget('5173')
 check('端口 → 开发服务器', t.kind === 'proxy' && t.port === 5173 && t.path === '/')
 t = parseTarget('http://localhost:3000/about?x=1')
@@ -35,6 +40,8 @@ t = parseTarget(site)
 check('目录 → 里面的 index.html', t.kind === 'file' && t.file === index)
 t = parseTarget('file://' + encodeURI(index))
 check('file:// 地址也认', t.kind === 'file' && t.file === index)
+t = parseTarget(pathToFileURL(index).href)
+check('标准 file:// 地址（Windows 上是 file:///C:/…）→ 文件', t.kind === 'file' && t.file === index, JSON.stringify(t))
 t = parseTarget('index.html', site)
 check('相对路径按工作目录找', t.kind === 'file' && t.file === index)
 check('不是 HTML → 拒', /只能预览 \.html/.test(throws(() => parseTarget(path.join(site, 'notes.txt')))))

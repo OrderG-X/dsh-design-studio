@@ -3,7 +3,7 @@
   "version": "0.3.2",
   "type": "module",
   "scripts": {
-    "test": "for t in test/*.mjs; do node \"$t\" || exit 1; done"
+    "test": "node --test --test-concurrency=1 test/*.mjs"
   },
   "description": "Design workbench in the DeepSeek Harness right sidebar: watch web / app / poster screens generate on a canvas with device frames, click an element to send it to the chat, tweak design tokens, compare versions, export share-ready images and scan to view on your phone.",
   "license": "MIT",
