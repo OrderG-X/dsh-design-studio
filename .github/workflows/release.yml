@@ -45,7 +45,7 @@ jobs:
           VERSION=$(node -p "require('./$PKG_DIR/package.json').version")
           echo "NAME=$NAME" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          if [ "$DRY" = true ]; then echo "演练：$NAME $VERSION，不发布"; exit 0; fi
+          if [ "$DRY" = true ]; then echo "演练：${NAME} ${VERSION}，不发布"; exit 0; fi
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           [ "$TAG" = "v$VERSION" ] || { echo "::error::标签 $TAG 和 $PKG_DIR/package.json 的版本 $VERSION 对不上"; exit 1; }
       - name: Test
@@ -71,7 +71,7 @@ jobs:
             [ "$CODE" = 201 ] || { echo "::error::npm 不认这个仓库的发布身份（HTTP $CODE）：检查 npm 上的 Trusted Publisher 设置"; exit 1; }
             echo "npm 可信发布：身份验证通过（演练，不发布）"
           elif [ "$(npm view "$NAME@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
-            echo "npm 上已有 $NAME@$VERSION，跳过"
+            echo "npm 上已有 ${NAME}@${VERSION}，跳过"
           else
             case "$VERSION" in *-*) DIST=next ;; *) DIST=latest ;; esac
             npm publish "$PKG_TGZ" --access public --provenance --tag "$DIST"
