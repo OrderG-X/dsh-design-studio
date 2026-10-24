@@ -51,10 +51,11 @@ function finish() {
 let dshVersion = ''
 let pkgName = ''
 
-// 1. 装指定版本的 DSH 命令行
+// 1. 装指定版本的 DSH 命令行，外加它装插件要用的 pnpm（GitHub 的机器上默认没有）
 fs.writeFileSync(path.join(tmp, 'cli', 'package.json'), '{"private":true}')
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-const inst = run(npm, ['i', `@deepseek-ai/dsh@${dshSpec}`, `--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error'], { cwd: path.join(tmp, 'cli') })
+const inst = run(npm, ['i', `@deepseek-ai/dsh@${dshSpec}`, 'pnpm@11', `--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error'], { cwd: path.join(tmp, 'cli') })
+env.PATH = `${path.join(tmp, 'cli', 'node_modules', '.bin')}${path.delimiter}${env.PATH}`
 if (inst.code !== 0) { problems.push(`装不上 @deepseek-ai/dsh@${dshSpec}（npm 退出码 ${inst.code}）\n\n${inst.out.slice(-2000)}`); finish() }
 const cliDir = path.join(tmp, 'cli', 'node_modules', '@deepseek-ai', 'dsh')
 dshVersion = JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8')).version
@@ -65,8 +66,9 @@ console.log(`DSH ${dshVersion}（${dshSpec}）`)
 const add = dsh(['plugin', '--profile', 'web', 'add', tgz], { cwd: tmp })
 const profile = path.join(env.DSH_HOME, 'profiles', 'web')
 if (add.code !== 0) {
-  const why = (add.out.match(/installation rejected:[^\n]*/) || [])[0] || add.out.split('\n').filter((l) => /dsh:|ERR/.test(l)).join('\n')
-  problems.push(`DSH ${dshVersion} 拒绝安装：${why.slice(0, 1500)}`)
+  const rejected = (add.out.match(/installation rejected:[^\n]*/) || [])[0]
+  const why = rejected || add.out.split('\n').filter((l) => /dsh:|ERR/.test(l)).join('\n')
+  problems.push(`DSH ${dshVersion} ${rejected ? '拒绝安装' : '安装失败'}：${why.slice(0, 1500)}`)
   finish()
 }
 const pj = JSON.parse(fs.readFileSync(path.join(profile, 'package.json'), 'utf8'))
