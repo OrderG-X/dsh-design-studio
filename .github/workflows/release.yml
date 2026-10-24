@@ -1,0 +1,82 @@
+# 自动发版：推一个 v* 标签（用 _ci/release.sh）→ 测试 → 在最新版 DSH 上实装实跑 → npm 发布 → GitHub Release 挂上 tgz。
+# npm 走可信发布（GitHub OIDC，不存 token）：每个包要先在 npmjs.com 的包设置里加一次 Trusted Publisher（仓库 + release.yml）。
+# 每一步都能重跑：npm 上已有这个版本就跳过，Release 已存在就只覆盖附件。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要（重新）发布的标签，例如 v1.2.3'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Load plugin settings
+        run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
+      - name: Check tag matches package.json
+        run: |
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          NAME=$(node -p "require('./$PKG_DIR/package.json').name")
+          VERSION=$(node -p "require('./$PKG_DIR/package.json').version")
+          [ "$TAG" = "v$VERSION" ] || { echo "::error::标签 $TAG 和 $PKG_DIR/package.json 的版本 $VERSION 对不上"; exit 1; }
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Test
+        run: bash -ec "$TEST_CMD"
+      - name: Pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          (cd "$PKG_DIR" && npm pack --pack-destination "$RUNNER_TEMP/out" --silent)
+          PKG_TGZ=$(ls "$RUNNER_TEMP"/out/*.tgz | head -1)
+          echo "PKG_TGZ=$PKG_TGZ" >> "$GITHUB_ENV"
+          for a in $ASSETS; do cp "$PKG_TGZ" "$RUNNER_TEMP/out/$a"; done
+          tar -tzf "$PKG_TGZ"
+      - name: Install and boot in DSH latest
+        run: node .github/dsh-compat.mjs "$PKG_TGZ" --dsh latest
+      - name: Publish to npm
+        run: |
+          npm install -g npm@^11.5.1 --silent
+          if [ "$(npm view "$NAME@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+            echo "npm 上已有 $NAME@$VERSION，跳过"
+          else
+            case "$VERSION" in *-*) DIST=next ;; *) DIST=latest ;; esac
+            npm publish "$PKG_TGZ" --access public --provenance --tag "$DIST"
+          fi
+      - name: GitHub Release
+        run: |
+          SUBJECT=$(git for-each-ref "refs/tags/$TAG" --format='%(contents:subject)')
+          git for-each-ref "refs/tags/$TAG" --format='%(contents:body)' > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || echo "$SUBJECT" > "$RUNNER_TEMP/notes.md"
+          FILES=$(for a in $ASSETS; do printf '%s ' "$RUNNER_TEMP/out/$a"; done)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" $FILES --clobber
+          else
+            case "$VERSION" in *-*) PRE=--prerelease ;; *) PRE= ;; esac
+            gh release create "$TAG" $FILES --verify-tag $PRE --title "$TAG — $SUBJECT" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          echo "### $NAME $VERSION 已发布" >> "$GITHUB_STEP_SUMMARY"
+          echo "- npm: https://www.npmjs.com/package/$NAME/v/$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

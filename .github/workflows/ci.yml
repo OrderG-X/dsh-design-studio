@@ -1,0 +1,59 @@
+# 日常检查：推送 / PR 时跑测试；外加每天一次在最新版和预览版 DSH 上实装实跑（DSH 升级把插件弄坏时会在这里先红）。
+# 模板在 dsh-plugins/_ci/，用 _ci/sync.sh 同步进五个仓库；每个仓库的差异只在 .github/plugin.env。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Load plugin settings
+        run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
+      - name: Test
+        run: bash -ec "$TEST_CMD"
+      - name: Pack
+        working-directory: ${{ env.PKG_DIR }}
+        run: npm pack --pack-destination "$RUNNER_TEMP" --silent
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ${{ runner.temp }}/*.tgz
+          retention-days: 7
+
+  dsh:
+    needs: test
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dsh: [latest, next]
+    name: DSH ${{ matrix.dsh }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: ${{ runner.temp }}/pkg
+      - name: Install and boot in a fresh DSH
+        run: node .github/dsh-compat.mjs "$(ls "$RUNNER_TEMP"/pkg/*.tgz | head -1)" --dsh ${{ matrix.dsh }}
