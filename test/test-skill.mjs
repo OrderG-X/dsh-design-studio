@@ -14,6 +14,7 @@ import { apply, skillProvider, designSkill, previewTool, studio } from '../lib/i
 import * as skillRow from '../lib/skill.js'
 import * as toolRow from '../lib/tool.js'
 import * as autoRow from '../lib/auto.js'
+import DesignPreset from '../lib/preset.js'
 
 let pass = 0
 let fail = 0
@@ -94,6 +95,17 @@ check('有设计模式', /- id: preset-design\n\s+name: dsh-design-studio\/prese
 const need = ['dsh-persona', 'dsh-tool-bash', 'dsh-tool-pwsh', 'dsh-tool-fs', 'dsh-tool-fs-search', 'dsh-skill-filesystem', 'dsh-tool-skill', 'dsh-plan-mode', 'dsh-compaction-basic', 'dsh-tool-subagent', 'dsh-tool-ask-user', 'dsh-tool-todo', 'dsh-tool-web']
 check('设计模式带齐标准模式的工具', need.every((n) => patch.includes(`'@deepseek-ai/${n}'`)))
 check('设计模式挂了预览工具和设计技能', /name: dsh-design-studio\/tool\n\s+- id: design-skill\n\s+name: dsh-design-studio\/skill\s*$/.test(patch))
+// 设计模式那行自己不引 @deepseek-ai/*（用 link: 装在 DSH 目录外面时找不到），照官方预设的样子注册
+{
+  const src = fs.readFileSync(path.join(root, 'lib', 'preset.js'), 'utf8')
+  check('设计模式那行不引 DSH 的包', !/from\s+['"]@deepseek-ai\//.test(src))
+  const got = []
+  const off = () => { got.push('off') }
+  const cfg = { id: 'design', plugins: [] }
+  const it = new DesignPreset({ agentPresets: { register: async (c) => { got.push(c); return off } } }, cfg)[Symbol.for('cordis.init')]()
+  const first = await it.next()
+  check('设计模式按官方预设的方式注册、交出反注册', got[0] === cfg && first.value === off && DesignPreset.inject.includes('agentPresets') && DesignPreset[Symbol.for('cordis.group')] === true)
+}
 // 装好的 DSH 里有的话，拿它的标准模式比一比：少了哪个插件
 try {
   const req = createRequire(import.meta.url)
