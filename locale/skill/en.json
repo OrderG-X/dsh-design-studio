@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Design skill (other modes)",
+    "description": "Lets Standard, Creator and other modes load the ui-design skill (process, guidelines, self-check list). The Design mode has its own copy and ignores this switch."
+  }
+}

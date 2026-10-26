@@ -1,6 +1,6 @@
 {
   "name": "dsh-design-studio",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.mjs"
@@ -22,6 +22,18 @@
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./auto": "./lib/auto.js",
+    "./auto/locale/*.json": "./locale/auto/*.json",
+    "./auto/icon": "./icon.svg",
+    "./tool": "./lib/tool.js",
+    "./tool/locale/*.json": "./locale/tool/*.json",
+    "./tool/icon": "./icon.svg",
+    "./skill": "./lib/skill.js",
+    "./skill/locale/*.json": "./locale/skill/*.json",
+    "./skill/icon": "./icon.svg",
+    "./preset": "./lib/preset.js",
+    "./preset/locale/*.json": "./locale/preset/*.json",
+    "./preset/icon": "./icon.svg",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./icon.svg": "./icon.svg",

@@ -228,6 +228,26 @@ check('清掉预览 → 盘上也删了', !mem.data.s5)
   check('在做设计：起了本地服务 → 打开', t8.snapshot('s8').target && t8.snapshot('s8').target.port === 8123)
 }
 {
+  // 用户关了「自动打开预览」：在做设计也不自动打开，写的网页给个按钮；开发服务器也不自动打开
+  let on = false
+  const tA = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:12' }), autoOpen: () => on })
+  skill(tA, 'sA')
+  const call = (id, name, args) => tA.observe('sA', { type: 'tool/call', time: Date.now(), data: { callId: id, name, arguments: JSON.stringify(args) } })
+  const res = (id, text) => tA.observe('sA', { type: 'tool/result', time: Date.now(), data: { message: { toolCallId: id, content: [{ type: 'text', text }] } } })
+  call('w', 'write', { file_path: other })
+  res('w', 'ok')
+  call('d', 'bash', { command: 'npx vite' })
+  res('d', 'Local: http://localhost:5199/')
+  await wait()
+  const a = tA.snapshot('sA')
+  check('关了自动打开 → 不打开，写的网页给按钮', a.target === null && a.openRev === 0 && a.hint === other, JSON.stringify(a))
+  on = true
+  call('w2', 'write', { file_path: other })
+  res('w2', 'ok')
+  await wait()
+  check('再打开 → 照常自动打开', tA.snapshot('sA').target && tA.snapshot('sA').target.file === other)
+}
+{
   // 用户在输入框调了 /ui-design：也算在做设计
   const t9 = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:9' }) })
   t9.observe('s9', { type: 'user/message', time: Date.now(), data: { source: { kind: 'user' }, content: [{ type: 'text', text: '/ui-design 做个登录页' }] } })

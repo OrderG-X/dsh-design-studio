@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Open previews automatically",
+    "description": "When the model writes a design HTML file or starts a dev server, the Design Studio sidebar opens the preview on its own. Turned off, the sidebar only offers a \"Preview …\" button."
+  }
+}

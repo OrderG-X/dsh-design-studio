@@ -68,6 +68,22 @@ On a narrow sidebar the less-used toolbar buttons move into a "More" menu.
 
 `preview_page` takes `target` (a file path, port or URL), `kind` (web / app / tablet / poster / slides / email), and optionally `size` (such as `1080x1920`) and `screens` (dev-server routes to show side by side).
 
+## Design mode and switches
+
+New sessions get a **Design** mode (shown as 设计模式) in the mode menu: all of Standard mode's tools plus the design skill and sidebar previews, with a design-focused persona. Pick it for design work; Standard, Creator and other modes keep these features too.
+
+The plugin is split into parts, each with its own switch under DSH Plugins → Design Studio. Changes apply right away, no restart:
+
+| Part | What it does | Default |
+| --- | --- | --- |
+| Design Studio | The sidebar and preview servers (turning it off means not using the plugin) | On |
+| Open previews automatically | While designing, a written HTML file or a started dev server opens in the sidebar; off, the sidebar only offers a "Preview …" button | On |
+| Preview tool (other modes) | Standard, Creator and other modes can use `preview_page` | On |
+| Design skill (other modes) | Standard, Creator and other modes can load the `ui-design` skill | On |
+| Design mode | The Design entry in the mode menu | On |
+
+To design only in Design mode and keep other modes clean, turn off the two "(other modes)" switches. Design mode carries its own tool and skill and ignores them.
+
 ## Security
 
 Each preview gets its own random `127.0.0.1` port, which is a different origin from DSH.

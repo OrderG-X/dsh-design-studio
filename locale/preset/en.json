@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Design mode",
+    "description": "Adds a Design mode for new sessions: all of Standard mode's tools plus the design skill and live previews in the Design Studio sidebar, with a design-focused persona. Turned off, the mode leaves the list."
+  }
+}
