@@ -330,7 +330,7 @@ li{padding:14px 0;list-style:none}.tab{position:absolute;left:0;right:0;bottom:0
 <body><main>${Array.from({ length: 20 }, (_, i) => `<p>段落 ${i + 1}</p>`).join('')}<p>最后一段离底栏够远</p></main><nav><a href="home.html">首页</a></nav></body></html>`)
   fs.writeFileSync(path.join(site, 'neg.css'), '/* 价格行 */\n.row { display: flex; gap: 8px }\n.row {\n  margin-top: -24px;\n}\n')
   fs.writeFileSync(path.join(site, 'neg.html'), `<!doctype html><html><head><meta charset="utf-8"><title>负边距</title><link rel="stylesheet" href="neg.css">
-<style>body{margin:0;padding:24px;font:16px/1.4 sans-serif}</style></head><body><p class="author">石黑一雄 著 · 宋佥 译</p><div class="row"><span class="price">¥68</span><span>精装 392 页</span></div></body></html>`)
+<style>body{margin:0;padding:24px;font:16px/1.4 sans-serif}.author{margin:0}</style></head><body><p class="author">石黑一雄 著 · 宋佥 译</p><div class="row"><span class="price">¥68</span><span>精装 392 页</span></div></body></html>`)
   // 附图：名字和价格叠在一起、框里的字被截断
   fs.writeFileSync(path.join(site, 'over.html'), `<!doctype html><html><head><meta charset="utf-8"><title>叠字</title>
 <style>body{margin:0;font:16px/1.4 sans-serif;padding:24px}.card{position:relative;height:120px;border:1px solid #ddd;padding:16px;margin-top:900px}
