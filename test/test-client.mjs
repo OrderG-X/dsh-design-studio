@@ -247,5 +247,79 @@ const tz = (k, v = {}) => ({ refText: '〔参考图〕{path}（{w}×{h}，{tone}
 const txt = formatRef(tz, { path: '/d/refs/a.png', w: 1280, h: 800, palette: { light: true, colors: [{ hex: '#F4EDE4', share: 0.7 }, { hex: '#E8572A', share: 0.004, accent: true }] }, hasDesign: true })
 check('参考图文字：路径、尺寸、颜色、怎么用', txt === '〔参考图〕/d/refs/a.png（1280×800，整体偏浅）\n主要颜色：#F4EDE4 70%、#E8572A 1%（点缀）\n改现在的\n', JSON.stringify(txt))
 
+// ── check_design：体检结果交回给模型的那段字 ──
+const { formatCheckTool } = mod._test
+const tk = (k, v = {}) => ({ ckToolHead: '量了 {s} 屏，发现 {n} 个问题：', ckToolOk: '量了 {s} 屏（{labels}），没发现问题。', ckToolErr: '{label}：没量成（{msg}）', ckScreen: '{label}（{where}）', ckItem: '{i}. {type}：{where}{text} — {detail}', ckQuote: '「{text}」', ck_tap: '点击区太小', cd_tap: '{w}×{h}' }[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '')
+const ckSt = { target: { kind: 'file', file: '/d/home.html', root: '/d' } }
+const ok = formatCheckTool(tk, [{ label: 'home', url: 'http://127.0.0.1:9/home.html', issues: [] }, { label: 'menu', url: 'http://127.0.0.1:9/menu.html', issues: [] }], ckSt)
+check('check_design：没问题就一句话，带量了哪几屏', ok === '量了 2 屏（home / menu），没发现问题。', ok)
+const bad = formatCheckTool(tk, [
+  { label: 'home', url: 'http://127.0.0.1:9/home.html', issues: [{ type: 'tap', sel: 'button.go', text: '搜', w: 26, h: 26 }] },
+  { label: 'cart', url: 'http://127.0.0.1:9/cart.html', issues: [], error: '页面没加载出来' },
+], ckSt)
+check('check_design：有问题按屏列出文件、选择器、数字', bad.startsWith('量了 2 屏，发现 1 个问题：') && bad.includes('home（文件：/d/home.html）') && bad.includes('1. 点击区太小：button.go「搜」 — 26×26'), bad)
+check('check_design：没量成的屏也说一声', bad.includes('cart：没量成（页面没加载出来）'), bad)
+
+// ── 同一屏的几个版本：画布上「就要这个」 ──
+const { takesOf } = mod._test
+const dirs = ['home-a.html', 'home-b.html', 'home-c.html', 'menu.html']
+check('三个方向：选 B，其他两个是同组', JSON.stringify(takesOf(dirs, 'home-b.html')) === JSON.stringify({ stem: 'home', letter: 'b', others: ['home-a.html', 'home-c.html'] }), JSON.stringify(takesOf(dirs, 'home-b.html')))
+check('不是版本的屏没有这个按钮', takesOf(dirs, 'menu.html') === null && takesOf(['menu-a.html', 'home.html'], 'menu-a.html') === null)
+const takes = ['login.html', 'login-b.html', 'login-c.html']
+check('「再出两版」：选新版，原版也挪走', JSON.stringify(takesOf(takes, 'login-c.html').others) === JSON.stringify(['login.html', 'login-b.html']) && takesOf(takes, 'login-c.html').stem === 'login')
+check('「再出两版」：留原版', takesOf(takes, 'login.html').letter === '' && takesOf(takes, 'login.html').others.length === 2)
+check('开发服务器的路由不算', takesOf(['/a', '/a-b'], '/a-b') === null)
+
+// ── 调样式：面板上的数、交给模型的那段字 ──
+const { pxOf, styleChanges, formatStyleAsk } = mod._test
+const toks = [{ name: '--r-md', value: '12px' }, { name: '--fs-lg', value: '1.25rem' }]
+check('调样式：px / rem / 设计变量都换成像素', pxOf('17px') === 17 && pxOf('var(--fs-lg)', toks) === 20 && pxOf(' var( --r-md ) ', toks) === 12 && pxOf('auto') === null && pxOf('var(--nope)', toks) === null)
+const ts = (k, v = {}) => ({ styleArrow: '{prop} {from} → {to}', styleFont: '字号', stylePadY: '上下内边距', styleRadius: '圆角', styleJoin: '；',
+  styleAskText: '〔调样式〕{name}（{sel}）：{list}。改进样式表。\n{where}\n' }[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '')
+const sty = { name: 'button.go', selector: 'main > button.go', url: 'http://127.0.0.1:9/home.html', base: { 'font-size': '15px', 'padding-top': '10px', 'padding-bottom': '10px', 'border-radius': '8px' },
+  live: { 'font-size': '17px', 'padding-top': '14px', 'padding-bottom': '14px', 'border-radius': 'var(--r-md)' } }
+check('调样式：改了的几项，上下内边距只说一次', JSON.stringify(styleChanges(ts, sty)) === JSON.stringify(['字号 15px → 17px', '上下内边距 10px → 14px', '圆角 8px → var(--r-md)']), JSON.stringify(styleChanges(ts, sty)))
+const tsBg = (k, v) => ts(k === 'styleBg' ? '背景' : k === 'styleClear' ? '透明' : k, v)
+check('调样式：没设背景（透明）说透明，不说成 #000000', JSON.stringify(styleChanges(tsBg, { base: { background: 'rgba(0, 0, 0, 0)' }, live: { background: 'var(--brand)' } })) === JSON.stringify(['背景 透明 → var(--brand)']),
+  JSON.stringify(styleChanges(tsBg, { base: { background: 'rgba(0, 0, 0, 0)' }, live: { background: 'var(--brand)' } })))
+{
+  const { pageOf } = mod._test
+  const sc = { key: 'a.html', url: 'http://127.0.0.1:9/a.html' }
+  check('调样式 / 改字：预览里跳到 b.html 再改 → 写 b.html（不写原来那屏）', JSON.stringify(pageOf(sc, 'http://127.0.0.1:9/b.html#top')) === JSON.stringify({ key: 'b.html', url: 'http://127.0.0.1:9/b.html' }))
+  check('调样式 / 改字：别的源、旧版本、不是 .html、没带地址 → 还是这一屏', ['http://evil.test/b.html', 'http://127.0.0.1:9/__dsh_design__/v/3/b.html', 'http://127.0.0.1:9/data.json', undefined].every((h) => pageOf(sc, h).key === 'a.html'))
+  check('调样式 / 改字：中文文件名解码', pageOf(sc, 'http://127.0.0.1:9/%E8%AF%A6%E6%83%85.html').key === '详情.html')
+}
+const ask = formatStyleAsk(ts, sty, { target: { kind: 'file', file: '/d/home.html', root: '/d' } })
+check('调样式：交给模型的字带元素、选择器、改动和文件', ask.startsWith('〔调样式〕button.go（main > button.go）：字号 15px → 17px；上下内边距 10px → 14px；圆角 8px → var(--r-md)。') && ask.includes('/d/home.html'), ask)
+{
+  const own = { ruleFrom: '- {props}：现在由 {sel} 决定（{at}）', ruleInline: '- {props}：现在写在元素的行内 style 上{over}', ruleOver: '，盖过了 {sel}（{at}）', ruleAt: '{file} 第 {line} 行',
+    styleAskText: '〔调样式〕{name}（{sel}）：{list}。{rules}改进样式表。\n{where}\n' }
+  const tr = (k, v = {}) => (k in own ? own[k].replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '') : ts(k, v))
+  const H = 'http://127.0.0.1:9/'
+  const withRules = { ...sty, rules: {
+    'font-size': { sel: '.btn', href: H + 'app.css', n: 0 }, 'padding-top': { sel: '.btn', href: H + 'app.css', n: 0 }, 'padding-bottom': { sel: '.btn', href: H + 'app.css', n: 0 },
+    'border-radius': { inline: true, sel: 'main .go', href: H + 'home.html', n: 1 }, color: { sel: '.x', href: H + 'x.css', n: 0 },
+  } }
+  const located = new Map([[`${H}app.css|.btn|0`, { file: 'css/app.css', line: 42 }], [`${H}home.html|main .go|1`, null]])
+  const a2 = formatStyleAsk(tr, withRules, { target: { kind: 'file', file: '/d/home.html', root: '/d' } }, located)
+  check('调样式：同一条规则决定的几项合成一行，带文件和行号', a2.includes('\n- 字号、上下内边距：现在由 .btn 决定（css/app.css 第 42 行）'), a2)
+  check('调样式：行内 style 盖过规则的说清楚；没找到行号只写文件名', a2.includes('- 圆角：现在写在元素的行内 style 上，盖过了 main .go（home.html）'), a2)
+  check('调样式：没改的项（颜色）不列', !a2.includes('.x'), a2)
+  check('调样式：没有规则信息时和以前一样', formatStyleAsk(tr, sty, {}).includes('var(--r-md)。改进样式表'), formatStyleAsk(tr, sty, {}))
+}
+
+// ── 风格卡：配色都过对比度，交给模型的字带全套 ──
+const { STYLES, formatStyle } = mod._test
+const lum = (hex) => { const v = hex.slice(1).match(/../g).map((x) => parseInt(x, 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2] }
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
+const lowC = STYLES.flatMap((x) => [['text', x.c.text, x.c.bg], ['muted', x.c.muted, x.c.bg], ['muted', x.c.muted, x.c.surface], ['on', x.c.on, x.c.primary], ['link', x.c.link, x.c.bg], ['link', x.c.link, x.c.surface]]
+  .filter(([, a, b]) => ratio(a, b) < 4.5).map(([k, a, b]) => `${x.id}.${k} ${ratio(a, b).toFixed(2)}`))
+check('风格卡：九种，正文 / 次要文字 / 主色按钮上的字 / 链接色都 ≥ 4.5:1', STYLES.length === 9 && !lowC.length, lowC.join(', '))
+const tz2 = (k, v = {}) => ({ lang: 'zh', styleText: '〔风格〕{name}——{desc}\n配色：{colors}\n字体：{fonts}\n形状：{shape}\n要点：{notes}\n{ask}', styleColors: '底色 {bg}，主色 {primary}{bgImage}', styleBgImage: '；叠 {v}',
+  styleFonts: '标题 {head}；正文 {body}', styleShape: '圆角 {r}px；阴影 {s}', styleStart: '照这个风格来做：', styleRestyle: '把现在的设计换成这个风格。\n' }[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '')
+const warm = formatStyle(tz2, STYLES.find((x) => x.id === 'warm'), false)
+check('风格卡：开局的字带名字、配色、字体、圆角、要点，最后让模型照着做', warm.startsWith('〔风格〕温暖手作——纸感底色') && warm.includes('底色 #F6EFE6，主色 #A9542A') && warm.includes('Songti SC') && warm.includes('圆角 16px') && warm.endsWith('照这个风格来做：'), warm)
+check('风格卡：换风格的字 + 玻璃的底色光斑', formatStyle(tz2, STYLES.find((x) => x.id === 'glass'), true).includes('；叠 radial-gradient') && formatStyle(tz2, STYLES[0], true).endsWith('把现在的设计换成这个风格。\n'))
+
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

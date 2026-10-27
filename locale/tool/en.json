@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Preview tool (other modes)",
-    "description": "Lets Standard, Creator and other modes use preview_page to open pages in the Design Studio sidebar. The Design mode has its own copy and ignores this switch."
+    "title": "Preview, check and look tools (other modes)",
+    "description": "Lets Standard, Creator and other modes use preview_page (open pages in the Design Studio sidebar), check_design (measure design problems at real sizes) and look_design (real-size screenshots for the model). The Design mode has its own copy and ignores this switch."
   }
 }

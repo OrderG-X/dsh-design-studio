@@ -47,6 +47,9 @@ fs.symlinkSync(path.join(tmp, 'secret.html'), path.join(site, 'sub', 'index.html
 // 纯函数
 check('injectPicker：插在 </body> 前', injectPicker('<body>x</body>').endsWith('<script src="/__dsh_design__/picker.js"></script></body>'))
 check('injectPicker：没有 body 就接在末尾', injectPicker('<p>x').endsWith('picker.js"></script>'))
+check('injectPicker：报错记录放在 <head> 最前（比页面脚本早）', injectPicker('<!doctype html><html><head><script>boom()</script></head><body></body></html>').startsWith('<!doctype html><html><head><script>(()=>{if(window.__dshErrs)'))
+check('injectPicker：没写 <head> 时放在 doctype 后面（不进怪异模式）', injectPicker('<!DOCTYPE html><p>x').startsWith('<!DOCTYPE html><script>(()=>{'))
+check('injectPicker：<header> 不当成 <head>', injectPicker('<!doctype html><header>h</header>').startsWith('<!doctype html><script>'))
 check('hostOk：本机名 + 自己端口', hostOk('127.0.0.1:5000', 5000) && hostOk('localhost:5000', 5000) && !hostOk('evil.com:5000', 5000) && !hostOk('127.0.0.1:5001', 5000))
 check('resolveInRoot：../ 跳不出去（被夹回根目录里）', resolveInRoot(site, '/../secret.txt').abs === path.join(site, 'secret.txt'))
 check('resolveInRoot：软链接指到外面 → 拒', resolveInRoot(site, '/leak.txt') === null)

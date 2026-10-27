@@ -2,7 +2,7 @@
 
 ## 画幅
 
-- 手机按 390×844（iPhone 15/16）设计，页面宽度就写满 390，不要居中一个小盒子。`<meta name="viewport" content="width=device-width,initial-scale=1">`。
+- 手机按 390×844（iPhone 15/16）设计，页面宽度跟着视口走（`width: 100%`），不要居中一个小盒子。`<meta name="viewport" content="width=device-width,initial-scale=1">`。别写死 `width: 390px`、也别给 body 加 `max-width` 再居中：工作台已经按 390 宽显示、套好手机外框，多尺寸视图还会拿 375 / 430 宽来看，写死就露馅。也别为了这个另开浏览器截图——要检查就调 `check_design`。
 - 顶部 54px 是状态栏 + 灵动岛：自己画一条状态栏（时间 9:41、信号、电量），中间空着——灵动岛预览的外框会画，页面里别再画一个（不然换尺寸看时会出现两个）。内容从 54px 以下开始。
 - 底部 34px 是横条（home indicator）区：底部的标签栏 / 按钮要把它让出来（标签栏总高约 83px）。
 - 左右边距 16–24px；卡片之间 12–16px。

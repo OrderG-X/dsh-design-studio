@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, urlFor, labelOf, parseKind, parseSize, listScreens } from '../lib/core.js'
+import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, setStyle, mergeStyle, cleanCss, urlFor, labelOf, parseKind, parseSize, listScreens, findRule } from '../lib/core.js'
 
 let pass = 0
 let fail = 0
@@ -87,6 +87,20 @@ check('改完 → writing 清掉', tracker.snapshot(SID).writing === '')
 
 tracker.changed(site)
 check('目录有改动 → rev 变大', tracker.snapshot(SID).rev >= 2)
+check('没说改了哪些 → changedFiles 是空的', Array.isArray(tracker.snapshot(SID).changedFiles) && tracker.snapshot(SID).changedFiles.length === 0)
+tracker.changed(site, ['style.css', 'img/a.png', 3])
+check('改了哪些文件跟着状态带给右侧栏（远程看按它重新打包）', JSON.stringify(tracker.snapshot(SID).changedFiles) === '["style.css","img/a.png"]')
+tracker.changed(site, ['a.html'])
+tracker.changed(site, ['b.html'])
+{
+  const ch = tracker.snapshot(SID).changes
+  const last = ch.slice(-2)
+  check('两次轮询之间来了两批改动：两批都记着（带递增序号）', last.length === 2 && last[0].files[0] === 'a.html' && last[1].files[0] === 'b.html' && last[1].n === last[0].n + 1, JSON.stringify(ch))
+  for (let i = 0; i < 30; i++) tracker.changed(site, ['x.css'])
+  check('改动记录只留最近 20 批', tracker.snapshot(SID).changes.length === 20)
+  tracker.changed(site, Array.from({ length: 51 }, (_, i) => `f${i}.css`))
+  check('一批改了 51 个文件：不列（空的 = 整屏刷新，别只列一半漏掉）', tracker.snapshot(SID).changedFiles.length === 0 && tracker.snapshot(SID).changes.slice(-1)[0].files.length === 0)
+}
 
 bash('npm run dev', '  VITE v5 ready\n  ➜  Local:   http://localhost:5173/')
 await wait()
@@ -111,7 +125,15 @@ check('模型指定了目标后，再写别的 HTML 也不跳', tracker.snapshot
 await tracker.setTarget(SID, parseTarget('8080'), { source: 'user', popup: false })
 check('用户自己输入地址 → 不触发弹出', tracker.snapshot(SID).openRev === before)
 
+// 模型用提问卡问用户：等回答时右侧栏不转圈；答完接着干活
+ev('tool/call', { callId: 'ask1', name: 'ask_user_question', arguments: JSON.stringify({ questions: [] }) })
+check('模型问了用户 → asking', tracker.snapshot(SID).asking === true)
+result('答：温暖手作', undefined, 'ask1')
+check('用户答完 → 不再 asking', tracker.snapshot(SID).asking === false)
+ev('tool/call', { callId: 'ask2', name: 'ask_user_question', arguments: '{}' })
 ev('turn/end', { reason: { kind: 'completed' } })
+check('回合结束（比如用户点了停止）→ 不再 asking', tracker.snapshot(SID).asking === false)
+check('干完一轮 → turns 加一（右侧栏靠它自动体检）', tracker.snapshot(SID).turns === 1, tracker.snapshot(SID).turns)
 check('回合结束 → turn=false', tracker.snapshot(SID).turn === false)
 
 // 重放历史：老事件不动手
@@ -121,7 +143,9 @@ t2.observe('s2', { type: 'turn/start', time: old, data: { turn: 1 } })
 t2.observe('s2', { type: 'tool/call', time: old, data: { turn: 1, name: 'write', arguments: JSON.stringify({ file_path: index }) } })
 t2.observe('s2', { type: 'tool/result', time: old, data: { turn: 1, message: { content: [{ type: 'text', text: 'http://localhost:5173' }] } } })
 await wait()
+t2.observe('s2', { type: 'turn/end', time: old, data: { turn: 1 } })
 check('重放历史 → 不自动预览、不显示在干活', t2.snapshot('s2').target === null && t2.snapshot('s2').turn === false)
+check('重放历史的回合不算「又干完一轮」', t2.snapshot('s2').turns === 0)
 
 // 相对路径：按工具的工作目录
 const t3 = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:2' }) })
@@ -295,7 +319,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 for (const f of ['login.html', 'home.html', 'detail.html']) { fs.writeFileSync(path.join(appDir, f), '<p>' + f); await sleep(15) }
 fs.writeFileSync(path.join(appDir, 'app.css'), 'p{}')
 fs.writeFileSync(path.join(appDir, '.draft.html'), 'x')
-check('几屏：只要 HTML、跳过隐藏文件、按创建顺序', JSON.stringify(listScreens(appDir)) === JSON.stringify(['login.html', 'home.html', 'detail.html']), JSON.stringify(listScreens(appDir)))
+fs.writeFileSync(path.join(appDir, '_probe.html'), 'x')
+check('几屏：只要 HTML、跳过隐藏文件和 _ 开头的临时文件、按创建顺序', JSON.stringify(listScreens(appDir)) === JSON.stringify(['login.html', 'home.html', 'detail.html']), JSON.stringify(listScreens(appDir)))
 
 const t7 = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:7' }) })
 await t7.setTarget('s7', parseTarget(path.join(appDir, 'login.html')), { source: 'tool', kind: 'phone' })
@@ -320,6 +345,15 @@ fs.writeFileSync(path.join(appDir, 'plan-b.html'), '<p>没有 plan.html')
 t7.changed(appDir)
 check('没有原版的 -b 文件照常排最后', t7.snapshot('s7').screens.at(-1).key === 'plan-b.html')
 for (const f of ['home-b.html', 'home-c.html', 'plan-b.html']) fs.rmSync(path.join(appDir, f))
+t7.changed(appDir)
+// 开局的三个方向：c 比 b 先写完，画布上照样排成 a、b、c
+for (const f of ['dir-a.html', 'dir-c.html', 'dir-b.html']) {
+  await sleep(15)
+  fs.writeFileSync(path.join(appDir, f), `<p>${f}`)
+  t7.changed(appDir)
+}
+check('三个方向不管谁先写完，都按 a、b、c 挨着排', t7.snapshot('s7').screens.map((x) => x.key).slice(-3).join(',') === 'dir-a.html,dir-b.html,dir-c.html', t7.snapshot('s7').screens.map((x) => x.key).join(','))
+for (const f of ['dir-a.html', 'dir-b.html', 'dir-c.html']) fs.rmSync(path.join(appDir, f))
 t7.changed(appDir)
 await t7.setView('s7', { view: 'canvas', kind: 'poster', size: '1080x1920' })
 s = t7.snapshot('s7')
@@ -388,6 +422,59 @@ check('改字：这轮干完又能改', tE.editText('sE', { key: 'b.html', befor
 await tE.setTarget('sE', parseTarget('5173'), { source: 'tool' })
 check('改字：开发服务器不在这里改', tE.editText('sE', { key: '/', before: 'x', after: 'y' }).reason === 'not-file')
 
+// ── 调样式：找到元素的开头标签，并进 style 属性 ──
+const page = '<!doctype html><head><style>.btn{}</style><script>if (a<b) document.write("<button class=btn>")</script></head><body>' +
+  '<!-- <button class="btn primary"> --><button class="btn primary">A</button>\n<button\n  class="btn" style="color: red; background-image: url(data:x;base64,AA)">B</button>' +
+  '<template><button class="btn">t</button></template><img src=a.png/><img src="b.png" /></body>'
+let ss = setStyle(page, { tag: 'button', n: 0, total: 2, cls: ['btn', 'primary', 'active'] }, { 'border-radius': '16px', 'font-size': '17px' })
+check('调样式：按第几个找到，注释 / 脚本 / 模板里的不算；页面脚本加的类不碍事', ss.ok && ss.html.includes('<button class="btn primary" style="border-radius: 16px; font-size: 17px">A'), JSON.stringify(ss))
+ss = setStyle(page, { tag: 'button', n: 1, total: 2, cls: ['btn'] }, { background: 'var(--brand)', color: '' })
+check('调样式：并进原来的 style，写 background 去掉 background-image，空值 = 去掉那条', ss.ok && ss.html.includes('<button\n  class="btn" style="background: var(--brand)">B'), JSON.stringify(ss))
+check('调样式：页面上多了脚本加的元素 → 只认类和 id 完全一样、只有一个的', setStyle(page, { tag: 'button', n: 3, total: 5, cls: ['btn', 'primary'] }, { color: '#fff' }).ok === true &&
+  setStyle(page, { tag: 'button', n: 0, total: 5, cls: ['card'] }, { color: '#fff' }).reason === 'not-found')
+check('调样式：第几个对上了但类对不上 → 不改', setStyle(page, { tag: 'button', n: 0, total: 2, cls: ['other'] }, { color: '#fff' }).reason === 'not-found')
+ss = setStyle(page, { tag: 'img', n: 0, total: 2, cls: [] }, { 'border-radius': '8px' })
+check('调样式：src=a.png/ 的 / 是属性值，不当自闭合', ss.ok && ss.html.includes('<img src=a.png/ style="border-radius: 8px">'), JSON.stringify(ss))
+ss = setStyle(page, { tag: 'img', n: 1, total: 2, cls: [] }, { 'border-radius': '8px' })
+check('调样式：自闭合标签写在 / 前面', ss.ok && ss.html.includes('<img src="b.png" style="border-radius: 8px" />'), JSON.stringify(ss))
+check('调样式：只收那几项、值里不许有引号分号尖括号', cleanCss({ color: 'red"><script>', position: 'fixed', 'font-size': '17px', background: 'url(x.png)' }) !== null &&
+  JSON.stringify(cleanCss({ color: 'red"><script>', position: 'fixed', 'font-size': '17px', background: 'url(x.png)' })) === '{"font-size":"17px"}' && cleanCss({ position: 'fixed' }) === null)
+check('调样式：url(data:…;…) 里的分号不拆', mergeStyle('background: url(data:a;b) ; color: red', { color: 'blue' }) === 'background: url(data:a;b); color: blue')
+// Astra 审查的几种：大写 <SCRIPT> 里的字符串、实体、自定义属性大小写、同名的几条
+ss = setStyle('<SCRIPT>document.body.innerHTML = "<button class=\'cta\'>买</button>";</SCRIPT><button class="cta">买</button>', { tag: 'button', n: 0, total: 1, cls: ['cta'] }, { color: 'red' })
+check('调样式：大写 <SCRIPT> 里的标签也不算', ss.ok && ss.html.startsWith('<SCRIPT>document.body.innerHTML = "<button class=\'cta\'>买</button>";</SCRIPT>') && ss.html.endsWith('<button class="cta" style="color: red">买</button>'), JSON.stringify(ss))
+ss = setStyle('<p style="font-family: &quot;Arial Black&quot;; --Brand: #f00; color: var(--Brand)">x</p>', { tag: 'p', n: 0, total: 1 }, { 'font-size': '18px' })
+check('调样式：原来 style 里的 &quot; 解开再转义一次，字体名不丢；--Brand 大小写不变', ss.ok && ss.html === '<p style="font-family: &quot;Arial Black&quot;; --Brand: #f00; color: var(--Brand); font-size: 18px">x</p>', JSON.stringify(ss))
+check('调样式：同名的几条只留一条（不然后面那条还会盖掉）', mergeStyle('color: red; padding: 4px; color: blue', { color: 'green' }) === 'color: green; padding: 4px')
+
+fs.writeFileSync(path.join(editDir, 'c.html'), '<div class="card"><button class="go">去点单</button></div>')
+await tE.setTarget('sE', parseTarget(path.join(editDir, 'c.html')), { source: 'tool' })
+snaps.length = 0
+er = tE.editStyle('sE', { key: 'c.html', loc: { tag: 'button', n: 0, total: 1, cls: ['go'] }, css: { 'border-radius': '20px' }, name: 'button.go' })
+check('调样式：写回文件，改前改后各存一版', er.ok && fs.readFileSync(path.join(editDir, 'c.html'), 'utf8').includes('<button class="go" style="border-radius: 20px">') &&
+  JSON.stringify(snaps) === JSON.stringify(['', '调样式「button.go」']), JSON.stringify([er, snaps]))
+check('调样式：找不到元素就说找不到（右侧栏改成交给模型）', tE.editStyle('sE', { key: 'c.html', loc: { tag: 'a', n: 0, total: 1 }, css: { color: 'red' } }).reason === 'not-found')
+check('调样式：目录外的文件不改', tE.editStyle('sE', { key: '../index.html', loc: { tag: 'p', n: 0, total: 1 }, css: { color: 'red' } }).reason === 'no-screen')
+// 别的会话预览同一个目录、它的模型正在干活：这边也不写（会被它整份重写盖掉）
+await tE.setTarget('sF', parseTarget(path.join(editDir, 'c.html')), { source: 'tool' })
+tE.observe('sF', { type: 'turn/start', time: Date.now(), data: {} })
+er = tE.editStyle('sE', { key: 'c.html', loc: { tag: 'button', n: 0, total: 1, cls: ['go'] }, css: { 'border-radius': '4px' } })
+check('调样式：同目录别的会话在干活 → busy', er.ok === false && er.reason === 'busy', JSON.stringify(er))
+tE.observe('sF', { type: 'turn/end', time: Date.now(), data: {} })
+// 经软链接打开同一个目录：也算同一个目录
+{
+  const link = path.join(path.dirname(editDir), 'edit-link')
+  try { fs.symlinkSync(editDir, link, 'dir') } catch { /* Windows 没权限建软链接就跳过 */ }
+  if (fs.existsSync(link)) {
+    await tE.setTarget('sG', parseTarget(path.join(link, 'c.html')), { source: 'tool' })
+    tE.observe('sG', { type: 'turn/start', time: Date.now(), data: {} })
+    er = tE.editStyle('sE', { key: 'c.html', loc: { tag: 'button', n: 0, total: 1, cls: ['go'] }, css: { 'border-radius': '4px' } })
+    check('调样式：别的会话经软链接开着同一个目录在干活 → busy', er.ok === false && er.reason === 'busy', JSON.stringify(er))
+    tE.observe('sG', { type: 'turn/end', time: Date.now(), data: {} })
+  }
+}
+check('调样式：它干完又能写', tE.editStyle('sE', { key: 'c.html', loc: { tag: 'button', n: 0, total: 1, cls: ['go'] }, css: { 'border-radius': '4px' } }).ok === true)
+
 // 预览服务器被关了（开的太多，旧的先关）：轮询状态时发现没了就重开，地址换成新的
 {
   const live = new Set()
@@ -416,6 +503,27 @@ check('改字：开发服务器不在这里改', tE.editText('sE', { key: '/', b
   await wait()
   const s2 = tR.snapshot('sR')
   check('重开：原来的端口要不到 → 换成新地址', s2.origin !== first && live.has(s2.origin) && s2.url.startsWith(s2.origin + '/') && s2.screens.every((x) => x.url.startsWith(s2.origin)), JSON.stringify(s2))
+}
+
+// ── 调样式：从浏览器给的选择器找回源文件里的行号 ──
+{
+  const css = ['/* .title { } 注释里的不算 */', '.card{color:red}', '.card > .title {', '  font-size: 16px', '}', '@media (max-width: 600px) {', '  .card>.title { font-size: 14px }', '}',
+    'h1, h2 .sub { margin: 0 }', 'li:nth-of-type(2n+1)::before { content: "" }', '.title { color: blue }', 'a[href="x"] { }'].join('\n')
+  check('找行号：子选择器，第 1 条', findRule(css, '.card > .title', 0) === 3, String(findRule(css, '.card > .title', 0)))
+  check('找行号：同一个选择器第 2 条（媒体查询里的，空格写法不同）', findRule(css, '.card > .title', 1) === 7)
+  check('找行号：选择器列表', findRule(css, 'h1, h2 .sub', 0) === 9)
+  check('找行号：伪类 / 伪元素（单冒号双冒号都认）', findRule(css, 'li:nth-of-type(2n+1)::before', 0) === 10 && findRule(css.replace('::before', ':before'), 'li:nth-of-type(2n+1)::before', 0) === 10)
+  check('找行号：.title 不会认成 .card > .title 的尾巴，也不认注释里的', findRule(css, '.title', 0) === 11)
+  check('找行号：属性选择器引号写法不同也认', findRule(css, 'a[href=x]', 0) === 12 || findRule(css, 'a[href="x"]', 0) === 12)
+  check('找行号：找不到给 0', findRule(css, '.nope', 0) === 0 && findRule(css, '.card > .title', 5) === 0)
+  const html = '<!doctype html>\n<html><head>\n<style>.go{padding:10px}\nmain .go { font-size: 15px }</style>\n</head><body><main><button class="go">x</button></main></body></html>'
+  const t0 = Date.now()
+  const evil = findRule('a{}'.repeat(10) + '"'.repeat(20), '[x=' + '""'.repeat(14) + ']', 0)
+  check('找行号：一串引号的怪选择器也马上返回（不会卡死）', evil === 0 && Date.now() - t0 < 200, `${Date.now() - t0}ms`)
+  check('找行号：大小写照原样比（.btn 不认 .Btn）', findRule('.Btn { }\n.btn { }', '.btn', 0) === 2)
+  check('找行号：HTML 里脚本、正文中像 CSS 的字不算', findRule('<script>const s = ".go { x }"</script>\n<p>.go { }</p>\n<style>\n.go { }\n</style>', '.go', 0) === 4)
+  check('找行号：字符串里的大括号不打断', findRule('.a::after { content: "{" }\n.b { }', '.b', 0) === 2 && findRule('.a::after { content: "{" }', '.a::after', 0) === 1)
+  check('找行号：HTML 里 <style> 里的规则', findRule(html, '.go', 0) === 3 && findRule(html, 'main .go', 0) === 4, `${findRule(html, '.go', 0)} ${findRule(html, 'main .go', 0)}`)
 }
 
 fs.rmSync(tmp, { recursive: true, force: true })
