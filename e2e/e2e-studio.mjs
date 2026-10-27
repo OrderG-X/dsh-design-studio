@@ -2,7 +2,7 @@
  * 设计台真机测试：全新的 DSH 网页版 + 本地「假模型」+ 无头 Chrome，在官方界面里走一遍第一期的功能
  *   ① 打包、装进全新的 DSH
  *   ② 假模型调 preview_page 打开一个三屏的 App 设计 → 右侧栏出画布；再调 check_design → 无头浏览器按真实尺寸量完把清单交回给模型；
- *     调 look_design → 工具结果里带一张真实渲染的截图；
+ *     严重的问题附上局部截图；调 look_design → 工具结果里带一张真实渲染的截图；
  *     模型用提问卡问用户时，右侧栏提示「在等你回答」，答完就没了
  *   ③ 设计体检：首屏埋了四类问题（点击区、对比度、截断、小字），另两屏干净；点一条会定位；「交给模型修」把清单放进输入框，发出去模型收得到
  *   ④ 改好首屏后「再查一次」→ 没问题
@@ -130,6 +130,7 @@ function sse(res, blocks, stop) {
 const textOf = (m) => (typeof m.content === 'string' ? m.content : (m.content || []).map((c) => c.text || (c.type === 'tool_result' ? '[tool_result]' : '')).join(' '))
 let fixAsk = '' // 「交给模型修」发出去后模型收到的那段
 const selfChecks = [] // 模型调 check_design 拿回来的结果
+const selfCheckImgs = [] // 每次 check_design 结果里带了几张图（严重问题的局部截图）
 const looks = [] // 模型调 look_design 拿回来的（原样的 tool_result 内容：一段字 + 几张图）
 const resultOf = (m) => (Array.isArray(m.content) ? m.content : []).filter((c) => c.type === 'tool_result').map((c) => (typeof c.content === 'string' ? c.content : (c.content || []).map((x) => x.text || '').join(''))).join('\n')
 const llm = http.createServer((req, res) => {
@@ -146,7 +147,11 @@ const llm = http.createServer((req, res) => {
     if (!agent) return sse(res, [{ type: 'text', text: '咖啡 App' }], 'end_turn')
     const said = textOf(last)
     if (said.includes('[tool_result]')) {
-      if ((last.content || []).some((c) => c.type === 'tool_result' && String(c.tool_use_id || '').startsWith('toolu_e2e_check'))) selfChecks.push(resultOf(last))
+      const ck = (last.content || []).find((c) => c.type === 'tool_result' && String(c.tool_use_id || '').startsWith('toolu_e2e_check'))
+      if (ck) {
+        selfCheckImgs.push(Array.isArray(ck.content) ? ck.content.filter((c) => c.type === 'image' && c.source && /jpe?g/.test(c.source.media_type || '') && (c.source.data || '').length > 1000).length : 0)
+        selfChecks.push(resultOf(last))
+      }
       const look = (last.content || []).find((c) => c.type === 'tool_result' && c.tool_use_id === 'toolu_e2e_look')
       if (look) looks.push(look.content)
       return sse(res, [{ type: 'text', text: '好了。' }], 'end_turn')
@@ -324,6 +329,7 @@ try {
   const self1 = await waitFor(() => selfChecks[0], 40000)
   check('模型调 check_design，量完把清单交回', self1 && /量了 3 屏.*发现 4 个问题/.test(self1), self1 || JSON.stringify(llmLog.slice(-3)))
   check('清单里有首屏和四类问题，另两屏没有', !!self1 && JSON.stringify(flagged(self1)) === '["home.html"]' && ['点击区太小', '对比度不够', '文字被截断', '字太小'].every((x) => self1.includes(x)), self1)
+  check('严重问题附了局部截图，清单里写看图几', selfCheckImgs[0] >= 1 && /附了 \d+ 张局部截图/.test(self1 || '') && /看图 1/.test(self1 || ''), `${selfCheckImgs[0]} 张；${self1}`)
   if (self1) console.log(`  （check_design：${self1.split('\n')[0]}）`)
 
   // ②b' 模型要看真实像素：调 look_design → 工具结果里带一张 JPEG 图交给模型
@@ -458,7 +464,8 @@ try {
   // ⑥ 首页再出一版 → home-b 紧挨着首页；点它的「就要这个」→ 输入框里是〔选定方向〕
   await say('MAKE-TAKE 首页再出一版')
   const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
-  check('再出的一版紧挨着原版', /首页,首页 B/.test(order || '') || /home,home-b/.test(order || ''), order)
+  // 标签是页面标题，标题没载出来时先显示文件名：两种都认
+  check('再出的一版紧挨着原版', /(首页|home),(首页 B|home-b)(,|$)/.test(order || ''), order)
   // 先点一下那一屏选中它（按钮在选中的那屏标签旁）
   // （那一屏可能在画面外，鼠标点不到，直接发 pointer 事件：按在那屏上、在窗口上松开）
   await page(`(() => {

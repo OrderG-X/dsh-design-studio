@@ -4,14 +4,15 @@
  *
  * 尺寸、类型、挑屏、给模型的字（look.js）；找浏览器、CDP 管道收发（browser.js，用假的浏览器进程）；
  * 两个工具走无头浏览器、没有浏览器时的说法、截图存进附件库；
- * 本机装着 Chrome / Edge 时再真开一回：底栏压住最后一行、脚本报错、缺样式表、固定栏离内容多远、真截图、元素裁剪、深色
+ * 体检附严重问题的局部截图（挑哪几条、图号写进清单）；
+ * 本机装着 Chrome / Edge 时再真开一回：底栏压住最后一行、脚本报错、缺样式表、固定栏离内容多远、真截图、元素裁剪、深色、问题附图
  */
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { PassThrough, Writable } from 'node:stream'
-import { parseMeta, sizeOf, designOf, metaOfFile, pickScreens, scaleFor, formatMeasure, issueSnapshot, formatShots, detailOf, measureAll, shootAll } from '../lib/look.js'
+import { parseMeta, sizeOf, designOf, metaOfFile, pickScreens, scaleFor, formatMeasure, issueSnapshot, formatShots, detailOf, measureAll, shootAll, pickCrops, cropIssues } from '../lib/look.js'
 import { findBrowser, frameReader, createBrowser } from '../lib/browser.js'
 import { checkTool, lookTool, studio } from '../lib/index.js'
 import { createHub } from '../lib/serve.js'
@@ -45,8 +46,9 @@ check('挑屏：不给就全部', pickScreens(snap, [], 12).list.length === 3)
 check('挑屏：超过上限的数出来', pickScreens(snap, [], 2).more === 1)
 check('挑屏：单页预览（没有 screens）就是那一页', pickScreens({ url: 'http://x/a', focus: '/a', screens: [] }, [], 12).list[0].url === 'http://x/a')
 check('截图缩放：手机放大到长边约 1568，网页 1.23 倍，大图不缩', scaleFor(390, 844) === 1.86 && scaleFor(1280, 800) === 1.23 && scaleFor(3000, 3000) === 1)
-check('问题细节：底栏压住', /滚到底还被底栏 nav 压住 52px/.test(detailOf({ type: 'covered', edge: 'bottom', bar: 'nav', px: 52 })))
+check('问题细节：底栏压住，给出底部至少再留多少（压住的 + 16）', /滚到底还被底栏 nav 压住 52px（给内容留出栏的高度：底部至少再留 68px，用 padding-bottom/.test(detailOf({ type: 'covered', edge: 'bottom', bar: 'nav', px: 52 })))
 check('问题细节：脚本报错带文件和行号', detailOf({ type: 'jserr', msg: 'x is not defined', src: 'app.js', line: 3 }) === 'x is not defined（app.js:3）')
+check('问题细节：叠字带可能的原因（负 margin / 绝对定位）', detailOf({ type: 'overlap', other: 'p.a', otherText: '作者', cause: { sel: '.row', prop: 'margin-top', value: '-26px' } }).endsWith('（可能是 .row 的 margin-top: -26px）') && /\.price 用了绝对定位 position: absolute/.test(detailOf({ type: 'overlap', other: 'x', cause: { sel: '.price', prop: 'position', value: 'absolute' } })))
 check('问题细节：缺样式表', /样式表 a\.css 载不出来/.test(detailOf({ type: 'missing', what: 'css', src: 'a.css' })))
 {
   const m = (page, bars = []) => ({ w: 390, h: 844, page, bars, areas: 0 })
@@ -78,6 +80,33 @@ check('问题细节：缺样式表', /样式表 a\.css 载不出来/.test(detail
   ], { sizes: [[390, 844], [375, 667]], prev })
   check('复查：比上次修好 3 个（两种尺寸的点击区 + 压住），新出 1 个，新的标「新」', again.includes('比上次（同样的屏和尺寸）：修好 3 个，新出 1 个') && /\[新\] \[375×667\] 离固定栏太近/.test(again), again)
   check('复查：第一次量没有「比上次」', !text.includes('比上次'), text)
+}
+{
+  // 体检附图：挑严重的、有元素的；先每屏每类一条、同类里最重的；同一个问题几种尺寸只截第一种；同一个元素只截一次
+  const cov = (sel, px) => ({ type: 'covered', sev: 2, sel, text: sel, edge: 'bottom', bar: 'nav', px })
+  const rows = [
+    { key: 'a.html', w: 390, h: 844, issues: [cov('li.x', 10), cov('li.y', 60), { type: 'tap', sev: 1, sel: 'a' }, { type: 'jserr', sev: 2, sel: '', msg: 'x' }] },
+    { key: 'a.html', w: 375, h: 667, issues: [cov('li.y', 60), { type: 'overlap', sev: 2, sel: 'li.y', other: 'b', otherSel: 'b' }, { type: 'contrast', sev: 1, sel: 'p' }] },
+    { key: 'b.html', w: 390, h: 844, issues: [{ type: 'clipped', sev: 2, sel: '.t', px: 9 }, { type: 'contrast', sev: 2, sel: '.f', ratio: 1.4, need: 4.5 }, { type: 'img', sev: 2, sel: 'img' }] },
+    { key: 'b.html', w: 375, h: 667, error: 'timeout', issues: [{ type: 'covered', sev: 2, sel: 'x', px: 99 }] },
+  ]
+  const picks = pickCrops(rows, 4).map((c) => `${c.row.key}@${c.row.w} ${c.it.type} ${c.it.sel}`)
+  check('附图挑选：压住类先截最重的；同一个元素不截两次；轻的、没元素的、没量成的不截；先每屏每类一条再按顺序补', JSON.stringify(picks) === JSON.stringify(['a.html@390 covered li.y', 'b.html@390 clipped .t', 'b.html@390 img img', 'b.html@390 contrast .f']), JSON.stringify(picks))
+  check('附图挑选：只要一张就截最要紧的那条', pickCrops(rows, 1).length === 1 && pickCrops(rows, 1)[0].it.sel === 'li.y')
+  const at = (y, x = 16) => ({ x, y, w: 120, h: 20 })
+  const near = pickCrops([{ key: 'a.html', w: 390, h: 844, issues: [{ ...cov('li.x', 10), rect: at(800) }, { ...cov('li.y', 60), rect: at(820) }, { ...cov('li.z', 30), rect: at(300) }, { ...cov('li.w', 20), rect: at(810, 250) }] }], 4)
+  check('附图挑选：挨着的（上下差不到 48px）不另截，记在那张图上；远的另截', JSON.stringify(near.map((c) => [c.it.sel, c.also.map((x) => x.it.sel)])) === '[["li.y",["li.w","li.x"]],["li.z",[]]]', JSON.stringify(near.map((c) => [c.it.sel, c.also.map((x) => x.it.sel)])))
+  const fill = pickCrops([{ key: 'a.html', w: 390, h: 844, issues: [cov('li.x', 10), cov('li.y', 60), cov('li.z', 30)] }], 4).map((c) => c.it.sel)
+  check('附图挑选：只有一类、没有位置时按轻重补满', JSON.stringify(fill) === '["li.y","li.z","li.x"]', JSON.stringify(fill))
+  const crops = [{ n: 1, k: 'a.html|covered|li.y|li.y||', ks: ['a.html|covered|li.y|li.y||', 'a.html|covered|li.x|li.x||'], key: 'a.html', w: 390, h: 844, type: 'covered' }]
+  const t = formatMeasure(rows.slice(0, 2).map((r) => ({ ...r, metrics: null })), { sizes: [[390, 844], [375, 667]], crops })
+  // 同一个原因的两处叠字并成一条；附图写明谁画在上面
+  const ovA = { type: 'overlap', sev: 2, sel: '.price', text: '¥68', other: 'p.author', otherText: '石黑一雄', otherSel: 'p.author', cause: { sel: '.row', prop: 'margin-top', value: '-26px' } }
+  const ovB = { type: 'overlap', sev: 2, sel: 'p.author', text: '石黑一雄', other: 'span.fmt', otherText: '精装', otherSel: 'span.fmt', cause: { sel: '.row', prop: 'margin-top', value: '-26px' } }
+  const ovRows = [{ key: 'd.html', w: 390, h: 844, issues: [ovA, ovB], metrics: null }]
+  const ovText = formatMeasure(ovRows, { sizes: [[390, 844]], crops: [{ n: 1, k: 'd.html|overlap|.price|¥68||', ks: ['d.html|overlap|.price|¥68||'], key: 'd.html', w: 390, h: 844, type: 'overlap', upper: 'self' }] })
+  check('叠字：同一个原因的两处并成一条，问题数也按一个算；附图说谁画在上面、另一个是橙框', ovText.includes('发现 1 个问题') && (ovText.match(/^ {2}\d+\. /gm) || []).length === 1 && ovText.includes('p.author「石黑一雄」和 span.fmt「精装」也叠着，同一个原因（可能是 .row 的 margin-top: -26px）') && ovText.includes('（看图 1；「¥68」画在上面）') && ovText.includes('橙色虚线框'), ovText)
+  check('附图写进清单：开头说附了几张、红框是什么；那条后面写看图几（两种尺寸都有时写截的是哪种）；同在图里的那条也写', t.includes('严重的问题附了 1 张局部截图（图 1，真实渲染') && t.includes('红框是出问题的元素') && t.includes('把栏调成了半透明，透出下面被压住的字') && /li\.y「li\.y」 — 滚到底还被底栏 nav 压住 60px.*（看图 1，390×844）/.test(t) && /li\.x「li\.x」 — .*压住 10px.*（看图 1）/.test(t) && (t.match(/看图/g) || []).length === 2, t)
 }
 {
   const t = formatShots([
@@ -158,6 +187,7 @@ const pageEval = (opts = {}) => (expr) => {
   if (expr.includes('.check(')) return { issues: opts.issues || [], metrics: { w: 390, h: 844, page: 1200, bars: [{ edge: 'bottom', name: 'nav.tab', h: 83, gap: 12 }], areas: 0 } }
   if (expr.includes(".scroll('end')")) return { i: 0, of: 1 }
   if (expr.includes('.scroll(')) return { i: 0, of: pageEval.parts || 2, y: 0 }
+  if (expr.includes('.crop(')) return opts.crop === undefined ? null : opts.crop
   if (expr.includes('.rect(')) return opts.rect === undefined ? { x: 10, y: 700, w: 300, h: 80, vx: 0, vy: 0, vw: 390, vh: 844 } : opts.rect
   return null
 }
@@ -214,7 +244,7 @@ const pageEval = (opts = {}) => (expr) => {
   check('check_design：按指定尺寸量指定的几屏（App 类型是从页面 meta 认出来的）', r.text.includes('2 屏 × 2 种尺寸（375×667、430×932）') && r.text.includes('home.html「首页」') && r.text.includes('cart.html「首页」'), r.text)
   check('check_design：问题清单带数字，测量数字也在', r.text.includes('被固定栏压住：main li:last-child「最后一本」 — 滚到底还被底栏 nav.tab 压住 40px') && r.text.includes('底栏 nav.tab 高 83，滚到底时离内容 12px'), r.text)
   check('check_design：认不出的尺寸说出来', r.text.includes('认不出的尺寸（没量）：abc'), r.text)
-  const sizes = log.filter((x) => x.method === 'Emulation.setDeviceMetricsOverride').map((x) => `${x.params.width}x${x.params.height}`).sort()
+  const sizes = log.filter((x) => x.method === 'Emulation.setDeviceMetricsOverride' && x.params.deviceScaleFactor === 1).map((x) => `${x.params.width}x${x.params.height}`).sort()
   check('check_design：每屏 × 每种尺寸各开一个页面', JSON.stringify(sizes) === '["375x667","375x667","430x932","430x932"]', JSON.stringify(sizes))
   const r0 = await checkTool.execute({}, exec)
   check('check_design：不给尺寸按设计的尺寸量全部屏', r0.text.includes('3 屏 × 1 种尺寸（390×844）'), r0.text)
@@ -224,6 +254,26 @@ const pageEval = (opts = {}) => (expr) => {
   // look_design：图存进附件库，render 时一张张带上
   const saved = []
   const ctx = { get: (k) => (k === 'attachments' ? { saveImages: async (imgs) => imgs.map((x, i) => { saved.push(x); return { id: `att-${saved.length}-${i}` } }) } : null) }
+
+  // check_design 附图：严重的那条按发现时的尺寸重开、截那一块，图存进附件库，清单里写看图几
+  studio.browser.stop()
+  log.length = 0
+  studio.browser = createBrowser({ bin: '/fake/chrome', launch: fakeLaunch(log, pageEval({ issues: [issue], crop: { x: 0, y: 520, w: 375, h: 147 } })), idleMs: 30 })
+  const ck = await checkTool.execute({ sizes: ['375'], screens: ['home'] }, exec, ctx)
+  const ckBlocks = checkTool.output.render({}, ck)
+  const cropShot = log.filter((x) => x.method === 'Page.captureScreenshot').pop()
+  const cropMetrics = log.filter((x) => x.method === 'Emulation.setDeviceMetricsOverride').pop().params
+  check('check_design 附图：按截图缩放重开一页，截问题那一块', cropMetrics.width === 375 && cropMetrics.deviceScaleFactor === 2 && cropShot && JSON.stringify(cropShot.params.clip) === '{"x":0,"y":520,"width":375,"height":147,"scale":1}', JSON.stringify([cropMetrics, cropShot && cropShot.params]))
+  check('check_design 附图：图存进附件库、引用在结果里，render 出文字 + 图', Array.isArray(ck.images) && ck.images.length === 1 && ckBlocks.length === 2 && ckBlocks[1].type === 'image' && saved.length === 1 && saved[0].mediaType === 'image/jpeg', JSON.stringify(ck))
+  check('check_design 附图：清单里那条写「看图 1」', ck.text.includes('严重的问题附了 1 张局部截图') && /压住 40px.*（看图 1）/.test(ck.text), ck.text)
+  const evals = log.filter((x) => x.method === 'Runtime.evaluate' && x.params.expression.includes('.crop(')).map((x) => x.params.expression)
+  check('check_design 附图：告诉页面是滚到底被底栏压住的那个元素，红框上标「压住 40px」', evals.length === 1 && evals[0].includes('"sel":"main li:last-child"') && evals[0].includes('"edge":"bottom"') && evals[0].includes('"label":"压住 40px"'), JSON.stringify(evals))
+  log.length = 0
+  const noImg = await checkTool.execute({ sizes: ['375'], screens: ['home'], images: false }, exec, ctx)
+  check('check_design 附图：images=false 不截、不附', !noImg.images && !noImg.text.includes('看图') && !log.some((x) => x.method === 'Page.captureScreenshot'), noImg.text)
+  const noCtx = await checkTool.execute({ sizes: ['375'], screens: ['home'] }, exec)
+  check('check_design 附图：附件库用不了就不提图（清单照给）', !noCtx.images && !noCtx.text.includes('看图') && noCtx.text.includes('压住 40px'), noCtx.text)
+  saved.length = 0
   const lk = await lookTool.execute({ screens: ['home', 'cart'], at: 'bottom', size: '375' }, exec, ctx)
   const blocks = lookTool.output.render({}, lk)
   check('look_design：图存进附件库（JPEG），render 出文字 + 两张图', saved.length === 2 && saved[0].mediaType === 'image/jpeg' && blocks.length === 3 && blocks[1].type === 'image' && blocks[1].attachment.id === 'att-1-0', JSON.stringify(blocks))
@@ -278,6 +328,15 @@ li{padding:14px 0;list-style:none}.tab{position:absolute;left:0;right:0;bottom:0
   fs.writeFileSync(path.join(site, 'clean.html'), `<!doctype html><html><head><meta charset="utf-8"><title>干净</title>
 <style>body{margin:0;font:15px/1.4 sans-serif}main{padding:16px 16px 120px}nav{position:fixed;bottom:0;left:0;right:0;height:83px;background:#fafafa}nav a{display:inline-block;width:60px;height:48px}</style></head>
 <body><main>${Array.from({ length: 20 }, (_, i) => `<p>段落 ${i + 1}</p>`).join('')}<p>最后一段离底栏够远</p></main><nav><a href="home.html">首页</a></nav></body></html>`)
+  fs.writeFileSync(path.join(site, 'neg.css'), '/* 价格行 */\n.row { display: flex; gap: 8px }\n.row {\n  margin-top: -24px;\n}\n')
+  fs.writeFileSync(path.join(site, 'neg.html'), `<!doctype html><html><head><meta charset="utf-8"><title>负边距</title><link rel="stylesheet" href="neg.css">
+<style>body{margin:0;padding:24px;font:16px/1.4 sans-serif}</style></head><body><p class="author">石黑一雄 著 · 宋佥 译</p><div class="row"><span class="price">¥68</span><span>精装 392 页</span></div></body></html>`)
+  // 附图：名字和价格叠在一起、框里的字被截断
+  fs.writeFileSync(path.join(site, 'over.html'), `<!doctype html><html><head><meta charset="utf-8"><title>叠字</title>
+<style>body{margin:0;font:16px/1.4 sans-serif;padding:24px}.card{position:relative;height:120px;border:1px solid #ddd;padding:16px;margin-top:900px}
+.price{position:absolute;right:16px;top:20px;font-size:28px;font-weight:700}.name{font-size:22px}
+@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style></head>
+<body><h1>订单</h1><div class="card"><div class="name">超长的商品名称会和价格叠在一起</div><div class="price">¥1299</div></div></body></html>`)
   fs.writeFileSync(path.join(site, 'app.css'), ['/* 按钮 */', '.btn {', '  font-size: 15px;', '  padding: 10px 16px;', '}', '.btn { color: #333 }', '@media (min-width: 1px) {', '  .btn { padding-top: 12px }', '}', '.btn { border-radius: 4px !important }'].join('\n'))
   fs.writeFileSync(path.join(site, 'rules.html'), `<!doctype html><html><head><meta charset="utf-8"><title>规则</title>
 <link rel="stylesheet" href="app.css">
@@ -329,6 +388,15 @@ main .btn { font-size: 17px }
     check('真浏览器：留够了底边距的页面不报压住', !types(at('clean.html', 375)).includes('covered') && !types(at('clean.html', 375)).includes('tight'), JSON.stringify(at('clean.html', 375).issues))
     console.log(`  （量 6 个页面用了 ${Date.now() - t0}ms）`)
 
+    // 体检附图：按发现时的尺寸重开，滚到出问题的样子截那一块
+    const t1 = Date.now()
+    const crops = await cropIssues(b, rows, { screens, dark: false })
+    const cropOf = (key) => crops.find((c) => c.key === key)
+    const jpgOk = (c) => c && c.jpg && c.jpg[0] === 0xff && c.jpg[1] === 0xd8
+    check('真浏览器附图：底栏压住的、App 壳里压住的各截一张（375×667，截被压得最多的那行）', jpgOk(cropOf('home.html')) && cropOf('home.html').type === 'covered' && cropOf('home.html').w === 375 && cropOf('home.html').k.includes('最后一本') && jpgOk(cropOf('shell.html')) && cropOf('shell.html').type === 'covered', JSON.stringify(crops.map((c) => [c.n, c.key, c.type, c.w, c.k])))
+    check('真浏览器附图：同一处被压住的上一行（挨着）不另截，算在同一张图里', crops.filter((c) => c.key === 'home.html').length === 1 && cropOf('home.html').ks.length === 2 && cropOf('home.html').ks.some((k) => k.includes('第 12 本')), JSON.stringify(crops.map((c) => c.ks)))
+    console.log(`  （附图用了 ${Date.now() - t1}ms）`)
+
     const shots = await shootAll(b, { screens: screens.slice(0, 2), size: [375, 667], at: 'bottom' })
     const dim = (buf) => { for (let i = 2; i < buf.length - 9;) { const len = buf.readUInt16BE(i + 2); if (buf[i + 1] >= 0xc0 && buf[i + 1] <= 0xc2) return [buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5)]; i += 2 + len } return null }
     check('真浏览器：截图是 JPEG，按缩放放大（375×667 → 长边约 1568）', shots.length === 2 && shots.every((s) => s.jpg && s.jpg[0] === 0xff && s.jpg[1] === 0xd8) && JSON.stringify(dim(shots[0].jpg)) === '[750,1334]', JSON.stringify(shots.map((s) => [s.error, s.jpg && dim(s.jpg)])))
@@ -348,6 +416,19 @@ main .btn { font-size: 17px }
     check('调样式规则：上内边距由生效的媒体查询里那条决定（app.css 第 8 行），下内边距还是第 2 行那条', R['padding-top'] && lineOf(R['padding-top']) === 8 && R['padding-bottom'] && lineOf(R['padding-bottom']) === 2, JSON.stringify([R['padding-top'], R['padding-bottom']]))
     check('调样式规则：行内 color 盖过 .btn；圆角的 !important 盖过行内（不算行内）', R.color && R.color.inline && R.color.sel === '.btn' && R.color.n === 1 && R['border-radius'] && !R['border-radius'].inline && lineOf(R['border-radius']) === 10, JSON.stringify([R.color, R['border-radius']]))
     const locate = (items) => items.map((it) => { const f = decodeURIComponent(new URL(it.href).pathname.slice(1)); return { file: f, line: findRule(fs.readFileSync(path.join(site, f), 'utf8'), it.sel, it.n) } })
+    const negLocate = (items) => items.map((it) => { const f = decodeURIComponent(new URL(it.href).pathname.slice(1)); return { file: f, line: findRule(fs.readFileSync(path.join(site, f), 'utf8'), it.sel, it.n) } })
+    const neg = await measureAll(b, { screens: [{ key: 'neg.html', url: `${entry.origin}/neg.html`, label: 'neg' }, { key: 'over.html', url: `${entry.origin}/over.html`, label: 'over' }], sizes: [[390, 844]], kind: 'app', locate: negLocate })
+    const negOv = neg[0].issues.find((x) => x.type === 'overlap'), absOv = neg[1].issues.find((x) => x.type === 'overlap')
+    check('真浏览器：叠字找到原因——价格行的负 margin，规则在 neg.css 第 3 行', negOv && negOv.cause && negOv.cause.prop === 'margin-top' && negOv.cause.value === '-24px' && /div\.row/.test(negOv.cause.sel) && negOv.rule && negOv.rule.sel === '.row' && negOv.rule.file === 'neg.css' && negOv.rule.line === 3, JSON.stringify(negOv))
+    check('真浏览器：叠字找到原因——价格是绝对定位；量出叠了多少 px', absOv && absOv.px > 0 && absOv.cause && absOv.cause.prop === 'position' && absOv.cause.value === 'absolute' && /price/.test(absOv.cause.sel), JSON.stringify(absOv))
+    const overScreens = [{ key: 'over.html', url: `${entry.origin}/over.html`, label: 'over' }]
+    for (const dk of [false, true]) {
+      const ov = await measureAll(b, { screens: overScreens, sizes: [[390, 844]], kind: 'app', dark: dk })
+      const oc = await cropIssues(b, ov, { screens: overScreens, dark: dk })
+      const ojpg = oc[0] && oc[0].jpg
+      // 裁剪范围按整页坐标（卡片在 900px 往下，要先滚过去）；至少 320 宽：390 宽的屏 × 1.86 倍
+      check(`真浏览器附图：叠在一起的两个元素截一张，说得出谁在上面（滚到卡片那儿${dk ? '，深色' : ''}）`, ov[0].issues.some((x) => x.type === 'overlap') && oc.length >= 1 && oc[0].type === 'overlap' && ['self', 'other'].includes(oc[0].upper) && ojpg && ojpg[0] === 0xff && ojpg.length > 3000 && ojpg.readUInt16BE(0) === 0xffd8, JSON.stringify([ov[0].issues.map((x) => x.type), oc.map((c) => [c.type, c.jpg && c.jpg.length])]))
+    }
     const lc = await measureAll(b, { screens: [{ key: 'lowc.html', url: `${entry.origin}/lowc.html`, label: 'lowc' }, screens[0]], sizes: [[390, 844]], kind: 'app', locate })
     const ctr = lc[0].issues.find((x) => x.type === 'contrast'), tiny = lc[0].issues.find((x) => x.type === 'tiny')
     check('体检带规则：对比度不够 → 由 .faint 决定，lowc.css 第 2 行', ctr && ctr.rule && ctr.rule.sel === '.faint' && ctr.rule.file === 'lowc.css' && ctr.rule.line === 2, JSON.stringify(lc[0].issues))
