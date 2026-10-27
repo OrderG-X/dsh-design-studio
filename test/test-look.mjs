@@ -193,7 +193,7 @@ const pageEval = (opts = {}) => (expr) => {
 }
 {
   const log = []
-  const b = createBrowser({ bin: '/fake/chrome', launch: fakeLaunch(log, pageEval()), idleMs: 30 })
+  const b = createBrowser({ bin: '/fake/chrome', platform: 'fake', launch: fakeLaunch(log, pageEval()), idleMs: 30 })
   const shot = await b.withPage({ url: 'http://127.0.0.1:9/home.html', w: 375, h: 667, scale: 2, dark: true }, async (page) => {
     const v = await page.eval('window.__dshDesign.info()')
     return { v, jpg: await page.shot({ clip: { x: 0, y: 0, width: 10, height: 10 } }) }
@@ -214,7 +214,7 @@ const pageEval = (opts = {}) => (expr) => {
   let launches = 0
   const log = []
   const inner = fakeLaunch(log, pageEval())
-  const b = createBrowser({ bin: '/fake/chrome', launch: (...a) => { launches++; return inner(...a) }, idleMs: 30 })
+  const b = createBrowser({ bin: '/fake/chrome', platform: 'fake', launch: (...a) => { launches++; return inner(...a) }, idleMs: 30 })
   let release
   const hold = new Promise((r) => { release = r })
   const busy = [1, 2, 3].map(() => b.withPage({ url: 'http://127.0.0.1:9/a.html', w: 100, h: 100 }, () => hold).catch((e) => e.message))
@@ -239,7 +239,7 @@ const pageEval = (opts = {}) => (expr) => {
   studio.tracker = { snapshot: () => snap }
   const log = []
   const issue = { type: 'covered', sev: 2, sel: 'main li:last-child', text: '最后一本', edge: 'bottom', bar: 'nav.tab', px: 40 }
-  studio.browser = createBrowser({ bin: '/fake/chrome', launch: fakeLaunch(log, pageEval({ issues: [issue] })), idleMs: 30 })
+  studio.browser = createBrowser({ bin: '/fake/chrome', platform: 'fake', launch: fakeLaunch(log, pageEval({ issues: [issue] })), idleMs: 30 })
   const r = await checkTool.execute({ sizes: ['375', '430x932', 'abc'], screens: ['home', 'cart'] }, exec)
   check('check_design：按指定尺寸量指定的几屏（App 类型是从页面 meta 认出来的）', r.text.includes('2 屏 × 2 种尺寸（375×667、430×932）') && r.text.includes('home.html「首页」') && r.text.includes('cart.html「首页」'), r.text)
   check('check_design：问题清单带数字，测量数字也在', r.text.includes('被固定栏压住：main li:last-child「最后一本」 — 滚到底还被底栏 nav.tab 压住 40px') && r.text.includes('底栏 nav.tab 高 83，滚到底时离内容 12px'), r.text)
@@ -258,7 +258,7 @@ const pageEval = (opts = {}) => (expr) => {
   // check_design 附图：严重的那条按发现时的尺寸重开、截那一块，图存进附件库，清单里写看图几
   studio.browser.stop()
   log.length = 0
-  studio.browser = createBrowser({ bin: '/fake/chrome', launch: fakeLaunch(log, pageEval({ issues: [issue], crop: { x: 0, y: 520, w: 375, h: 147 } })), idleMs: 30 })
+  studio.browser = createBrowser({ bin: '/fake/chrome', platform: 'fake', launch: fakeLaunch(log, pageEval({ issues: [issue], crop: { x: 0, y: 520, w: 375, h: 147 } })), idleMs: 30 })
   const ck = await checkTool.execute({ sizes: ['375'], screens: ['home'] }, exec, ctx)
   const ckBlocks = checkTool.output.render({}, ck)
   const cropShot = log.filter((x) => x.method === 'Page.captureScreenshot').pop()
@@ -291,7 +291,7 @@ const pageEval = (opts = {}) => (expr) => {
   const bad = await lookTool.execute({ size: 'huge' }, exec, ctx)
   check('look_design：认不出的尺寸说清楚', /认不出尺寸「huge」/.test(bad.text), bad.text)
   const nofile = await lookTool.execute({ screens: ['home'] }, exec, { get: () => null })
-  const files = (nofile.text.match(/\/[^\n]+\.jpg/g) || [])
+  const files = (nofile.text.match(/(?:[A-Za-z]:\\|\/)[^\n]+\.jpg/g) || [])
   check('look_design：附件库用不了 → 存成文件告诉模型在哪', files.length === 1 && fs.existsSync(files[0]), nofile.text)
   for (const f of files) fs.rmSync(f, { force: true })
   studio.browser.stop()
