@@ -13,12 +13,18 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { Readable } from 'node:stream'
 import os from 'node:os'
-import { parseTarget } from '../lib/core.js'
-import { apply, skillProvider, designSkill, previewTool, checkTool, studio } from '../lib/index.js'
-import * as skillRow from '../lib/skill.js'
-import * as toolRow from '../lib/tool.js'
-import * as autoRow from '../lib/auto.js'
-import DesignPreset from '../lib/preset.js'
+
+// 插件把预览记录、版本、设计系统存在 ~/.dsh 下（载入时就定好路径）：先把家目录换成临时的，免得测试写进真 DSH 的缓存
+const fakeHome = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-skill-home-')))
+process.env.HOME = fakeHome
+process.env.USERPROFILE = fakeHome
+process.on('exit', () => fs.rmSync(fakeHome, { recursive: true, force: true }))
+const { parseTarget } = await import('../lib/core.js')
+const { apply, skillProvider, designSkill, previewTool, checkTool, studio } = await import('../lib/index.js')
+const skillRow = await import('../lib/skill.js')
+const toolRow = await import('../lib/tool.js')
+const autoRow = await import('../lib/auto.js')
+const { default: DesignPreset } = await import('../lib/preset.js')
 
 let pass = 0
 let fail = 0
@@ -41,7 +47,7 @@ check('名字是短横线小写', /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(c.name))
 check('候选项字段齐全', c.description.length > 0 && typeof c.source === 'string' && Number.isFinite(c.rank) && c.provider === skillProvider.name &&
   typeof c.invocation.modelInvocable === 'boolean' && typeof c.invocation.userInvocable === 'boolean')
 const def = await skillProvider.get(c)
-check('载入的内容就是 SKILL.md，带资源目录', def.content === body && def.resourceBase.kind === 'directory' && def.name === c.name && def.provider === c.provider)
+check('载入的内容是 SKILL.md 加上设计系统一节，带资源目录', def.content.startsWith(body) && def.content.slice(body.length).includes('## 设计系统') && def.resourceBase.kind === 'directory' && def.name === c.name && def.provider === c.provider)
 
 // 技能那行：有技能服务就挂上
 const mounted = []
@@ -65,7 +71,7 @@ check('工作台本体不再自己挂技能（交给技能那行）', mounted.le
 // 工具那行：挂 preview_page；工作台关着时调用会说清楚
 const tools = []
 toolRow.apply({ tools: { register: (t) => tools.push(t) } })
-check('工具那行挂上 preview_page、check_design、look_design', tools.length === 3 && tools[0].name === 'preview_page' && tools[0].parameters.required.includes('target') && tools[1].name === 'check_design' && tools[2].name === 'look_design')
+check('工具那行挂上 preview_page、check_design、look_design、extract_design_system、handoff_design、compare_design', tools.map((x) => x.name).join() === 'preview_page,check_design,look_design,extract_design_system,handoff_design,compare_design' && tools[0].parameters.required.includes('target') && tools[3].parameters.required.includes('sources') && tools[5].parameters.required.includes('url'))
 const saved = studio.tracker
 studio.tracker = null
 let msg = ''

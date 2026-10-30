@@ -193,7 +193,10 @@ const mem = { data: {}, load() { return JSON.parse(JSON.stringify(this.data)) },
 const t5 = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:5' }), store: mem })
 await t5.setTarget('s5', parseTarget(index), { source: 'tool' })
 check('存盘：记下了会话的预览目标', mem.data.s5 && mem.data.s5.target.file === index)
+t5.observe('s5', { type: 'tool/result', time: Date.now(), data: { meta: { cwd: '/proj/shop' }, message: { toolCallId: 'x', content: [] } } })
+check('存盘：会话目录也记下（跑过工具后补上）', mem.data.s5.cwd === '/proj/shop', JSON.stringify(mem.data.s5))
 const t6 = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:6' }), store: mem })
+check('重启后还没跑工具：会话目录用存盘里的', t6.cwdOf('s5') === '/proj/shop' && t6.cwdOf('nobody') === os.homedir())
 check('重启后第一次取状态：正在接着开上次的预览（loading，右侧栏先别显示空状态）', t6.snapshot('s5').loading === true)
 await wait()
 s = t6.snapshot('s5')
@@ -419,6 +422,15 @@ er = tE.editText('sE', { key: 'b.html', before: 'BB', after: 'CC' })
 check('改字：模型正在干活时不改（免得被它整份重写盖掉）', er.ok === false && er.reason === 'busy' && fs.readFileSync(path.join(editDir, 'b.html'), 'utf8') === '<h1>BB</h1>', JSON.stringify(er))
 tE.observe('sE', { type: 'turn/end', time: Date.now(), data: {} })
 check('改字：这轮干完又能改', tE.editText('sE', { key: 'b.html', before: 'BB', after: 'CC' }).ok === true)
+{
+  let ran = 0
+  const n0 = snaps.length
+  const moved = tE.editDir('sE', () => { ran++; return { ok: true, files: ['x'] } }, '调节', path.join(tmp, 'another-design'))
+  check('调节写回：右侧栏看的是另一套设计（中途换了）→ 不写', moved.ok === false && moved.reason === 'moved' && ran === 0 && snaps.length === n0, JSON.stringify(moved))
+  const same = tE.editDir('sE', (root) => { ran++; return { ok: root === editDir, files: ['x'] } }, '调节', editDir)
+  check('调节写回：还是同一套 → 写，存版本', same.ok === true && ran === 1 && snaps.length === n0 + 2)
+  check('快照里带设计目录（右侧栏写回时带上）', tE.snapshot('sE').target.root === editDir)
+}
 await tE.setTarget('sE', parseTarget('5173'), { source: 'tool' })
 check('改字：开发服务器不在这里改', tE.editText('sE', { key: '/', before: 'x', after: 'y' }).reason === 'not-file')
 

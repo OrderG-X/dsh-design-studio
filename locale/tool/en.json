@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Preview, check and look tools (other modes)",
-    "description": "Lets Standard, Creator and other modes use preview_page (open pages in the Design Studio sidebar), check_design (measure design problems at real sizes) and look_design (real-size screenshots for the model). The Design mode has its own copy and ignores this switch."
+    "title": "Preview, check, look and handoff tools (other modes)",
+    "description": "Lets Standard, Creator and other modes use preview_page (open pages in the Design Studio sidebar), check_design (measure design problems at real sizes), look_design (real-size screenshots for the model), extract_design_system (pull a brand design system from a site or project), and handoff_design / compare_design (build the design as real code and pixel-compare it with the design). The Design mode has its own copy and ignores this switch."
   }
 }

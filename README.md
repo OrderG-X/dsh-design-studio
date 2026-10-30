@@ -83,10 +83,13 @@ dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/dow
 23. **风格卡**：九套现成风格——极简白、温暖手作、杂志编辑、深色高级、活泼年轻、清新自然、专业科技、玻璃质感、柔和立体，每张卡是一套配色、字体、圆角、阴影的小样。还没开始设计时，空白页上点一张，输入框里写好〔风格〕和整套配色，再补一句要做什么；已经有设计了，在设计规范面板点「换个风格…」，模型先改 `tokens.css`，再把写死的颜色换掉，版式和文字不动，改完自己体检一遍。
 24. **远程也能看**：从手机（dsh-mobile 走外网）或别的电脑打开 DSH 网页时，电脑本机的预览端口那边连不上。本地 HTML 做的设计，插件把一屏连同样式、脚本、图片打成一份传过去，放进沙盒 iframe 显示，选择、改字、调样式、体检、导出照样能用；页面里点跳转就换到那一屏，文件改了跟着刷新（只刷用到这个文件的屏）。开发服务器的页面打包不了，还是只给一句说明。
 25. **模型自己看图**：模型想看真实渲染的样子时调 `look_design`：同样用那个看不见的浏览器，按指定尺寸截一屏——顶上一屏、滚到底、整页分几段，或者只截某个元素（比如底栏），也能截深色——图直接交给模型看。不用自己起服务器、写截图脚本。
+26. **品牌设计系统**：给一个网站地址或项目文件夹（「照我们官网的风格」），模型调 `extract_design_system`，插件用看不见的浏览器打开网页量真实渲染的样式——底色、正文和次要文字、主色、点睛色、边框，字体和字号阶梯，圆角、阴影，主按钮 / 次按钮 / 输入框 / 卡片 / 顶栏的样子——项目文件夹还会扫 CSS 变量、写死的颜色、Tailwind 配置和组件库。提出来的是一整套文件：`tokens.css`（和技能起手模板同一套变量名）、`components.css`（按钮、输入框、卡片、文字样式）、`components.html` 样张、`DESIGN.md` 说明，连同网站和组件截图存进 `~/.dsh/design-systems/<品牌>/`。设成默认后，以后每次做新设计模型都先复制这一套，不再问「想要什么感觉」，三个方向只在版式上拉开。右侧栏设计规范面板里「品牌设计系统…」（窄的时候在「更多」里）列出所有套，带样张缩略图和色块，能设默认、取消默认、一键套用到当前设计，也能直接填地址让模型提一套。
+27. **调节滑块**：模型给这套设计挑几个最值得试的维度（留白疏密、圆角、主色、卡片排法……）写进 `tweaks.json`，工具栏旋钮按钮列成滑块、取色、几选一；拖的时候画布上每一屏一起变（只改页面上的 CSS 变量和 `<html>` 上的属性，不动文件），满意了「写回文件」（变量写进 `tokens.css` 的默认值，属性写到每屏的 `<html>` 上，改前改后各存一版），或「交给模型」照这几个值改、顺手协调相关的地方。还没有滑块时一键让模型做几个；`check_design` 会顺带查滑块有没有真接上（变量没人用、没有默认值、选项没有对应的样式）。
+28. **转成代码**：工具栏 `</>` 按钮，选用什么做（跟现有项目一样 / React / Vue / Next.js / 纯 HTML）、代码放哪、转全部还是这一屏，点「开始转成代码」。模型先调 `handoff_design`：插件在设计目录写一份 `handoff/HANDOFF.md`（每屏的文件、建议路由、跳去哪，设计变量，几屏共用该抽成组件的部分，脚本 / 表单 / 悬停这些交互，滑块，图片字体，做法和验收）和每屏从上到下的截图；模型照着一屏一屏写，每屏写完把开发服务器跑起来调 `compare_design`：同样尺寸各截一张逐像素比，回一张「设计稿 | 做出来的 | 差异」拼图，差得多的地方红框标号、写明两边分别是哪个元素，差异降到 3% 以下再做下一屏。
 
 工具栏还有：地址（点一下能改，输文件路径 / 端口 / localhost 地址都行）、刷新、在浏览器里打开。右侧栏拉窄时，不常用的几个按钮收进「更多」菜单。会话标题栏右边有个「设计工作台」按钮，随时打开。DSH 重启后，每个会话接着预览原来的页面（类型、视图也记着）。
 
-`preview_page` 工具的参数：`target`（文件路径 / 端口 / 地址）、`kind`（web / app / tablet / poster / slides / email）、`size`（如 `1080x1920`，可选）、`screens`（开发服务器上并排看的几个路由，可选）。`check_design`：`screens`（只量哪几屏）、`sizes`（如 `["375x667","430x932"]`）、`dark`、`images`（`false` 不附截图）。`look_design`：`screens`、`size`、`at`（top / bottom / full）、`selector`（只截这个元素）、`dark`。
+`preview_page` 工具的参数：`target`（文件路径 / 端口 / 地址）、`kind`（web / app / tablet / poster / slides / email）、`size`（如 `1080x1920`，可选）、`screens`（开发服务器上并排看的几个路由，可选）。`check_design`：`screens`（只量哪几屏）、`sizes`（如 `["375x667","430x932"]`）、`dark`、`images`（`false` 不附截图）。`look_design`：`screens`、`size`、`at`（top / bottom / full）、`selector`（只截这个元素）、`dark`。`extract_design_system`：`sources`（网址 / 项目文件夹 / HTML 文件，1–5 个）、`name`、`default`。`handoff_design`：`framework`（same / react / vue / next / html）、`dest`、`screens`。`compare_design`：`url`（做出来的页面，本机地址或端口）、`screen`、`size`、`at`（top / bottom）、`dark`。
 
 ## 设计模式和开关
 
@@ -98,7 +101,7 @@ dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/dow
 | --- | --- | --- |
 | 设计工作台 | 右侧栏和预览服务器（关掉就等于不用这个插件） | 开 |
 | 自动打开预览 | 做设计时写了 HTML、起了开发服务器，右侧自动打开；关掉后只在右侧栏给一个「预览刚写的 …」按钮 | 开 |
-| 预览和体检工具（其他模式） | 标准、创造等模式也能用 `preview_page`、`check_design` 和 `look_design` | 开 |
+| 预览和体检工具（其他模式） | 标准、创造等模式也能用 `preview_page`、`check_design`、`look_design`、`extract_design_system`、`handoff_design` 和 `compare_design` | 开 |
 | 设计技能（其他模式） | 标准、创造等模式也能加载 `ui-design` 技能 | 开 |
 | 设计模式 | 模式菜单里的「设计模式」 | 开 |
 
@@ -138,7 +141,11 @@ dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/dow
         /dsh-design-studio/api/edit|ref                预览里改的字写回 HTML、存参考图
         /dsh-design-studio/api/style|locate            调样式：写进元素在源码里的 style 属性；按规则找回源文件和行号
         /dsh-design-studio/api/bundle                  远程看：一屏连同样式、图片打成一份（放进沙盒 iframe）
+        /dsh-design-studio/api/tweak                   调节滑块写回文件（tokens.css 默认值、每屏 <html> 属性、tweaks.json）
+        /dsh-design-studio/api/systems|systhumb        品牌设计系统库：列出来、设 / 取消默认、样张缩略图
+        /dsh-design-studio/api/project                 转成代码前：会话目录是不是前端项目、建议放哪
         check_design / look_design → 无头浏览器（browser.js）按真实尺寸开页面，picker 里量、截图（look.js）
+        extract_design_system → system.js；handoff_design / compare_design → handoff.js
 页面    picker.js 注入到 HTML：悬停框选、点选 / 拖选、屏间链接、演示时接住跳转、就地改字、postMessage 回右侧栏、改动后刷新
 客户端  右侧栏标签页（sidebarRightTabs）+ 标题栏按钮（session.header.utilities）
 ```
@@ -150,6 +157,9 @@ dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/dow
 - `lib/serve.js` —— 预览服务器：静态文件 / 代理 / 改动推送 / 注入（picker 和一段收集页面报错、没载到的资源的小脚本）
 - `lib/browser.js` —— 无头浏览器：找本机的 Chrome / Edge / Chromium / Brave，`--remote-debugging-pipe` 说话（不开端口），临时用户目录，闲置自己关
 - `lib/look.js` —— `check_design` / `look_design` 的量和截：挑屏、解析尺寸、每种尺寸开一页量问题和测量数字、挑严重问题截局部图、截顶上 / 滚到底 / 整页分段 / 元素，整理成交给模型的字
+- `lib/system.js` —— 品牌设计系统：在网页里收集颜色 / 字体 / 圆角 / 阴影 / 组件，扫项目文件夹，按 OKLab 聚类定角色（对比度够不够也算），写 tokens.css / components.css / 样张 / DESIGN.md，库（默认那套）和给技能补的一节
+- `lib/tweaks.js` —— 调节滑块：读 tweaks.json、写回（:root 上的默认值、<html> 属性）、查有没有接上
+- `lib/handoff.js` —— 转成代码：认现有项目、交接说明和截图、compare_design 的逐像素比（在无头浏览器里算差异、找成片的差异块、拼图）
 - `lib/bundle.js` —— 远程看：把一屏的样式表（含 `@import`）、脚本、图片、字体内联成一份 HTML，放 `<base>` 和 picker
 - `lib/phone.js` —— 手机上看：局域网入口（口令换 Cookie、转发到预览服务器、补 viewport、跟随跳屏、WebSocket 透传、闲置自动关）
 - `lib/qr.js` —— 二维码生成（字节模式、纠错 M、版本 1–10，不引第三方库）
@@ -171,6 +181,9 @@ node test/test-bundle.mjs  # 远程看的打包：样式表 / @import / url() / 
 node test/test-phone.mjs   # 手机上看：二维码结构、挑网卡、补 viewport、口令换 Cookie、没口令 / Host 不对 403、转发、跟随跳屏、WebSocket、停止、闲置自动关
 node test/test-doc.mjs     # PDF / PPT：JPEG 尺寸、PDF 结构和交叉引用、PPT 的各个部件（解压校验 CRC）、幻灯片比例和居中、接口存进 exports/、重名加序号、坏输入拒掉
 node test/test-look.mjs    # check_design / look_design：挑屏、尺寸、整理给模型的字；假浏览器走完工具和附图；本机有 Chrome / Edge 时真开页面：底栏压住最后一行（矮屏报、大屏不报）、App 壳里的滚动区、脚本报错、缺样式表、截图尺寸、元素裁剪、深色、调样式每项由哪条规则决定、严重问题附图（底栏压住、App 壳、叠字，浅色深色）
+node test/test-system.mjs  # 品牌设计系统：颜色解析和对比度、扫项目、定角色、写出来的文件、库和默认、给技能补的一节；有 Chrome / Edge 时真从一个网页提一套（品牌名、角色、字体、圆角、组件、截图、再提覆盖）
+node test/test-tweaks.mjs  # 调节滑块：读 tweaks.json（写错了怎么说）、值规整、写回 tokens.css（同一个变量写了几遍都改）/ <html> / tweaks.json、体检、写回走版本；真浏览器里拖了页面真变、撤掉还原
+node test/test-handoff.mjs # 转成代码：认项目、路由、共用部分、只比本机地址、代码默认放哪（不放进设计目录，软链接别名也认）、交接包不跟软链接写到外面、交接说明的各节；真浏览器：交接包截图、一样的页面差异 < 1%、改过的页面标出差在哪、淡灰对白也算差异、滚到底连里面能滚的区域、data-theme 深色两边都切、本机地址跳到外网被拦下
 node e2e/check-page.mjs    # 设计体检（要本机 Chrome）：十二类问题都查得出、该放过的放过（省略号、动画中的半透明字、深色页面、限宽的段落、object-fit 的图、正文里跟着折行的字…），干净的页面零问题；加 --dir <设计目录> 拿真设计稿试
 node e2e/e2e-studio.mjs    # 真机（要本机 Chrome，会从 npm 装一个临时 DSH）：假模型调 preview_page 开三屏 App；干完一轮按钮上标出问题数，体检查出埋的问题、交给模型修、改完自动再量；面板开着时模型改坏别的屏，面板自己刷新、那屏挪出来；模型调 `check_design` 拿回清单和严重问题的局部截图；模型调 `look_design` 拿回一张真实渲染的图；导出的 PDF / PPT 里跳转能点；调样式拖滑块、写回、交给模型；换风格；换个地址打开（像手机走外网）时预览打包传过来、点得动、跟着改动刷新
 ```
