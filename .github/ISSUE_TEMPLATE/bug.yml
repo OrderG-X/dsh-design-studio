@@ -17,7 +17,7 @@ body:
     attributes:
       label: 版本 / Versions
       description: DSH 版本和插件版本，DSH 的插件页能看到 / DSH and plugin versions, shown on the DSH Plugins page
-      placeholder: DSH 0.2.1-rc.2, plugin 1.0.0
+      placeholder: 填你自己的，例如 DSH 0.2.1-rc.5、插件 1.5.2 / yours, e.g. DSH 0.2.1-rc.5, plugin 1.5.2
     validations:
       required: true
   - type: input

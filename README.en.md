@@ -45,6 +45,8 @@ It is an npm package. When DSH installs by package name and can't reach the offi
 
 **Restart DSH** after installing, because client code is bundled when DSH starts. The plugin is listed as 设计工作台 / Design Studio on the Plugins page.
 
+**Updating:** uninstall it on the Plugins page and add it again. A new version can be installed by package name about a day after release, because the pnpm that DSH uses skips brand-new versions by default. To get it right away, use the release tarball.
+
 For development, enter the absolute path of a local checkout under **Add plugin**; it installs as a `link:`. Client changes still need a restart. `lib/picker.js` is served fresh on every request, so it doesn't.
 
 ## What it does
