@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Design Studio",
-    "description": "A design workbench in the right sidebar: web, app and poster screens generate on a canvas inside device frames; click an element to have the model change it, tweak design tokens across every screen, compare and roll back versions, export share-ready images, and scan a QR code to view it on your phone."
+    "description": "A design workbench in the right sidebar: web, app and poster screens generate on a canvas inside device frames; click an element to have the model change it, drag sliders to tweak design tokens across every screen, compare and roll back versions, extract a brand's design system from a website, turn a design into React / Vue / HTML code and diff it pixel by pixel, export share-ready images, and scan a QR code to view it on your phone."
   }
 }

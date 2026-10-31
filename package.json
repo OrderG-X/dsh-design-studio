@@ -1,11 +1,11 @@
 {
   "name": "dsh-design-studio",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.mjs"
   },
-  "description": "Design workbench in the DeepSeek Harness right sidebar: watch web / app / poster screens generate on a canvas with device frames, click an element to send it to the chat, tweak design tokens, compare versions, export share-ready images and scan to view on your phone.",
+  "description": "Design workbench in the DeepSeek Harness right sidebar: watch web / app / poster screens generate on a canvas with device frames, click an element to send it to the chat, tweak design tokens with sliders, compare versions, extract a brand's design system from a site, turn a design into React / Vue / HTML code checked pixel by pixel, export share-ready images and scan to view on your phone.",
   "license": "MIT",
   "repository": {
     "type": "git",
