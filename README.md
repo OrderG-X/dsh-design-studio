@@ -19,7 +19,7 @@
 >
 > **什么时候用**：「做个落地页」「设计一个 App 界面」「做张海报」「做几页幻灯片」。新会话可以直接选「设计模式」。
 >
-> **安装**：`dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`，重启 DSH。
+> **安装**：DSH「插件」页 →「添加插件」，填 `dsh-design-studio`（npm 包，连不上 npm 会自动换国内镜像），重启 DSH。
 
 让 DSH（DeepSeek Harness）做界面设计时像 Google Stitch / Claude Code 桌面端那样：模型做网页、App 界面、海报、幻灯片时，右侧栏「设计工作台」实时显示——一屏一屏生成出来，在画布上并排摆好，套上手机 / 浏览器外框；看到哪里不对，点一下那个元素、或拖出一块区域，它就整理成一段文字放进输入框，补一句「改成橙色」发出去，模型照着源码改，改过的地方在预览里闪一下。
 
@@ -35,9 +35,13 @@
 
 ## 安装
 
-```sh
-dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz
+在 DSH「插件」页点「添加插件」，填包名：
+
 ```
+dsh-design-studio
+```
+
+这是 npm 包：按包名装时，DSH 连不上 npm 官方源会自动改用国内镜像（npmmirror），不经过 GitHub。也可以填发布包地址 `https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`，那样要能连上 GitHub。
 
 装完**重启 DSH**（客户端代码在 DSH 启动时打包）。DSH「插件」页里显示为「设计工作台」。
 
