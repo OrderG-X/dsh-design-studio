@@ -45,7 +45,7 @@ dsh-design-studio
 
 装完**重启 DSH**（客户端代码在 DSH 启动时打包）。DSH「插件」页里显示为「设计工作台」。
 
-开发时可以直接链到本地目录：`dsh plugin --profile desktop add link:/path/to/dsh-design-studio`，改了客户端代码同样要重启（`lib/picker.js` 每次现给，不用重启）。
+开发时可以直接链到本地目录：在「添加插件」里填本仓库的绝对路径，装上的是 `link:`，改了客户端代码同样要重启（`lib/picker.js` 每次现给，不用重启）。
 
 ## 用起来是什么样
 

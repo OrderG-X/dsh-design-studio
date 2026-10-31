@@ -19,7 +19,7 @@
 >
 > **Use it for:** "make a landing page", "design an app screen", "make a poster", "make a few slides".
 >
-> **Install:** `dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`, then restart DSH.
+> **Install:** on the DSH Plugins page, click Add plugin and enter `dsh-design-studio` (an npm package), then restart DSH.
 
 A design workbench for DSH (DeepSeek Harness), in the spirit of Google Stitch. When the model builds a web page, an app screen, a poster or a slide deck, the **Design Studio** tab in the right sidebar shows it live. Screens appear one by one on a canvas, each inside a phone or browser frame. When something looks off, click the element or drag over an area. The plugin turns your pick into text in the chat input. Add "make it orange" and send. The model edits the source, and the change flashes in the preview.
 
@@ -35,13 +35,17 @@ The exported showcase, straight from the plugin with no editing:
 
 ## Install
 
-```sh
-dsh plugin add https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz
+On the DSH Plugins page, click **Add plugin** and enter the package name:
+
 ```
+dsh-design-studio
+```
+
+It is an npm package. When DSH installs by package name and can't reach the official npm registry, it falls back to the npmmirror mirror in China, so GitHub is never needed. You can also enter the release tarball `https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`, which needs GitHub access.
 
 **Restart DSH** after installing, because client code is bundled when DSH starts. The plugin is listed as 设计工作台 / Design Studio on the Plugins page.
 
-For development, link a local checkout with `dsh plugin --profile desktop add link:/path/to/dsh-design-studio`. Client changes still need a restart. `lib/picker.js` is served fresh on every request, so it doesn't.
+For development, enter the absolute path of a local checkout under **Add plugin**; it installs as a `link:`. Client changes still need a restart. `lib/picker.js` is served fresh on every request, so it doesn't.
 
 ## What it does
 
