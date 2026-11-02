@@ -463,9 +463,10 @@ try {
 
   // ⑥ 首页再出一版 → home-b 紧挨着首页；点它的「就要这个」→ 输入框里是〔选定方向〕
   await say('MAKE-TAKE 首页再出一版')
-  const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
+  const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab > span:first-child')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
   // 标签是页面标题，标题没载出来时先显示文件名：两种都认
   check('再出的一版紧挨着原版', /(首页|home),(首页 B|home-b)(,|$)/.test(order || ''), order)
+  check('几个版本并排：每屏标题旁都有「就要这个」，不用先选中', /首页就要这个,首页 B就要这个|homeUse this,home-bUse this/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent).join(',')`) || ''))
   // 先点一下那一屏选中它（按钮在选中的那屏标签旁）
   // （那一屏可能在画面外，鼠标点不到，直接发 pointer 事件：按在那屏上、在窗口上松开）
   await page(`(() => {

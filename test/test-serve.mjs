@@ -12,6 +12,7 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { createHub, hostOk, injectPicker, resolveInRoot, webOrigins, trustedOrigins } from '../lib/serve.js'
+import { findBrowser, createBrowser } from '../lib/browser.js'
 
 let pass = 0
 let fail = 0
@@ -287,6 +288,87 @@ check('webOrigins：别的地址只认它自己、乱的不认',JSON.stringify(w
   he.closeAll()
   check('关了以后 alive() 都是 false', opened.every((o) => !he.alive(o.origin)))
 }
+// ── 真浏览器：在右侧栏里改动由右侧栏转告，页面自己不开 SSE（画布上 6 屏就会占满 6 条连接） ──
+const bin = findBrowser()
+if (!bin) console.log('（没找到 Chrome / Edge，跳过真浏览器那几条）')
+else {
+  fs.mkdirSync(path.join(tmp, 'relay'))
+  fs.writeFileSync(path.join(tmp, 'relay', 'index.html'), '<!doctype html><title>r</title><h1>r</h1>')
+  // 导出用：图标在外部的 icons.svg 里（<use href="icons.svg#sq">）
+  fs.writeFileSync(path.join(tmp, 'relay', 'icons.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><symbol id="sq" viewBox="0 0 10 10"><rect width="10" height="10" fill="#ff0000"/></symbol></svg>')
+  // 连线用：被固定底栏盖住的按钮不报，底栏里的照报
+  fs.writeFileSync(path.join(tmp, 'relay', 'bar.html'), '<!doctype html><style>body{margin:0;height:600px}a{display:block}.bar{position:fixed;left:0;right:0;bottom:0;height:50px;background:#fff}</style>'
+    + '<a href="b.html" style="height:40px">top</a><a href="c.html" style="position:absolute;top:160px;left:0;width:200px;height:30px">under</a><div class="bar"><a href="d.html" style="height:50px">tab</a></div>')
+  fs.writeFileSync(path.join(tmp, 'relay', 'icon.html'), '<!doctype html><style>body{margin:0;background:#fff}</style><svg width="40" height="40"><use href="icons.svg#sq"/></svg>')
+  let preview = ''
+  // 假的 DSH：嵌预览，收到 hello 回 init（relay=1 是新版右侧栏；relay=0 是老版，不说 relay）
+  const outer = http.createServer((req, res) => {
+    const relay = req.url.includes('relay=1')
+    res.writeHead(200, { 'content-type': 'text/html' })
+    const src = preview + (new URL(req.url, 'http://x').searchParams.get('page') || 'index.html')
+    res.end(`<!doctype html><iframe id="f" src="${src}" width="300" height="200"></iframe><script>
+      window.got = []
+      addEventListener('message', (e) => {
+        const d = e.data || {}
+        if (d.dshDesign !== 1) return
+        window.got.push(d.type)
+        if (d.type === 'hello') e.source.postMessage({ dshDesign: 1, type: 'init', relay: ${relay} }, '*')
+        if (d.type === 'ready') e.source.postMessage({ dshDesign: 1, type: 'reveal' }, '*')
+        if (d.type === 'captured') window.cap = d
+        if (d.links) window.links = d.links.map((l) => l.path)
+      })
+      window.capture = () => document.getElementById('f').contentWindow.postMessage({ dshDesign: 1, type: 'capture', id: 1, scale: 1 }, '*')
+      window.files = () => document.getElementById('f').contentWindow.postMessage({ dshDesign: 1, type: 'files', file: '', files: [] }, '*')
+    </script>`)
+  })
+  await new Promise((r) => outer.listen(0, '127.0.0.1', r))
+  const outerOrigin = `http://127.0.0.1:${outer.address().port}`
+  const hr = createHub({ parents: () => [outerOrigin] })
+  const er = await hr.open({ kind: 'file', root: path.join(tmp, 'relay') })
+  preview = er.origin + '/'
+  const b = createBrowser({ bin })
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+  try {
+    const on = await b.withPage({ url: outerOrigin + '/?relay=1', w: 600, h: 400 }, async (page) => {
+      await wait(3800)
+      const n = hr.listeners()
+      await page.eval('window.files()')
+      await wait(400)
+      return { n, got: await page.eval('window.got') }
+    })
+    check('右侧栏转告：页面没开改动通知（过了 3 秒也没开）', on.n === 0, JSON.stringify(on))
+    check('右侧栏转告：转来的改动页面照常回 changed', on.got.includes('hello') && on.got.includes('changed'), JSON.stringify(on.got))
+    const old = await b.withPage({ url: outerOrigin + '/?relay=0', w: 600, h: 400 }, async () => { await wait(3800); return hr.listeners() })
+    check('老版右侧栏（不说 relay）：3 秒后页面自己开改动通知', old === 1, String(old))
+    const lk = await b.withPage({ url: outerOrigin + '/?relay=1&page=bar.html', w: 600, h: 400 }, async (page) => {
+      for (let i = 0; i < 40 && !(await page.eval('!!window.links')); i++) await wait(150)
+      await wait(300)
+      return page.eval('window.links')
+    })
+    check('连线：被固定底栏盖住的按钮不报（看不见），底栏里的照报', JSON.stringify(lk) === '["/b.html","/d.html"]', JSON.stringify(lk))
+    const px = await b.withPage({ url: outerOrigin + '/?relay=1&page=icon.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        return { px: [...g.getImageData(20, 20, 1, 1).data].slice(0, 3) }
+      })()`)
+    })
+    check('导出：外部 icons.svg 里的图标画进图里', px.px && px.px[0] > 200 && px.px[1] < 60 && px.px[2] < 60, JSON.stringify(px))
+  } finally {
+    b.stop()
+    hr.closeAll()
+    outer.close()
+  }
+}
+
 fs.rmSync(tmp, { recursive: true, force: true })
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

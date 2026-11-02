@@ -137,6 +137,13 @@ L = layoutGrid(4, 1280, 834, 450, 570)
 check('四屏网页在窄舞台上排成两行两列', L.cols === 2 && L.rows === 2, JSON.stringify({ cols: L.cols, z: L.z }))
 const rowGap = (L.pos[2].y - 834) * L.z
 check('两行之间留够标题的位置（不压到上一行）', rowGap >= 34, String(rowGap))
+{
+  const a = layoutGrid(6, 390, 844, 575, 740)
+  const b = layoutGrid(6, 390, 844, 800, 740)
+  const c = layoutGrid(6, 390, 844, 1100, 740)
+  check('六屏手机：右侧栏拉宽，一行多排（3 → 4 → 6），屏不变小', a.cols === 3 && b.cols === 4 && c.cols === 6 && b.z >= a.z - 1e-9 && c.z >= b.z - 1e-9, [a, b, c].map((x) => `${x.cols}@${x.z.toFixed(3)}`).join(' '))
+  check('多排时不让最后一行只剩一屏（四屏是 2+2，不是 3+1）', layoutGrid(4, 390, 844, 650, 740).cols === 2 && layoutGrid(5, 390, 844, 900, 740).cols === 3)
+}
 const cam = fitCam(L, 450, 570)
 check('摆好后整块在舞台里', cam.x >= 0 && cam.y >= 0 && cam.x + L.bw * cam.z <= 450 + 0.5 && cam.y + L.bh * cam.z <= 570 + 0.5, JSON.stringify(cam))
 
@@ -173,7 +180,7 @@ check('版本时间：今天只写时分', hhmm(today.getTime()) === '09:05')
 check('版本时间：以前的带月日', /^\d+\/\d+ \d\d:\d\d$/.test(hhmm(Date.now() - 3 * 86400000)))
 
 // ── 原型：跳转连线 ──
-const { keyOfPath, flowsOf, flowLines } = mod._test
+const { keyOfPath, flowsOf, flowLines, flowMarks } = mod._test
 check('跳转路径 → 屏：本地文件', keyOfPath('/detail.html', true) === 'detail.html' && keyOfPath('/', true) === 'index.html' && keyOfPath('/shop/', true) === 'shop/index.html')
 check('跳转路径 → 屏：旧版本的前缀去掉', keyOfPath('/__dsh_design__/v/3/login.html', true) === 'login.html')
 check('跳转路径 → 屏：开发服务器是路由', keyOfPath('/cart', false) === '/cart')
@@ -183,41 +190,83 @@ const lk = {
   'detail.html': [{ path: '/home.html', x: 10, y: 50, w: 40, h: 40 }, { path: '/cart.html', x: 200, y: 780, w: 170, h: 48 }],
 }
 const fl = flowsOf(scr, (sc) => lk[sc.key], true)
-check('连线：同一对只留一条、跳到不存在的屏 / 自己的不画', fl.length === 3 && fl.map((x) => x.from + '>' + x.to).join(',') === 'home.html>detail.html,detail.html>home.html,detail.html>cart.html', JSON.stringify(fl))
+check('连线：同一对只留一条（按钮都记着）、跳到不存在的屏 / 自己的不画', fl.length === 3 && fl.map((x) => x.from + '>' + x.to).join(',') === 'home.html>detail.html,detail.html>home.html,detail.html>cart.html' && fl[0].hots.length === 2, JSON.stringify(fl))
 const pos = [{ x: 0, y: 0 }, { x: 600, y: 0 }, { x: 1200, y: 0 }]
-const ln = flowLines(fl, scr.map((x) => x.key), pos, 'app', [390, 844])
+const K3 = scr.map((x) => x.key)
+const ln = flowLines(fl, K3, pos, 'app', [390, 844])
 const fwd = ln.find((x) => x.from === 'home.html')
-check('连线：往右的从按钮右边出发、落到目标屏左边', fwd.sx === 11 + 180 && fwd.ex === 600 && fwd.tip === 1 && fwd.sy === 11 + 400, JSON.stringify(fwd))
+check('连线：挨着的一条直线，从离得近的那个按钮右边出发、落到目标屏左边', fwd.pts.length === 2 && fwd.sx === 11 + 360 && fwd.ex === 600 && fwd.ux === 1 && fwd.sy === 11 + 400 && fwd.ey === fwd.sy && fwd.hot.x === 11 + 200 && !/Q/.test(fwd.d), JSON.stringify(fwd))
 const bk = ln.find((x) => x.to === 'home.html')
-check('连线：往回的从按钮左边出发、落到目标屏右边', bk.sx === 600 + 11 + 10 && bk.ex === 412 && bk.tip === -1, JSON.stringify(bk))
-const low = flowLines([{ from: 'home.html', to: 'detail.html', x: 0, y: 5000, w: 10, h: 10 }], ['home.html', 'detail.html'], pos, 'app', [390, 844])[0]
-check('连线：按钮在屏幕外面（往下滚才看得到）→ 起点贴着屏幕底边', low.sy === 11 + 844)
-check('连线：位置缺了的屏不画', flowLines(fl, scr.map((x) => x.key), [pos[0]], 'app', [390, 844]).length === 0)
-// 把连线的 path 拆成一串点，看有没有穿过别的屏（含标题那一条）
-function pathPts(d) {
-  const pts = []
-  let x = 0
-  let y = 0
-  for (const c of d.match(/[MHVQC][^MHVQC]*/g)) {
-    const n = c.slice(1).trim().split(/[\s,]+/).map(Number)
-    const seg = (fn) => { for (let k = 1; k <= 20; k++) pts.push(fn(k / 20)) }
-    if (c[0] === 'M') { x = n[0]; y = n[1] } else if (c[0] === 'H') { const x0 = x; seg((t) => [x0 + (n[0] - x0) * t, y]); x = n[0] } else if (c[0] === 'V') { const y0 = y; seg((t) => [x, y0 + (n[0] - y0) * t]); y = n[0] } else if (c[0] === 'Q') { const [x0, y0] = [x, y]; seg((t) => [0, 1].map((j) => (1 - t) ** 2 * [x0, y0][j] + 2 * (1 - t) * t * n[j] + t * t * n[2 + j])); x = n[2]; y = n[3] } else { const [x0, y0] = [x, y]; seg((t) => [0, 1].map((j) => (1 - t) ** 3 * [x0, y0][j] + 3 * (1 - t) ** 2 * t * n[j] + 3 * (1 - t) * t * t * n[2 + j] + t ** 3 * n[4 + j])); x = n[4]; y = n[5] }
-  }
-  return pts
-}
-const through = (d, ps, skip, lift = 34) => ps.some((p, i) => !skip.includes(i) && pathPts(d).some(([x, y]) => x > p.x && x < p.x + 412 && y > p.y - lift && y < p.y + 866))
-const far = flowLines([{ from: 'cart.html', to: 'home.html', x: 10, y: 50, w: 40, h: 40 }, { from: 'home.html', to: 'cart.html', x: 300, y: 300, w: 60, h: 40 }, { from: 'home.html', to: 'detail.html', x: 0, y: 300, w: 10, h: 10 }], scr.map((x) => x.key), pos, 'app', [390, 844], { lift: 34 })
-check('连线：隔着一屏的绕到标题上面走，不穿过中间那屏', far.length === 3 && !through(far[0].d, pos, [0, 2]) && !through(far[1].d, pos, [0, 2])
-  && far[0].ex === 412 && far[0].tip === -1 && far[1].ex === 1200 && far[1].tip === 1 && /Q/.test(far[0].d), far.map((x) => x.d).join(' | '))
-check('连线：挨着的照旧是一条曲线', /C/.test(far[2].d) && !/Q/.test(far[2].d))
-const g2 = [{ x: 0, y: 0 }, { x: 600, y: 0 }, { x: 0, y: 1000 }, { x: 600, y: 1000 }]
-const dn = flowLines([{ from: 'b', to: 'c', x: 10, y: 400, w: 40, h: 40 }, { from: 'a', to: 'c', x: 10, y: 400, w: 40, h: 40 }, { from: 'c', to: 'b', x: 10, y: 400, w: 40, h: 40 }, { from: 'd', to: 'a', x: 10, y: 400, w: 40, h: 40 }], ['a', 'b', 'c', 'd'], g2, 'app', [390, 844], { lift: 34 })
-const skipOf = (ln) => ['a', 'b', 'c', 'd'].map((k, i) => (k === ln.from || k === ln.to ? i : -1)).filter((i) => i >= 0)
+check('连线：往回的落到目标屏右边、箭头朝左', bk.ex === 412 && bk.ux === -1, JSON.stringify(bk))
+const low = flowLines([{ from: 'home.html', to: 'detail.html', hots: [{ x: 0, y: 5000, w: 10, h: 10 }] }], ['home.html', 'detail.html'], pos, 'app', [390, 844])[0]
+check('连线：按钮在屏幕外面（往下滚才看得到）→ 从屏幕底边出发、画虚线', low.off && !low.hot && low.sy === 11 + 844, JSON.stringify(low))
+check('连线：位置缺了的屏不画', flowLines(fl, K3, [pos[0]], 'app', [390, 844]).length === 0)
+
+// 拐点连成的线有没有穿过别的屏（含标题那一条）；出发那屏和目标屏不算
+const sample = (pts) => pts.slice(1).flatMap((p, i) => Array.from({ length: 20 }, (_, k) => [pts[i][0] + (p[0] - pts[i][0]) * (k + 1) / 20, pts[i][1] + (p[1] - pts[i][1]) * (k + 1) / 20]))
+const through = (pts, ps, skip, lift = 34) => ps.some((p, i) => !skip.includes(i) && sample(pts).some(([x, y]) => x > p.x && x < p.x + 412 && y > p.y - lift && y < p.y + 866))
+const hv = (pts) => pts.slice(1).every((p, i) => Math.abs(p[0] - pts[i][0]) < 0.01 || Math.abs(p[1] - pts[i][1]) < 0.01)
+const far = flowLines([{ from: 'cart.html', to: 'home.html', x: 10, y: 50, w: 40, h: 40 }, { from: 'home.html', to: 'cart.html', x: 300, y: 300, w: 60, h: 40 }], K3, pos, 'app', [390, 844], { lift: 34 })
+check('连线：隔着一屏的走缝、横平竖直带圆角，不穿过中间那屏', far.length === 2 && far.every((x) => hv(x.pts) && !through(x.pts, pos, [0, 2]) && /Q/.test(x.d)), far.map((x) => JSON.stringify(x.pts)).join(' | '))
 const g3 = [0, 1, 2, 3, 4, 5].map((i) => ({ x: (i % 3) * 520, y: Math.floor(i / 3) * 1000 }))
 const k6 = ['a', 'b', 'c', 'd', 'e', 'f']
-dn.push(...flowLines([{ from: 'f', to: 'a', x: 10, y: 400, w: 40, h: 40 }, { from: 'a', to: 'f', x: 300, y: 600, w: 40, h: 40 }, { from: 'e', to: 'b', x: 10, y: 400, w: 40, h: 40 }, { from: 'c', to: 'a', x: 10, y: 400, w: 40, h: 40 }], k6, g3, 'app', [390, 844], { lift: 34 }).map((ln) => ({ ...ln, g: g3 })))
-const skip6 = (ln) => k6.map((k, i) => (k === ln.from || k === ln.to ? i : -1)).filter((i) => i >= 0)
-check('连线：换排 / 上下同一列 / 隔屏的都不穿过别的屏', dn.length === 8 && dn.every((ln) => !through(ln.d, ln.g || g2, ln.g ? skip6(ln) : skipOf(ln))), dn.map((x) => x.d).join(' | '))
+const skip6 = (x) => k6.map((k, i) => (k === x.from || k === x.to ? i : -1)).filter((i) => i >= 0)
+const dn = [['b', 'c'], ['a', 'c'], ['c', 'b'], ['d', 'a'], ['f', 'a'], ['a', 'f'], ['e', 'b'], ['c', 'a'], ['c', 'd'], ['a', 'e']]
+  .flatMap(([from, to], i) => flowLines([{ from, to, x: 10 + (i % 3) * 120, y: 200 + i * 50, w: 40, h: 40 }], k6, g3, 'app', [390, 844], { lift: 34, z: 0.4 }))
+check('连线：换排 / 上下同一列 / 隔屏的都不穿过别的屏', dn.length === 10 && dn.every((x) => hv(x.pts) && !through(x.pts, g3, skip6(x))), dn.filter((x) => through(x.pts, g3, skip6(x))).map((x) => x.from + '>' + x.to + JSON.stringify(x.pts)).join(' | '))
+
+// 选中一屏、它通往好几屏：各走各的道（不叠在一起）、互不交叉
+const segsOf = (pts) => pts.slice(1).map((p, i) => [pts[i], p])
+const crossN = (A, B) => {
+  let n = 0
+  for (const [a, b] of segsOf(A)) for (const [c, d] of segsOf(B)) {
+    const av = Math.abs(a[0] - b[0]) < 0.01
+    if (av === (Math.abs(c[0] - d[0]) < 0.01)) continue
+    const [v0, v1, h0, h1] = av ? [a, b, c, d] : [c, d, a, b]
+    if (h0[1] > Math.min(v0[1], v1[1]) + 0.01 && h0[1] < Math.max(v0[1], v1[1]) - 0.01 && v0[0] > Math.min(h0[0], h1[0]) + 0.01 && v0[0] < Math.max(h0[0], h1[0]) - 0.01) n++
+  }
+  return n
+}
+const lapN = (A, B) => {
+  let n = 0
+  for (const [a, b] of segsOf(A)) for (const [c, d] of segsOf(B)) {
+    const v = Math.abs(a[0] - b[0]) < 0.01
+    if (v !== (Math.abs(c[0] - d[0]) < 0.01)) continue
+    const j = v ? 1 : 0
+    if (Math.abs(a[1 - j] - c[1 - j]) > 0.01) continue
+    n += Math.max(0, Math.min(Math.max(a[j], b[j]), Math.max(c[j], d[j])) - Math.max(Math.min(a[j], b[j]), Math.min(c[j], d[j])))
+  }
+  return n
+}
+const many = flowLines(['a', 'b', 'd', 'e', 'f'].map((to, i) => ({ from: 'c', to, x: 20, y: 120 + i * 110, w: 350, h: 60 })), k6, g3, 'app', [390, 844], { lift: 34, z: 0.35 })
+let tangle = 0
+for (let i = 0; i < many.length; i++) for (let j = i + 1; j < many.length; j++) tangle += crossN(many[i].pts, many[j].pts) + (lapN(many[i].pts, many[j].pts) > 1 ? 1 : 0)
+const mix = flowLines([{ from: 'c', to: 'a', hots: [{ x: 284, y: 312, w: 47, h: 40 }] }, { from: 'c', to: 'b', hots: [{ x: 266, y: 70, w: 48, h: 40 }] }, { from: 'c', to: 'e', hots: [{ x: 21, y: 278, w: 53, h: 40 }] }], k6, g3, 'app', [390, 844], { lift: 34, z: 0.35 })
+let mixN = 0
+for (let i = 0; i < mix.length; i++) for (let j = i + 1; j < mix.length; j++) mixN += crossN(mix[i].pts, mix[j].pts)
+check('连线：同走一道缝的几条排好里外，不交叉', mix.length === 3 && mixN === 0, mix.map((x) => x.to + JSON.stringify(x.pts)).join(' | '))
+check('连线：一屏通往五屏，各走各的道、互不交叉、不穿过别的屏', many.length === 5 && tangle === 0 && many.every((x) => !through(x.pts, g3, skip6(x))), many.map((x) => x.to + JSON.stringify(x.pts)).join(' | '))
+
+// 底栏 / 返回：好几屏同一个位置都跳同一屏 → 只描框不画线
+const nav = (k) => [{ path: '/a.html', x: 10, y: 790, w: 74, h: 45 }, { path: '/c.html', x: 84, y: 790, w: 74, h: 45 }, { path: '/d.html', x: 158, y: 790, w: 74, h: 45 }, ...(k === 'a.html' ? [{ path: '/b.html', x: 120, y: 700, w: 150, h: 60 }] : [])]
+const sc4 = ['a.html', 'b.html', 'c.html', 'd.html'].map((key) => ({ key }))
+const nf = flowsOf(sc4, (sc) => nav(sc.key), true)
+const fa = nf.filter((x) => x.from === 'a.html')
+check('连线：每屏同一处都有的（底栏）认成导航', fa.find((x) => x.to === 'c.html').hots[0].nav === true && fa.find((x) => x.to === 'b.html').hots[0].nav === false && nf.filter((x) => x.from === 'b.html' && x.to === 'a.html')[0].hots[0].nav, JSON.stringify(nf))
+const p4 = [0, 1, 2, 3].map((i) => ({ x: Math.floor(i / 2) * 520, y: (i % 2) * 1000 }))
+const nl = flowLines(fa, sc4.map((x) => x.key), p4, 'app', [390, 844], { lift: 34, z: 0.4 })
+const drawn = nl.filter((x) => !x.nav)
+check('连线：导航只描框、真跳转才画线', nl.some((x) => x.nav && x.to === 'c.html' && x.hot && !x.d) && drawn.length === 1 && drawn[0].to === 'b.html', JSON.stringify(nl.map((x) => [x.to, !!x.nav])))
+const navR = nl.filter((x) => x.nav).map((x) => x.hot)
+const inS = drawn[0].pts.slice(0, 2)
+check('连线：从按钮出来那一小段不压到底栏', !navR.some((r) => Math.min(inS[0][0], inS[1][0]) < r.x + r.w && Math.max(inS[0][0], inS[1][0]) > r.x && Math.min(inS[0][1], inS[1][1]) < r.y + r.h && Math.max(inS[0][1], inS[1][1]) > r.y), JSON.stringify(drawn[0].pts))
+check('连线：导航按钮滚出去看不见 → 什么都不画', flowLines(nf.filter((x) => x.from === 'b.html'), sc4.map((x) => x.key), p4, 'app', [390, 300], { lift: 34 }).length === 0)
+
+// 画出来：粗细跟着缩放走（屏幕上看着一样粗）
+const mk = flowMarks(drawn.concat(nl.filter((x) => x.nav)), 0.5)
+const tags = mk.map(([t, a]) => t + '.' + a.className)
+check('连线：画出按钮框、衬底、线、箭头、起点圆点；导航是虚线框', ['rect.hot', 'path.halo', 'path.ln', 'path.hd', 'circle.dot', 'rect.hot nav'].every((t) => tags.includes(t)) && mk.find(([t]) => t === 'path')[1].strokeWidth === 11 && mk.find(([, a]) => a.className === 'ln')[1].strokeWidth === 3.5 && mk.find(([, a]) => a.className === 'hot nav')[1].strokeDasharray, tags.join(','))
+check('连线：看不见的按钮那条是虚线', flowMarks([low], 1).find(([, a]) => a.className === 'ln off')[1].strokeDasharray)
 
 // ── 多尺寸并排 ──
 check('外框：标准手机有灵动岛，SE 那种矮屏没有', mod._test.frameOf('app', 393, 852).island > 0 && mod._test.frameOf('app', 375, 667).island === 0 && mod._test.frameOf('tablet', 744, 1133).pad === 14)
@@ -320,6 +369,17 @@ const tz2 = (k, v = {}) => ({ lang: 'zh', styleText: '〔风格〕{name}——{d
 const warm = formatStyle(tz2, STYLES.find((x) => x.id === 'warm'), false)
 check('风格卡：开局的字带名字、配色、字体、圆角、要点，最后让模型照着做', warm.startsWith('〔风格〕温暖手作——纸感底色') && warm.includes('底色 #F6EFE6，主色 #A9542A') && warm.includes('Songti SC') && warm.includes('圆角 16px') && warm.endsWith('照这个风格来做：'), warm)
 check('风格卡：换风格的字 + 玻璃的底色光斑', formatStyle(tz2, STYLES.find((x) => x.id === 'glass'), true).includes('；叠 radial-gradient') && formatStyle(tz2, STYLES[0], true).endsWith('把现在的设计换成这个风格。\n'))
+
+// ── 插进输入框：前后怎么接，光标落在哪 ──
+const { padInsert } = mod._test
+const pk = '〔选中元素〕h1\n样式：…\n'
+const pi = (...a) => JSON.stringify(padInsert(...a))
+check('插入：空输入框，点选的字末尾留空行、光标退回空行上', pi(pk, '', '', 0, true) === JSON.stringify({ text: pk + '\n', back: 1 }), pi(pk, '', '', 0, true))
+check('插入：前面有字不在行首 → 先换行', padInsert(pk, '这里改一下', '', 5, true).text === '\n' + pk + '\n')
+check('插入：上一次插的停在空行上 → 不再换行、也不再多留空行', pi(pk, 'a\n', '\n', 2, true) === JSON.stringify({ text: pk, back: 0 }), pi(pk, 'a\n', '\n', 2, true))
+check('插入：读不到输入框 → 照旧先换行', padInsert(pk, null, null, 3, true).text === '\n' + pk + '\n')
+check('插入：「照这个风格来做：」不加空行，光标跟在后面', pi('照这个风格来做：', '', '', 0, true) === JSON.stringify({ text: '照这个风格来做：', back: 0 }))
+check('插入：直接发的字不加空行', pi('〔选定方向〕…\n', '', '', 0, false) === JSON.stringify({ text: '〔选定方向〕…\n', back: 0 }))
 
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)
