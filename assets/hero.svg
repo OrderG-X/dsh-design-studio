@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="210" viewBox="0 0 760 210" role="img" aria-label="dsh-design-studio">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#161b22"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4D6BFE" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#4D6BFE" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <style>
+    .float { animation: float 3.4s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    .halo { animation: halo 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    @keyframes halo { 0%, 100% { opacity: 0.75; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+    .ripple { fill: none; stroke: #4D6BFE; stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center;
+      animation: ripple 3.4s cubic-bezier(0.2, 0.6, 0.4, 1) infinite; }
+    .r2 { animation-delay: 1.7s; }
+    @keyframes ripple { 0% { transform: scale(0.55); opacity: 0.85; } 70% { transform: scale(1.7); opacity: 0; } 100% { transform: scale(1.7); opacity: 0; } }
+    .press { transform-box: fill-box; transform-origin: center; animation: press 3.4s ease-in-out infinite; }
+    @keyframes press { 0%, 55%, 100% { transform: scale(1); } 62% { transform: scale(0.9); } 70% { transform: scale(1); } }
+    .pill { animation: pill 3.4s ease-in-out infinite; }
+    .p2 { animation-delay: 0.12s; } .p3 { animation-delay: 0.24s; } .p4 { animation-delay: 0.36s; }
+    @keyframes pill { 0%, 60%, 100% { opacity: 1; } 66% { opacity: 0.72; } }
+  </style>
+
+  <rect width="760" height="210" rx="18" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="759" height="209" rx="17.5" fill="none" stroke="#30363d"/>
+
+  <circle class="halo" cx="76" cy="92" r="62" fill="url(#glow)"/>
+  <circle class="ripple" cx="76" cy="92" r="30"/>
+  <circle class="ripple r2" cx="76" cy="92" r="30"/>
+
+  <g class="float">
+    <g class="press">
+        <rect x="38" y="66" width="22" height="44" rx="5" fill="#4D6BFE" fill-opacity="0.35" stroke="#8ea6ff" stroke-width="2"/>
+        <rect x="92" y="66" width="22" height="44" rx="5" fill="#4D6BFE" fill-opacity="0.35" stroke="#8ea6ff" stroke-width="2"/>
+        <rect x="62" y="56" width="28" height="56" rx="6" fill="#4D6BFE" stroke="#ffffff" stroke-width="2"/>
+        <rect x="70" y="60" width="12" height="3" rx="1.5" fill="#ffffff" fill-opacity="0.8"/>
+    </g>
+  </g>
+
+  <text x="146" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif"
+        font-size="38" font-weight="700" fill="#ffffff" letter-spacing="-0.5">dsh-design-studio</text>
+
+  <text x="146" y="116" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif"
+        font-size="14.5" fill="#8b949e">A design canvas for DSH: device frames, click-to-edit, versions and export.</text>
+
+  <text x="146" y="138" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+        font-size="14.5" fill="#8b949e">模型画的界面摆上画布：点一下就改，换主色三屏一起变，一键导出展示图。</text>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif" font-size="12" font-weight="600">
+    <g class="pill">
+      <rect x="146" y="156" width="74" height="26" rx="13" fill="#4D6BFE" fill-opacity="0.16" stroke="#4D6BFE" stroke-opacity="0.45"/>
+      <text x="183" y="173" fill="#8ea6ff" text-anchor="middle">canvas</text>
+    </g>
+    <g class="pill p2">
+      <rect x="228" y="156" width="126" height="26" rx="13" fill="#4D6BFE" fill-opacity="0.16" stroke="#4D6BFE" stroke-opacity="0.45"/>
+      <text x="291" y="173" fill="#8ea6ff" text-anchor="middle">device frames</text>
+    </g>
+    <g class="pill p3">
+      <rect x="362" y="156" width="89" height="26" rx="13" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.4"/>
+      <text x="406.5" y="173" fill="#7ee787" text-anchor="middle">versions</text>
+    </g>
+    <g class="pill p4">
+      <rect x="459" y="156" width="74" height="26" rx="13" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.4"/>
+      <text x="496" y="173" fill="#7ee787" text-anchor="middle">export</text>
+    </g>
+  </g>
+</svg>
