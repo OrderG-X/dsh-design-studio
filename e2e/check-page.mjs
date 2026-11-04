@@ -76,7 +76,23 @@ fs.writeFileSync(path.join(site, 'article.html'), head('web') + `
 <img class="fine" src="pic.jpg" alt="" style="width:160px;height:80px">
 </body></html>`)
 
-// 仿右侧栏：外层页面，iframe 进预览，按 picker 的握手走
+// 小程序顶栏：白底带过渡，调色（tweak）后变深；窄于 380 时媒体查询换深色
+fs.writeFileSync(path.join(site, 'mini-tone.html'), head('miniprogram') + `<style>:root{--nav:#ffffff}.nav{height:88px;background:var(--nav);transition:background-color .3s}@media (max-width:380px){.nav{background:#111}}</style>
+<div class="nav"></div><p>正文</p></body></html>`)
+
+// 载完半秒后顶上的图换成黑的；页面自己一直滚（每 45ms 滚 5px，滚 1.5 秒），滚过 20px 顶栏变黑
+const svg = (fill) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect width="20" height="10" fill="${fill}"/></svg>`)
+fs.writeFileSync(path.join(site, 'mini-late.html'), head('miniprogram') + `<img id="h" src="${svg('#fff')}" alt="" style="display:block;width:100%;height:200px;object-fit:cover">
+<script>addEventListener('load', () => setTimeout(() => { document.getElementById('h').src = ${JSON.stringify(svg('#111'))} }, 500))</script></body></html>`)
+fs.writeFileSync(path.join(site, 'mini-roll.html'), head('miniprogram') + `<style>.nav{position:fixed;top:0;left:0;right:0;height:88px;background:#fff}.nav.dk{background:#111}main{height:4000px}</style>
+<div class="nav"></div><main></main><script>
+addEventListener('scroll', () => document.querySelector('.nav').classList.toggle('dk', scrollY > 20))
+addEventListener('load', () => setTimeout(() => { const t0 = performance.now(); const iv = setInterval(() => { scrollBy(0, 5); if (performance.now() - t0 > 1500) { clearInterval(iv); parent.postMessage({ dshDesign: 1, type: 'rollEnd' }, '*') } }, 45) }, 300))
+</script></body></html>`)
+
+fs.writeFileSync(path.join(site, 'mini-auto.html'), head('miniprogram') + `<style>:root{color-scheme:light dark}.nav{position:fixed;top:0;left:0;right:0;height:88px;background:#fff}@media (prefers-color-scheme: dark){.nav{background:#111}}</style>
+<div class="nav"></div></body></html>`)
+// 仿右侧栏：外层页面，iframe 进预览，按 picker 的握手走（kind=none 不体检，只记胶囊深浅 window.__tops）
 const harness = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x')
   const src = u.searchParams.get('src') || ''
@@ -85,14 +101,18 @@ const harness = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
   res.end(`<!doctype html><body style="margin:0"><iframe id="f" src="${src}" style="width:${w}px;height:${h}px;border:0"></iframe><script>
     const f = document.getElementById('f'); const origin = new URL(${JSON.stringify(src)}).origin
-    window.__res = null
+    window.__res = null; window.__tops = []; window.__caps = {}; window.__log = []
     const send = (m) => f.contentWindow.postMessage({ dshDesign: 1, ...m }, origin)
+    window.__send = send
     addEventListener('message', (e) => {
       if (e.origin !== origin || !e.data || e.data.dshDesign !== 1) return
       const d = e.data
       if (d.type === 'hello') send({ type: 'init', seed: null })
-      else if (d.type === 'ready') setTimeout(() => send({ type: 'check', id: 'c1', kind: ${JSON.stringify(kind)} }), 300)
+      else if (d.type === 'ready') { if (${JSON.stringify(kind)} !== 'none') setTimeout(() => send({ type: 'check', id: 'c1', kind: ${JSON.stringify(kind)} }), 300) }
       else if (d.type === 'checked') window.__res = d
+      else if (d.type === 'top') { window.__tops.push(d.dark); window.__log.push(['top', d.dark]) }
+      else if (d.type === 'rollEnd') window.__log.push(['end'])
+      else if (d.type === 'captured') window.__caps[d.id] = { top: d.top, ok: !!d.png }
     })
   </script></body>`)
 })
@@ -222,6 +242,74 @@ try {
   check('图片被拉变形：2:1 的图塞进方框；object-fit: cover、按比例的不算', sq.length === 1 && /squash/.test(sq[0].sel) && sq[0].nw === 16 && sq[0].nh === 8 && sq[0].w === 200, JSON.stringify(sq))
   const app = await run('article.html', 'app', '390x844')
   check('App 不查一行太长', !((app && app.issues) || []).some((x) => x.type === 'long'), JSON.stringify(app && app.issues.map((x) => x.type)))
+
+  // 胶囊深浅跟着变：调色（带过渡）放完再量、换尺寸碰上媒体查询再量；导出截图带上同一个结果
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/mini-tone.html`)}&kind=none&size=390x844`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    let first = null
+    for (let i = 0; i < 40 && first === null; i++) { await sleep(150); first = (await ev('window.__tops'))?.[0] ?? null }
+    await ev("__send({ type: 'tweak', vars: { '--nav': '#111111' } })")
+    await sleep(900)
+    const afterTweak = await ev('window.__tops.at(-1)')
+    await ev("__send({ type: 'capture', id: 'k1', full: false, scale: 1 })")
+    let cap = null
+    for (let i = 0; i < 40 && !cap; i++) { await sleep(150); cap = (await ev('window.__caps.k1')) || null }
+    await ev("__send({ type: 'tweak', vars: {} })")
+    await sleep(900)
+    const back = await ev('window.__tops.at(-1)')
+    // 截图和调色同时发：胶囊深浅按复制页面那一刻（白顶栏）算，不按后来变的
+    await ev("__send({ type: 'capture', id: 'k2', full: false, scale: 1 }); __send({ type: 'tweak', vars: { '--nav': '#111111' } })")
+    let cap2 = null
+    for (let i = 0; i < 40 && !cap2; i++) { await sleep(150); cap2 = (await ev('window.__caps.k2')) || null }
+    await ev("__send({ type: 'tweak', vars: {} })")
+    await sleep(900)
+    await ev("document.getElementById('f').style.width = '375px'")
+    await sleep(600)
+    const narrow = await ev('window.__tops.at(-1)')
+    await chrome.cdp('Target.closeTarget', { targetId })
+    check('胶囊深浅：白顶栏先报黑胶囊；调成深色（过渡 .3s）放完后报白的；撤掉调色回黑的；窄到媒体查询换深色又报白的', first === false && afterTweak === true && back === false && narrow === true, JSON.stringify({ first, afterTweak, back, narrow }))
+    check('导出截图带上页面量的胶囊深浅（和画布上同一个）', cap && cap.ok && cap.top === true, JSON.stringify(cap))
+    check('截图后马上调色：截图带的胶囊深浅是复制页面那一刻的', cap2 && cap2.ok && cap2.top === false, JSON.stringify(cap2))
+  }
+  // 晚换的图、一直在滚的页面：不用等停下来才报
+  {
+    const open = async (file) => {
+      const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/${file}`)}&kind=none&size=375x812`
+      const { targetId } = await chrome.cdp('Target.createTarget', { url })
+      const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+      return { ev: async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value, close: () => chrome.cdp('Target.closeTarget', { targetId }) }
+    }
+    const late = await open('mini-late.html')
+    await sleep(2000)
+    const lateTops = await late.ev('window.__tops')
+    await late.close()
+    check('载完后图换成黑的：胶囊跟着报白的', Array.isArray(lateTops) && lateTops[0] === false && lateTops.at(-1) === true, JSON.stringify(lateTops))
+    const roll = await open('mini-roll.html')
+    await sleep(2600)
+    const log = await roll.ev('window.__log')
+    await roll.close()
+    const darkAt = (log || []).findIndex((x) => x[0] === 'top' && x[1] === true)
+    const endAt = (log || []).findIndex((x) => x[0] === 'end')
+    check('一直在滚的页面：顶栏变黑后滚动中就报白胶囊，不等停下来', darkAt >= 0 && endAt > darkAt, JSON.stringify(log))
+    // 系统从浅色切到深色（页面跟着系统换顶栏颜色）：不用点页面，胶囊跟着报白的
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/mini-auto.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await chrome.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }, sessionId)
+    let autoFirst = null
+    for (let i = 0; i < 40 && autoFirst === null; i++) { await sleep(150); autoFirst = (await ev('window.__tops'))?.at(-1) ?? null }
+    await sleep(600)
+    autoFirst = await ev('window.__tops.at(-1)')
+    await chrome.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] }, sessionId)
+    await sleep(800)
+    const autoDark = await ev('window.__tops.at(-1)')
+    await chrome.cdp('Target.closeTarget', { targetId })
+    check('系统换成深色：顶栏跟着变深，胶囊不用点页面就报白的', autoFirst === false && autoDark === true, JSON.stringify({ autoFirst, autoDark }))
+  }
 
   const dark = await run('dark.html', 'web', '1280x800')
   const dk = (dark && dark.issues) || []

@@ -269,6 +269,7 @@ check('连线：画出按钮框、衬底、线、箭头、起点圆点；导航�
 check('连线：看不见的按钮那条是虚线', flowMarks([low], 1).find(([, a]) => a.className === 'ln off')[1].strokeDasharray)
 
 // ── 多尺寸并排 ──
+check('小程序：meta 认 miniprogram / 小程序，默认 375×812；外框是手机 + 胶囊，矮屏没灵动岛但胶囊还在', mod._test.parseMeta('miniprogram').kind === 'miniprogram' && mod._test.parseMeta('小程序').kind === 'miniprogram' && mod._test.sizeOf('', 'miniprogram').join('x') === '375x812' && mod._test.frameOf('miniprogram', 375, 812).island > 0 && mod._test.frameOf('miniprogram', 375, 812).capsule && mod._test.frameOf('miniprogram', 375, 667).island === 0 && mod._test.frameOf('miniprogram', 375, 667).capsule)
 check('外框：标准手机有灵动岛，SE 那种矮屏没有', mod._test.frameOf('app', 393, 852).island > 0 && mod._test.frameOf('app', 375, 667).island === 0 && mod._test.frameOf('tablet', 744, 1133).pad === 14)
 const { layoutRow } = mod._test
 const row = layoutRow([[390, 844], [848, 1208], [1440, 934]], 700, 600)
@@ -358,12 +359,23 @@ check('调样式：交给模型的字带元素、选择器、改动和文件', a
 }
 
 // ── 风格卡：配色都过对比度，交给模型的字带全套 ──
-const { STYLES, formatStyle } = mod._test
+const { STYLES, formatStyle, accentUse } = mod._test
 const lum = (hex) => { const v = hex.slice(1).match(/../g).map((x) => parseInt(x, 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2] }
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
 const lowC = STYLES.flatMap((x) => [['text', x.c.text, x.c.bg], ['muted', x.c.muted, x.c.bg], ['muted', x.c.muted, x.c.surface], ['on', x.c.on, x.c.primary], ['link', x.c.link, x.c.bg], ['link', x.c.link, x.c.surface]]
   .filter(([, a, b]) => ratio(a, b) < 4.5).map(([k, a, b]) => `${x.id}.${k} ${ratio(a, b).toFixed(2)}`))
-check('风格卡：九种，正文 / 次要文字 / 主色按钮上的字 / 链接色都 ≥ 4.5:1', STYLES.length === 9 && !lowC.length, lowC.join(', '))
+check('风格卡：十五种，正文 / 次要文字 / 主色按钮上的字 / 链接色都 ≥ 4.5:1', STYLES.length === 15 && !lowC.length, lowC.join(', '))
+// 点缀色怎么用由对比度定：说能写大字的 ≥ 3:1；只做色块的，色块上的正文色 ≥ 4.5:1
+const accBad = STYLES.flatMap((x) => {
+  const u = accentUse(x.c)
+  if (u === 'accBig') return Math.min(ratio(x.c.accent, x.c.bg), ratio(x.c.accent, x.c.surface)) >= 3 ? [] : [`${x.id} 大字`]
+  if (u === 'accBlock') return ratio(x.c.text, x.c.accent) >= 4.5 ? [] : [`${x.id} 色块上的字`]
+  return u === 'accShape' ? [] : [`${x.id} ${u}`]
+})
+const uses = Object.fromEntries(['guochao', 'cute', 'retro', 'sale', 'fresh', 'soft', 'dark'].map((id) => [id, accentUse(STYLES.find((x) => x.id === id).c)]))
+check('风格卡：点缀色按对比度说用法——国潮、可爱、复古、促销、清新只做色块，柔和立体只做图形，深色能写大字', !accBad.length && JSON.stringify(uses) === JSON.stringify({ guochao: 'accBlock', cute: 'accBlock', retro: 'accBlock', sale: 'accBlock', fresh: 'accBlock', soft: 'accShape', dark: 'accBig' }), accBad.join(', ') + ' ' + JSON.stringify(uses))
+const tz3 = (k, v = {}) => ({ lang: 'zh', styleText: '{colors}', styleColors: '点缀 {accent}（{accUse}）', accBig: '图形、大字', accBlock: '只做色块；色块上的字用 {text}', accShape: '只做图形' }[k] ?? '').replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '')
+check('风格卡：交给模型的字里，可爱的点缀色写明只做色块、上面的字用正文色', formatStyle(tz3, STYLES.find((x) => x.id === 'cute'), false) === '点缀 #FFC93C（只做色块；色块上的字用 #3A2540）' && formatStyle(tz3, STYLES.find((x) => x.id === 'dark'), false).endsWith('（图形、大字）'), formatStyle(tz3, STYLES.find((x) => x.id === 'cute'), false))
 const tz2 = (k, v = {}) => ({ lang: 'zh', styleText: '〔风格〕{name}——{desc}\n配色：{colors}\n字体：{fonts}\n形状：{shape}\n要点：{notes}\n{ask}', styleColors: '底色 {bg}，主色 {primary}{bgImage}', styleBgImage: '；叠 {v}',
   styleFonts: '标题 {head}；正文 {body}', styleShape: '圆角 {r}px；阴影 {s}', styleStart: '照这个风格来做：', styleRestyle: '把现在的设计换成这个风格。\n' }[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '')
 const warm = formatStyle(tz2, STYLES.find((x) => x.id === 'warm'), false)

@@ -466,7 +466,7 @@ try {
   const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab > span:first-child')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
   // 标签是页面标题，标题没载出来时先显示文件名：两种都认
   check('再出的一版紧挨着原版', /(首页|home),(首页 B|home-b)(,|$)/.test(order || ''), order)
-  check('几个版本并排：每屏标题旁都有「就要这个」，不用先选中', /首页就要这个,首页 B就要这个|homeUse this,home-bUse this/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent).join(',')`) || ''))
+  check('几个版本并排：每屏标题旁都有「就要这个」，不用先选中', /(首页|home)(就要这个|Use this),(首页 B|home-b)(就要这个|Use this)/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent).join(',')`) || ''))
   // 先点一下那一屏选中它（按钮在选中的那屏标签旁）
   // （那一屏可能在画面外，鼠标点不到，直接发 pointer 事件：按在那屏上、在窗口上松开）
   await page(`(() => {
@@ -584,7 +584,7 @@ try {
   await page(`[...document.querySelectorAll('.ddp-sc')].find((x) => x.querySelector('.nm')?.textContent === '温暖手作').click()`)
   await sleep(500)
   const styTxt = await page(composerText)
-  check('换风格：九张风格卡，点「温暖手作」→ 输入框里是〔风格〕、整套配色和换风格的要求', cards === 9 && /〔风格〕温暖手作/.test(styTxt) && styTxt.includes('#F6EFE6') && /把现在的设计换成这个风格/.test(styTxt) && !(await page(`!!document.querySelector('.ddp-styles')`)),
+  check('换风格：十五张风格卡，点「温暖手作」→ 输入框里是〔风格〕、整套配色和换风格的要求', cards === 15 && /〔风格〕温暖手作/.test(styTxt) && styTxt.includes('#F6EFE6') && /把现在的设计换成这个风格/.test(styTxt) && !(await page(`!!document.querySelector('.ddp-styles')`)),
     `${cards} 张；${styTxt.slice(-300)}`)
 
   // ⑨ 远程看：同一个会话换个地址打开（remote.test 指向本机，DSH 信任这个域名；页面里 127.0.0.1 指的是「那台设备自己」，预览连不上）

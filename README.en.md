@@ -15,7 +15,7 @@
 
 </div>
 
-**Design Studio** is a DeepSeek Harness (DSH) plugin. Say what you want to make, and the model's web pages, app screens, posters and slides appear one by one on a canvas in the right sidebar, inside phone or browser frames. Click the direction you like, or click whatever looks off and add a sentence, and the model edits it.
+**Design Studio** is a DeepSeek Harness (DSH) plugin. Say what you want to make, and the model's web pages, app screens, mini programs, posters and slides appear one by one on a canvas in the right sidebar, inside phone or browser frames. Click the direction you like, or click whatever looks off and add a sentence, and the model edits it.
 
 ![Demo: one sentence → three directions → pick one for the full set → click to edit](assets/demo.gif)
 
