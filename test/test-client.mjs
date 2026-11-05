@@ -42,6 +42,16 @@ const ctx = {
     inject: (name, fn) => fn(),
     register: (opts, comp) => { slots.push({ opts, comp }); return () => {} },
   },
+  // DSH 0.2.1 起的服务：点选标签用（来源、会话、消息里的规则）
+  inject: (deps, fn) => fn({ ...svc, effect: (f) => f() }),
+}
+const sources = []
+const rules = []
+const bails = []
+const svc = {
+  inputTriggers: { registerSource: (src) => { sources.push(src); return () => {} } },
+  sessions: { binding: (sid) => (sid === 'sA' ? { ctx: { bail: (self, name, req) => { bails.push({ name, req }); return true } } } : undefined) },
+  uiConversation: { userText: { register: (r) => { rules.push(r); return () => {} } } },
 }
 mod.apply(ctx)
 
@@ -405,6 +415,28 @@ check('插入：上一次插的停在空行上 → 不再换行、也不再多�
 check('插入：读不到输入框 → 照旧先换行', padInsert(pk, null, null, 3, true).text === '\n' + pk + '\n')
 check('插入：「照这个风格来做：」不加空行，光标跟在后面', pi('照这个风格来做：', '', '', 0, true) === JSON.stringify({ text: '照这个风格来做：', back: 0 }))
 check('插入：直接发的字不加空行', pi('〔选定方向〕…\n', '', '', 0, false) === JSON.stringify({ text: '〔选定方向〕…\n', back: 0 }))
+
+// ── 点选标签（DSH 0.2.1 起：输入框里一个短标签，悬停看详情，发出去是整段） ──
+const { pickInfo, pickLabel, pickRule } = mod._test
+const src0 = sources[0]
+check('点选标签：注册成 @ 的来源，不出候选、不占菜单标题', sources.length === 1 && src0.name === 'dsh-design-studio' && src0.trigger === '@' && src0.showGroupTitle === false && (await src0.candidates()).length === 0)
+check('点选标签：复制出来、发给模型都是整段，前后空一行', src0.codec.clipboardText('〔选中元素〕a') === '\n\n〔选中元素〕a\n\n' && (await src0.codec.serialize('〔选中元素〕a')) === '\n\n〔选中元素〕a\n\n')
+check('点选标签：消息里的规则和标签都注册了', rules.length === 1 && rules[0].id === 'ddp-pick' && slots.some((s) => s.opts.name === 'conversation.user.text.node' && s.opts.key === 'ddp-pick'))
+const PK = formatPick(el, fileSt).trim()
+const inf = pickInfo(PK)
+check('点选标签：读出元素名、字、大小、文件', inf.kind === 'el' && inf.name === el.name && inf.text && pickLabel(inf, (k) => k) === inf.text && /^\d+×\d+$/.test(inf.size) && inf.file === 'index.html', JSON.stringify(inf))
+const AREA = '〔选中区域〕页面上 (0, 0) 起 300×200 的一块\n文件：/a/b.html\n包含：\n- a.go「去点单」\n- h1'
+const ai = pickInfo(AREA)
+check('点选标签：区域写几个元素', ai.kind === 'area' && ai.n === 2 && ai.size === '300×200' && pickLabel(ai, (k, v) => k + (v ? v.n : '')) === 'pickAreaN2', JSON.stringify(ai))
+const MSG = '改成绿色\n\n' + PK + '\n\n再大一点'
+const nodes = []
+for (let at = 0, n; (n = pickRule.match(MSG, at)); at = n.end) nodes.push(n)
+const pkN = nodes.find((n) => n.id === 'ddp-pick')
+check('点选标签：发出去的消息里整块认成一个标签，前后空行显示成空格', nodes.length === 3 && pkN && MSG.slice(pkN.start, pkN.end) === PK && nodes[0].data.display === ' ' && nodes[2].data.display === ' ' && nodes[0].end === pkN.start && nodes[2].start === pkN.end, JSON.stringify(nodes.map((n) => [n.id, n.start, n.end])))
+check('点选标签：用户自己打的字不认', !pickRule.match('〔选中元素〕是什么意思？\n- 请解释格式', 0) && !pickRule.match('〔选中元素〕是什么意思？', 0) && !pickRule.match('〔选中元素〕是什么意思？\n位置：在工具栏里\n- 请解释格式', 0) && !pickRule.match('〔选中区域〕是啥\n文件：a.html', 0) && !pickRule.match('〔选中元素〕请解释这个格式\n位置：顶上\nHTML：一段代码\n样式：随便\n- 列表', 0) && !pickRule.match('随便说说', 0))
+check('点选标签：页面地址带 ?参数 也读出文件名', pickInfo('〔选中元素〕a\n页面：http://localhost:3000/index.html?theme=dark#top\n位置：a').file === 'index.html')
+const pill = slots.find((s) => s.opts.name === 'conversation.user.text.node').comp({ node: { data: { text: PK } } })
+check('点选标签：消息里显示成标签（只有元素的字）', pill.props.className === 'ddp-pickpill' && text(pill) === inf.text, text(pill))
 
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

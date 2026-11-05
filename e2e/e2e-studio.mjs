@@ -11,6 +11,8 @@
  *   ⑦ 调样式：单看菜单屏，点「加入购物车」→ 面板认出它用的设计变量；拖圆角页面上先变，写回文件 → 源码里那个元素带上 style；
  *     再拖字号「交给模型」→ 输入框里是〔调样式〕；退出 → 没写回的改动撤掉
  *   ⑧ 换风格：设计规范面板里「换个风格…」→ 一排风格卡，点「温暖手作」→ 输入框里是〔风格〕和整套配色
+ *   ⑧b 画笔标注：工具栏「画笔标注」→ 在页面上画圈、箭头、写字，撤销 / 重做 →「交给模型」→ refs/ 里一张标注图（页面截图叠着画的），
+ *     输入框里是〔标注〕和图的路径，叫模型先用 read_image 看
  *   ⑨ 远程看：换个地址（remote.test，像手机走外网）打开同一个会话 → 连不上本机预览，右侧栏把这一屏打包放进沙盒 iframe：
  *     样式、写回的 style 都在，<base> 指着原地址（不漏 DSH 的地址），设计变量照样报上来；点页面里的链接换到那一屏；文件改了跟着变；体检照样量、导出照样能导
  *
@@ -243,7 +245,8 @@ try {
   const inst = run('npm', ['i', `@deepseek-ai/dsh@${DSH_SPEC}`, 'pnpm@11', `--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error'], { cwd: path.join(tmp, 'cli') })
   if (!check(`装 DSH ${DSH_SPEC}`, inst.code === 0, inst.out.slice(-800))) throw new Error('DSH 没装上')
   const cliDir = path.join(tmp, 'cli', 'node_modules', '@deepseek-ai', 'dsh')
-  console.log(`  （DSH ${JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8')).version}）`)
+  const dshVersion = JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8')).version
+  console.log(`  （DSH ${dshVersion}）`)
   const add = run(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), 'plugin', '--profile', 'web', 'add', path.join(tmp, tgz)], { cwd: tmp })
   if (!check('DSH 装上插件', add.code === 0, add.out.slice(-800))) throw new Error('插件没装上')
   console.log(`  （预览版说明：${seedWelcome(cliDir)}）`)
@@ -574,6 +577,32 @@ try {
   const after = await styleAttr('menu.html', 'a.go')
   check('调样式：退出 → 没写回的字号撤掉，写回的圆角还在', after !== null && /border-radius:\s*24px/.test(after) && !/font-size/.test(after) && !(await page(`!!document.querySelector('.ddp-style')`)), after)
 
+  // ⑦b 点选元素 → 输入框：DSH 0.2.1 起是一个短标签（悬停看详情，发出去是整段），更早的版本插成一段字
+  await page(`document.querySelector('.ddp-bar button.pick').click()`)
+  await sleep(300)
+  await clickIn('menu.html', 'a.go')
+  await sleep(800)
+  const pq = await page(`(() => { const c = [...document.querySelectorAll('[data-composer-chip="dsh-design-studio"]')]; const last = c[c.length - 1]; const r = last && last.getBoundingClientRect(); return { n: c.length, h: r ? Math.round(r.height) : 0, x: r ? r.x + r.width / 2 : 0, y: r ? r.y + r.height / 2 : 0, text: last ? (last.querySelector('[aria-hidden]') ? last.innerText.replace(last.querySelector('[aria-hidden]').textContent, '') : last.innerText).trim() : '', mark: last && last.querySelector('[aria-hidden]') ? getComputedStyle(last.querySelector('[aria-hidden]')).fontSize : '', quotes: document.querySelectorAll('[data-composer-quote]').length, all: ${composerText} } })()`)
+  const chipDsh = !/^0\.([01]\.|2\.0)/.test(dshVersion)
+  check('点选元素 → 输入框里' + (chipDsh ? '是一个短标签「加入购物车」' : '是〔选中元素〕a.go（旧版 DSH 插成字）'),
+    chipDsh ? pq.n === 1 && pq.text === '加入购物车' && pq.mark !== '' && pq.mark === '0px' && pq.h > 0 && pq.h < 32 && pq.quotes === 0 && !/〔选中元素〕/.test(pq.all) : pq.n === 0 && /〔选中元素〕a\.go/.test(pq.all) && /HTML：/.test(pq.all), JSON.stringify({ ...pq, all: pq.all.slice(-200), dshVersion }))
+  if (chipDsh) {
+    await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pq.x, y: pq.y }, sessionId)
+    const card = await until(`(() => { const c = document.querySelector('.ddp-pickcard'); return c && c.style.display !== 'none' && c.innerText })()`, 3000)
+    const cardBg = await page(`getComputedStyle(document.querySelector('.ddp-pickcard')).backgroundColor`)
+    check('点选标签：悬停出详情卡（元素、位置、文件，有底色）', !!card && /a\.go/.test(card) && /menu\.html/.test(card) && !/rgba\(0, 0, 0, 0\)|transparent/.test(cardBg), card + ' ' + cardBg)
+    await shot('7b-pick-chip')
+    await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 }, sessionId)
+    await sleep(200)
+    const gone = await page(`(() => { const c = document.querySelector('.ddp-pickcard'); return !c || c.style.display === 'none' })()`)
+    check('点选标签：鼠标移开详情卡收起', gone)
+    // 点完直接打字：字要接在标签后面（光标别跑到输入框最前面）
+    await chrome.cdp('Input.insertText', { text: '改成红色' }, sessionId)
+    await sleep(300)
+    const typed = await page(composerText)
+    check('点选标签：接着打的字在标签后面', typed.indexOf('加入购物车') >= 0 && typed.indexOf('改成红色') > typed.indexOf('加入购物车'), JSON.stringify({ chip: typed.indexOf('加入购物车'), typed: typed.indexOf('改成红色'), len: typed.length, head: typed.slice(0, 30), active: await page(`(() => { const a = document.activeElement; return a ? a.tagName + (a.getAttribute('data-lexical-editor') ? '[lexical]' : '') + (a.tagName === 'IFRAME' ? a.src : '') : null })()`) }))
+  }
+
   // ⑧ 换风格：设计规范面板 →「换个风格…」→ 点一张卡
   await page(`document.querySelector('button[title="设计规范"]').click()`)
   await sleep(300)
@@ -591,6 +620,135 @@ try {
   const styTxt = await page(composerText)
   check('换风格：二十张风格卡，样板上点「用这个风格」→ 输入框里是〔风格〕、整套配色和换风格的要求', cards === 20 && /〔风格〕温暖手作/.test(styTxt) && styTxt.includes('#F6EFE6') && /把现在的设计换成这个风格/.test(styTxt) && !(await page(`!!document.querySelector('.ddp-styles')`)),
     `${cards} 张；${styTxt.slice(-300)}`)
+
+  // ⑧b 画笔标注：真鼠标在台面上画（CDP 的鼠标事件，和人点的一样走 pointer 事件）
+  const mouse = (type, x, y) => chrome.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }, sessionId)
+  const drag = async (x0, y0, x1, y1) => {
+    await mouse('mousePressed', x0, y0)
+    for (let i = 1; i <= 8; i++) await mouse('mouseMoved', x0 + ((x1 - x0) * i) / 8, y0 + ((y1 - y0) * i) / 8)
+    await mouse('mouseReleased', x1, y1)
+  }
+  const tool = (name) => page(`document.querySelector('.ddp-mk-tools button[title^="${name}"]').click()`)
+  await page(`document.querySelector('.ddp-bar button[title^="画笔标注"]').click()`)
+  const markOn = await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
+  check('画笔标注：盖上画布，工具栏有七种笔 + 撤销 / 重做 / 清掉，颜色和粗细', markOn && await page(`document.querySelectorAll('.ddp-mk-tools > .ddp-btn').length`) === 10 &&
+    await page(`document.querySelectorAll('.ddp-mk-sz .ddp-btn').length`) === 3 && await page(`!!document.querySelector('.ddp-mk-color')`), await page(`document.querySelector('.ddp-mark')?.innerText || '没有标注层'`))
+  // 画在台面上看得到的那一屏中间
+  const fr = await page(`(() => { const s = document.querySelector('.ddp-stage').getBoundingClientRect(); const r = [...document.querySelectorAll('.ddp-stage iframe')].map((x) => x.getBoundingClientRect()).find((r) => r.width > 80 && r.height > 80 && r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null })()`)
+  if (fr) {
+    await tool('圆圈')
+    await drag(fr.x - 40, fr.y - 30, fr.x + 40, fr.y + 30)
+    await tool('箭头')
+    await drag(fr.x - 90, fr.y + 90, fr.x - 45, fr.y + 35)
+    await tool('文字')
+    await mouse('mousePressed', fr.x - 60, fr.y + 110)
+    await mouse('mouseReleased', fr.x - 60, fr.y + 110)
+    await until(`document.activeElement?.tagName === 'TEXTAREA' && !!document.activeElement.closest('.ddp-mark')`, 3000)
+    await chrome.cdp('Input.insertText', { text: '这里改大' }, sessionId)
+    await enter()
+    await sleep(200)
+  }
+  const red = await page(`(() => { const c = document.querySelector('.ddp-mark .cv'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] < 90 && d[i + 2] < 90 && d[i + 3] > 200) n++; return n })()`)
+  const undoOff = `document.querySelector('.ddp-mk-tools button[title^="撤销"]').disabled`
+  const redoOff = `document.querySelector('.ddp-mk-tools button[title^="重做"]').disabled`
+  await page(`document.querySelector('.ddp-mk-tools button[title^="撤销"]').click()`)
+  await sleep(150)
+  const redOne = await page(`(() => { const c = document.querySelector('.ddp-mark .cv'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] < 90 && d[i + 2] < 90 && d[i + 3] > 200) n++; return n })()`)
+  const canRedo = !(await page(redoOff))
+  await page(`document.querySelector('.ddp-mk-tools button[title^="重做"]').click()`)
+  await sleep(150)
+  await shot('8c-markup')
+  check('画笔标注：画了红圈、箭头和字；撤销少一笔，能重做', !!fr && red > 300 && redOne > 50 && redOne < red && canRedo && !(await page(undoOff)) && (await page(redoOff)), `frame ${JSON.stringify(fr)}，红点 ${red} → 撤销后 ${redOne}，可重做 ${canRedo}`)
+  // 窗口变窄（侧栏被拉窄也一样）：页面挪了、缩了，画的跟着那一屏走
+  const markAt = `(() => { const c = document.querySelector('.ddp-mark .cv'); const cr = c.getBoundingClientRect(); const k = c.width / cr.width; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0, sx = 0, sy = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] < 90 && d[i + 2] < 90 && d[i + 3] > 200) { const p = i / 4; n++; sx += (p % c.width) / k; sy += Math.floor(p / c.width) / k }
+    const f = [...document.querySelectorAll('.ddp-stage iframe')].map((x) => x.getBoundingClientRect()).find((r) => r.width > 80 && r.height > 80 && r.right > cr.left && r.left < cr.right)
+    return n && f ? { x: sx / n, y: sy / n, fl: f.left - cr.left, ft: f.top - cr.top, fw: f.width } : null })()`
+  const mk0 = await page(markAt)
+  const vw = await page('innerWidth')
+  const vh = await page('innerHeight')
+  await chrome.cdp('Emulation.setDeviceMetricsOverride', { width: vw - 260, height: vh, deviceScaleFactor: 0, mobile: false }, sessionId)
+  await sleep(900)
+  const mk1 = await page(markAt)
+  await chrome.cdp('Emulation.clearDeviceMetricsOverride', {}, sessionId)
+  await sleep(900)
+  const mk2 = await page(markAt)
+  const follows = (a, b) => !!a && !!b && Math.abs(b.x - (b.fl + (a.x - a.fl) * (b.fw / a.fw))) < 3 && Math.abs(b.y - (b.ft + (a.y - a.ft) * (b.fw / a.fw))) < 3
+  check('画笔标注：窗口变窄页面挪了，画的跟着那一屏走；变回来也对得上', follows(mk0, mk1) && follows(mk0, mk2) && Math.abs(mk1.fl - mk0.fl) + Math.abs(mk1.fw - mk0.fw) > 20, JSON.stringify({ mk0, mk1, mk2 }))
+  // 字写到一半直接点聊天输入框：字留下，焦点留在输入框，不被标注层抢回去
+  let typing = false
+  if (fr) {
+    await tool('文字')
+    await mouse('mousePressed', fr.x + 30, fr.y - 90)
+    await mouse('mouseReleased', fr.x + 30, fr.y - 90)
+    typing = await until(`document.activeElement?.tagName === 'TEXTAREA' && !!document.activeElement.closest('.ddp-mark')`, 3000)
+    if (typing) await chrome.cdp('Input.insertText', { text: '间距' }, sessionId)
+  }
+  const cp = await page(`(() => { const r = [...document.querySelectorAll('${composer}')].find((x) => !x.closest('.ddp')).getBoundingClientRect(); return { x: r.left + Math.min(40, r.width / 2), y: r.top + r.height / 2 } })()`)
+  await mouse('mousePressed', cp.x, cp.y)
+  await mouse('mouseReleased', cp.x, cp.y)
+  await sleep(400)
+  check('画笔标注：字写一半点聊天输入框，字留下、焦点留在输入框', typing && await page(`!!document.activeElement && !document.activeElement.closest('.ddp-mark') && !!document.activeElement.closest('${composer}, [contenteditable], textarea')`) &&
+    !(await page(`!!document.querySelector('.ddp-mark textarea')`)), await page(`document.activeElement ? document.activeElement.tagName + '.' + document.activeElement.className : 'none'`))
+  const refsBefore = fs.existsSync(path.join(DESIGN, 'refs')) ? fs.readdirSync(path.join(DESIGN, 'refs')).length : 0
+  await page(`[...document.querySelectorAll('.ddp-mk-bar button')].find((x) => /交给模型/.test(x.textContent)).click()`)
+  const markGone = await until(`!document.querySelector('.ddp-mark') && /〔标注〕/.test(${composerText})`, 30000)
+  const markTxt = await page(composerText)
+  const markFile = (/〔标注〕(\S+?\.png)/.exec(markTxt) || [])[1] || ''
+  let markPng = null
+  try { markPng = fs.readFileSync(markFile) } catch { markPng = null }
+  const pw = markPng && markPng.length > 24 ? markPng.readUInt32BE(16) : 0
+  const ph = markPng && markPng.length > 24 ? markPng.readUInt32BE(20) : 0
+  check('画笔标注：「交给模型」→ 标注图存进设计目录的 refs/，输入框里是〔标注〕、图的路径、用 read_image 看的要求和图上写的字', markGone && path.dirname(markFile) === path.join(DESIGN, 'refs') &&
+    /^markup-/.test(path.basename(markFile)) && /read_image/.test(markTxt) && /图上写的字：「这里改大」、「间距」/.test(markTxt) && markPng && markPng.readUInt32BE(0) === 0x89504e47 && pw >= 160 && ph >= 160 && markPng.length > 8000 &&
+    fs.readdirSync(path.join(DESIGN, 'refs')).length === refsBefore + 1, `${markTxt.slice(-260)} / ${markFile} ${pw}×${ph} ${markPng ? markPng.length : 0}B`)
+  await sleep(1200)
+  check('画笔标注：存图不算设计改动（不报「已更新」）', !(await page(`(document.body.innerText.match(/(已更新|Updated) coffee-app[^\\n]*/) || [''])[0]`)))
+  // 画布上一笔自由线从一屏画到另一屏：窗口变窄画布换了行，两头各跟各的屏；取消后回单页
+  await page(`document.querySelector('.ddp-bar button[title^="画布"]').click()`)
+  await sleep(900)
+  await page(`document.querySelector('.ddp-bar button[title^="画笔标注"]').click()`)
+  await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
+  const twoAt = `(() => { const s = document.querySelector('.ddp-stage').getBoundingClientRect(); const c = document.querySelector('.ddp-mark .cv').getBoundingClientRect()
+    return [...document.querySelectorAll('.ddp-stage iframe')].map((x, i) => [i, x.getBoundingClientRect()]).filter(([, r]) => r.width > 40 && r.height > 40 && r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1)
+      .map(([i, r]) => ({ i, x: r.left + r.width / 2, y: r.top + r.height / 2, cx: r.left + r.width / 2 - c.left, cy: r.top + r.height / 2 - c.top, w: r.width })) })()`
+  const blueNear = (q) => page(`(() => { const c = document.querySelector('.ddp-mark .cv'); const k = c.width / c.getBoundingClientRect().width; const d = c.getContext('2d').getImageData(Math.round((${q.cx} - 6) * k), Math.round((${q.cy} - 6) * k), Math.round(12 * k), Math.round(12 * k)).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 120 && d[i + 1] > 90 && d[i + 1] < 180 && d[i + 2] > 200 && d[i + 3] > 200) n++; return n })()`)
+  // 最后两屏：换行时最后一屏挪到下一行，前一屏不动
+  const two0 = (await page(twoAt)).slice(-2)
+  let pen = null
+  if (two0.length === 2) {
+    await page(`document.querySelector('.ddp-mk-color > .ddp-btn').click()`)
+    await sleep(100)
+    await page(`document.querySelector('.ddp-mk-pal button[title="#3b82f6"]').click()`)
+    await tool('画笔')
+    const [A, B] = two0
+    await mouse('mousePressed', A.x, A.y)
+    for (let i = 1; i <= 16; i++) await mouse('mouseMoved', A.x + ((B.x - A.x) * i) / 16, A.y + ((B.y - A.y) * i) / 16)
+    await mouse('mouseReleased', B.x, B.y)
+    await sleep(200)
+    pen = { A, B, at0: [await blueNear(A), await blueNear(B)], tries: [] }
+    // 变窄变高，直到画布换行（B 相对 A 的位置不是整体缩放能对上的）
+    for (const [cut, tall] of [[200, 0], [260, 700], [320, 1400], [380, 2400], [440, 3400]]) {
+      await chrome.cdp('Emulation.setDeviceMetricsOverride', { width: vw - cut, height: vh + tall, deviceScaleFactor: 0, mobile: false }, sessionId)
+      await sleep(900)
+      const now = await page(twoAt)
+      const [A1, B1] = [now.find((q) => q.i === A.i), now.find((q) => q.i === B.i)]
+      if (!A1 || !B1) { pen.tries.push({ cut, gone: true }); continue }
+      const kk = A1.w / A.w
+      const wrapped = Math.hypot(B1.cx - A1.cx - (B.cx - A.cx) * kk, B1.cy - A1.cy - (B.cy - A.cy) * kk) > 20
+      pen.tries.push({ cut, wrapped, at: [await blueNear(A1), await blueNear(B1)] })
+      if (wrapped) break
+    }
+    await chrome.cdp('Emulation.clearDeviceMetricsOverride', {}, sessionId)
+    await sleep(900)
+    const back = await page(twoAt)
+    pen.at2 = [await blueNear(back.find((q) => q.i === A.i) || A), await blueNear(back.find((q) => q.i === B.i) || B)]
+  }
+  const hit = pen && pen.tries.find((x) => x.wrapped)
+  check('画笔标注：画布上自由线从一屏画到另一屏，换行后两头各跟各的屏', !!hit && [...pen.at0, ...hit.at, ...pen.at2].every((n) => n > 4) && pen.tries.every((x) => x.gone || x.at.every((n) => n > 4)), JSON.stringify(pen || two0))
+  await page(`[...document.querySelectorAll('.ddp-mk-bar button')].find((x) => x.textContent === '取消').click()`)
+  await until(`!document.querySelector('.ddp-mark')`, 3000)
+  await page(`document.querySelector('.ddp-bar button[title^="单页"]').click()`)
+  await sleep(900)
 
   // ⑨ 远程看：同一个会话换个地址打开（remote.test 指向本机，DSH 信任这个域名；页面里 127.0.0.1 指的是「那台设备自己」，预览连不上）
   const here = await page('location.href')

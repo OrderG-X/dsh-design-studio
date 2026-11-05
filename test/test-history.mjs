@@ -167,6 +167,7 @@ const PICK = '〔选中元素〕em「3.2 km」\n文件：/a/home.html\n位置：
 check('askOf：点选块换成短名字，后面跟用户的话', askOf(u(PICK + '\n改成绿色')) === '「3.2 km」 · 改成绿色')
 check('askOf：块紧贴在用户那句话后面也认得', askOf(u('把这个距离文字改成绿色（只改这一处）' + PICK)) === '「3.2 km」 · 把这个距离文字改成绿色（只改这一处）')
 check('askOf：只点选没说话 → 改「…」', askOf(u(PICK)) === '改「3.2 km」')
+check('askOf：点选标签发出去的样子（前后空行、后面的话带空格）也认得', askOf(u(PICK.trim() + '\n\n 改成绿色')) === '「3.2 km」 · 改成绿色' && askOf(u('改成绿色\n\n' + PICK.trim())) === '「3.2 km」 · 改成绿色', askOf(u(PICK.trim() + '\n\n 改成绿色')))
 check('askOf：没字的元素用元素名', askOf(u('〔选中元素〕img\n文件：/a/b.html\n位置：img\n')) === '改img')
 check('askOf：区域 / 两个元素', askOf(u('〔选中区域〕页面上 (1, 2) 起 3×4 的一块\n页面：http://x/\n包含：\n- div「a」\n\n挪到右边')) === '选中区域 · 挪到右边'
   && askOf(u(PICK + '\n〔选中元素〕button「领养」\n位置：b\n对齐一下')) === '「3.2 km」、「领养」 · 对齐一下')

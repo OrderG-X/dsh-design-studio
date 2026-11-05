@@ -84,6 +84,68 @@ fs.writeFileSync(path.join(site, 'mini-tone.html'), head('miniprogram') + `<styl
 const svg = (fill) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect width="20" height="10" fill="${fill}"/></svg>`)
 fs.writeFileSync(path.join(site, 'mini-late.html'), head('miniprogram') + `<img id="h" src="${svg('#fff')}" alt="" style="display:block;width:100%;height:200px;object-fit:cover">
 <script>addEventListener('load', () => setTimeout(() => { document.getElementById('h').src = ${JSON.stringify(svg('#111'))} }, 500))</script></body></html>`)
+// 画笔标注截「看得到的那一屏」：页面滚了 600、里面的滚动框滚了 300；吸顶的标题、贴底的栏、滚动框里露出来的那段都得在截图里原样的位置
+fs.writeFileSync(path.join(site, 'scrolled.html'), head('app') + `<style>
+.top{position:sticky;top:0;height:40px;background:#2563eb}
+.bar{position:fixed;left:0;right:0;bottom:0;height:50px;background:#dc2626}
+.box{position:absolute;left:0;right:0;top:700px;height:200px;overflow:auto}
+.box i{display:block;height:300px}.box .y{background:#facc15}.box .g{background:#16a34a}
+</style><div class="top"></div><div style="height:2000px"></div><div class="box"><i class="y"></i><i class="g"></i></div><div class="bar"></div>
+<script>addEventListener('load', () => { document.querySelector('.box').scrollTop = 300; scrollTo(0, 600) })</script></body></html>`)
+// 再难一点：滚动框里是背景图（截图要等图转好）、滚动框里包着贴底栏、藏起来的固定弹层、靠父层 z-index 定上下的两个固定条、同源内嵌页面（自己也滚过）
+fs.writeFileSync(path.join(site, 'bg.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="600"><rect width="10" height="300" fill="#dc2626"/><rect y="300" width="10" height="300" fill="#16a34a"/></svg>')
+fs.writeFileSync(path.join(site, 'inner.html'), '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}i{display:block;height:150px}</style></head><body><i style="background:#facc15"></i><i style="background:#7c3aed"></i><i style="background:#facc15"></i><script>addEventListener("load", () => scrollTo(0, 150))</script></body></html>')
+fs.writeFileSync(path.join(site, 'scrolled2.html'), head('app') + `<style>
+.box{position:absolute;left:0;right:0;top:700px;height:200px;overflow:auto}
+.bgi{height:600px;background:url(bg.svg) 0 0/100% 600px}
+.fbar{position:fixed;left:0;right:0;bottom:0;height:50px;background:#9333ea}
+</style>
+<div style="position:relative;z-index:2"><div style="position:fixed;left:0;right:0;top:0;height:40px;background:#f97316"></div></div>
+<div style="position:relative;z-index:1"><div style="position:fixed;left:0;right:0;top:0;height:80px;background:#06b6d4"></div></div>
+<div style="height:3000px"></div>
+<div class="box"><div class="bgi"><div class="fbar"></div></div></div>
+<div style="opacity:0"><div style="position:fixed;left:0;right:0;top:300px;height:100px;background:#000"></div></div>
+<iframe src="inner.html" style="position:absolute;left:0;top:1000px;width:375px;height:150px;border:0"></iframe>
+<iframe src="inner3.html" style="position:absolute;left:0;top:1170px;width:200px;height:70px;border:0"></iframe>
+<script>addEventListener('load', () => { document.querySelector('.box').scrollTop = 300; scrollTo(0, 600) })</script></body></html>`)
+// 第三张：滚动框里以外层为准的弹层（不能被框进滚动区）、横滚的 SVG、内嵌页面里的滚动框和吸顶、四个并排内嵌页、缩小的内嵌页、内嵌页里的相对路径图片
+fs.writeFileSync(path.join(site, 'violet.html'), '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#7c3aed}</style></head><body></body></html>')
+fs.writeFileSync(path.join(site, 'inner2.html'), '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}.sc{height:150px;overflow:auto}.sc i{display:block}</style></head><body><div class="sc"><i style="position:sticky;top:0;height:30px;background:#2563eb"></i><i style="height:300px;background:#facc15"></i><i style="height:300px;background:#7c3aed"></i></div><script>addEventListener("load", () => { document.querySelector(".sc").scrollTop = 300 })</script></body></html>')
+fs.mkdirSync(path.join(site, 'nested'))
+fs.writeFileSync(path.join(site, 'nested', 'picture.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="70"><rect width="200" height="70" fill="#16a34a"/></svg>')
+fs.writeFileSync(path.join(site, 'inner3.html'), '<!doctype html><html><head><meta charset="utf-8"><base href="nested/"><style>body{margin:0}svg{display:block}</style></head><body><svg width="200" height="70"><image href="picture.svg" width="200" height="70"/></svg></body></html>')
+fs.writeFileSync(path.join(site, 'scrolled3.html'), head('app') + `<style>.ab{position:absolute;left:0;border:0}</style>
+<div class="ab" style="top:0;width:375px;height:150px">
+  <div class="list" style="height:100px;overflow:auto"><div>
+    <div style="height:300px;background:#facc15"></div><div style="height:300px;background:#16a34a"></div>
+    <div style="position:absolute;left:0;top:110px;width:375px;height:30px;background:#dc2626"></div>
+  </div></div>
+</div>
+<div class="ab hs" style="top:200px;width:375px;height:100px;overflow:auto"><svg width="1000" height="100" style="display:block"><rect width="500" height="100" fill="#dc2626"/><rect x="500" width="500" height="100" fill="#16a34a"/></svg></div>
+<iframe class="ab" src="inner2.html" style="top:320px;width:375px;height:150px"></iframe>
+<iframe class="ab" src="violet.html" style="top:490px;width:90px;height:40px"></iframe>
+<iframe class="ab" src="violet.html" style="top:490px;left:94px;width:90px;height:40px"></iframe>
+<iframe class="ab" src="violet.html" style="top:490px;left:188px;width:90px;height:40px"></iframe>
+<iframe class="ab" src="violet.html" style="top:490px;left:282px;width:90px;height:40px"></iframe>
+<iframe class="ab" src="violet.html" style="top:560px;width:180px;height:140px;transform:scale(.5);transform-origin:0 0"></iframe>
+<div class="ab deep" style="top:650px;width:375px;height:60px;overflow:auto"><div><div style="height:400px"></div><div style="position:absolute;left:0;top:320px;width:375px;height:40px;background:#16a34a"></div></div></div>
+<div class="ab mid" style="top:730px;width:375px;height:60px;overflow:auto;display:flex;justify-content:center"><i style="flex:none;width:600px;background:#dc2626"></i><i style="flex:none;width:600px;background:#2563eb"></i></div>
+<script>addEventListener('load', () => { document.querySelector('.list').scrollTop = 300; document.querySelector('.hs').scrollLeft = 400; document.querySelector('.deep').scrollTop = 300; document.querySelector('.mid').scrollLeft = 300 })</script></body></html>`)
+// 第四张：滚动框里的 section 带上边距，里面的标题默认边距往外叠（常见的卡片列表写法）
+fs.writeFileSync(path.join(site, 'scrolled4.html'), head('app') + `<style>.sc{height:300px;overflow:auto}section{margin-top:24px}h2{margin:20px 0 10px;height:30px;background:#2563eb}.card{height:100px;margin:0 0 12px}</style>
+<div class="sc"><section><h2></h2><div class="card" style="background:#facc15"></div><div class="card" style="background:#dc2626"></div><div class="card" style="background:#16a34a"></div><div class="card" style="background:#7c3aed"></div><div class="card" style="background:#f97316"></div></section></div>
+<script>addEventListener('load', () => { document.querySelector('.sc').scrollTop = 300 })</script></body></html>`)
+// 第五张：SVG 图表的渐变填充和裁剪（页内引用 url(#id)）
+fs.writeFileSync(path.join(site, 'chart.html'), head('app') + `<svg width="375" height="200" style="display:block"><defs><linearGradient id="area" x1="0" x2="1"><stop offset="0" stop-color="#dc2626"/><stop offset="1" stop-color="#dc2626"/></linearGradient><clipPath id="clip"><rect width="100" height="200"/></clipPath></defs><rect width="375" height="100" fill="url(#area)"/><rect y="100" width="375" height="100" fill="#16a34a" clip-path="url(#clip)"/></svg></body></html>`)
+// 第六张：body::before 铺的固定背景（页面滚过）；两个内嵌页里同名的渐变 id、颜色不同
+const gpage = (c) => `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}</style></head><body><svg width="150" height="60" style="display:block"><defs><linearGradient id="g"><stop offset="0" stop-color="${c}"/><stop offset="1" stop-color="${c}"/></linearGradient></defs><rect width="150" height="60" fill="url(#g)"/></svg></body></html>`
+fs.writeFileSync(path.join(site, 'g1.html'), gpage('#dc2626'))
+fs.writeFileSync(path.join(site, 'g2.html'), gpage('#2563eb'))
+fs.writeFileSync(path.join(site, 'scrolled5.html'), head('app').replace('background:#fff', 'background:#fff;position:relative') + `<style>body::before{content:"";position:fixed;inset:0;background:#0f766e;z-index:-1}</style>
+<div style="height:3000px"></div>
+<iframe src="g1.html" style="position:absolute;left:0;top:700px;width:150px;height:60px;border:0"></iframe>
+<iframe src="g2.html" style="position:absolute;left:200px;top:700px;width:150px;height:60px;border:0"></iframe>
+<script>addEventListener('load', () => scrollTo(0, 600))</script></body></html>`)
 fs.writeFileSync(path.join(site, 'mini-roll.html'), head('miniprogram') + `<style>.nav{position:fixed;top:0;left:0;right:0;height:88px;background:#fff}.nav.dk{background:#111}main{height:4000px}</style>
 <div class="nav"></div><main></main><script>
 addEventListener('scroll', () => document.querySelector('.nav').classList.toggle('dk', scrollY > 20))
@@ -101,7 +163,7 @@ const harness = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
   res.end(`<!doctype html><body style="margin:0"><iframe id="f" src="${src}" style="width:${w}px;height:${h}px;border:0"></iframe><script>
     const f = document.getElementById('f'); const origin = new URL(${JSON.stringify(src)}).origin
-    window.__res = null; window.__tops = []; window.__caps = {}; window.__log = []
+    window.__res = null; window.__tops = []; window.__caps = {}; window.__px = {}; window.__log = []
     const send = (m) => f.contentWindow.postMessage({ dshDesign: 1, ...m }, origin)
     window.__send = send
     addEventListener('message', (e) => {
@@ -112,7 +174,15 @@ const harness = http.createServer((req, res) => {
       else if (d.type === 'checked') window.__res = d
       else if (d.type === 'top') { window.__tops.push(d.dark); window.__log.push(['top', d.dark]) }
       else if (d.type === 'rollEnd') window.__log.push(['end'])
-      else if (d.type === 'captured') window.__caps[d.id] = { top: d.top, ok: !!d.png }
+      else if (d.type === 'captured') {
+        window.__caps[d.id] = { top: d.top, ok: !!d.png, href: d.href || '', w: d.w, h: d.h }
+        // 取截图上一点的颜色：__px[id](x, y) → [r, g, b]
+        if (d.png) createImageBitmap(d.png).then((b) => {
+          const c = document.createElement('canvas'); c.width = b.width; c.height = b.height
+          const x = c.getContext('2d'); x.drawImage(b, 0, 0)
+          window.__px[d.id] = (X, Y) => Array.from(x.getImageData(X, Y, 1, 1).data.slice(0, 3))
+        })
+      }
     })
   </script></body>`)
 })
@@ -309,6 +379,117 @@ try {
     const autoDark = await ev('window.__tops.at(-1)')
     await chrome.cdp('Target.closeTarget', { targetId })
     check('系统换成深色：顶栏跟着变深，胶囊不用点页面就报白的', autoFirst === false && autoDark === true, JSON.stringify({ autoFirst, autoDark }))
+  }
+
+  // 画笔标注截的那一屏：和屏幕上看到的一样（页面滚过、滚动框滚过、吸顶 / 贴底的元素）；回来带上真正截到的页面地址
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/scrolled.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1500)
+    await ev("__send({ type: 'capture', id: 's1', full: false, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) {
+      await sleep(150)
+      px = await ev("window.__px.s1 ? { top: __px.s1(187, 20), mid: __px.s1(187, 200), low: __px.s1(187, 500), bar: __px.s1(187, 790), cap: __caps.s1 } : null")
+    }
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    const ok = px && near(px.top, [37, 99, 235]) && near(px.mid, [22, 163, 74]) && near(px.low, [255, 255, 255]) && near(px.bar, [220, 38, 38])
+    check('滚过的页面截屏：吸顶标题在顶上、滚动框露的是第二段（绿）、贴底的栏在底下', ok, JSON.stringify(px))
+    check('截图带回真正截到的页面地址', px && /\/scrolled\.html$/.test(px.cap.href), JSON.stringify(px && px.cap))
+  }
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/scrolled2.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1800)
+    await ev("__send({ type: 'capture', id: 's2', full: false, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) {
+      await sleep(150)
+      px = await ev("window.__px.s2 ? { nav: __px.s2(187, 20), over: __px.s2(187, 60), bg: __px.s2(187, 200), hid: __px.s2(187, 350), sub: __px.s2(187, 470), img: __px.s2(50, 605), bar: __px.s2(187, 790) } : null")
+    }
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    check('滚过的页面截屏：滚动框里的背景图露的是第二段、包在滚动框里的贴底栏还在', px && near(px.bg, [22, 163, 74]) && near(px.bar, [147, 51, 234]), JSON.stringify(px))
+    check('滚过的页面截屏：藏起来的固定弹层还是藏着、两个固定条上下顺序不变', px && near(px.hid, [255, 255, 255]) && near(px.nav, [249, 115, 22]) && near(px.over, [6, 182, 212]), JSON.stringify(px))
+    check('同源内嵌页面也截进来（按它自己滚到的位置）；里面相对路径的图按它自己的地址找', px && near(px.sub, [124, 58, 237]) && near(px.img, [22, 163, 74]), JSON.stringify(px))
+  }
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/scrolled3.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(2000)
+    await ev("__send({ type: 'capture', id: 's3', full: false, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) {
+      await sleep(150)
+      px = await ev("window.__px.s3 ? { pop: __px.s3(187, 125), svg: __px.s3(187, 250), stick: __px.s3(187, 335), roll: __px.s3(187, 410), fourth: __px.s3(327, 510), small: __px.s3(45, 595), past: __px.s3(150, 595), deep: __px.s3(187, 690), mid: __px.s3(187, 760), mid2: __px.s3(30, 760) } : null")
+    }
+    // 居中排列的横滚条：屏幕上那两点实际是什么颜色（在预览页里量）
+    const { frameTree } = await chrome.cdp('Page.getFrameTree', {}, sessionId)
+    const w = await chrome.cdp('Page.createIsolatedWorld', { frameId: frameTree.childFrames[0].frame.id }, sessionId)
+    const live = (await chrome.cdp('Runtime.evaluate', { contextId: w.executionContextId, returnByValue: true,
+      expression: '[[187, 760], [30, 760]].map(([x, y]) => getComputedStyle(document.elementFromPoint(x, y)).backgroundColor.match(/\\d+/g).slice(0, 3).map(Number))' }, sessionId)).result.value
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    check('滚动框里以外层为准的弹层照样截到；横滚过的 SVG 露的是滚到的那段', px && near(px.pop, [220, 38, 38]) && near(px.svg, [22, 163, 74]), JSON.stringify(px))
+    check('内嵌页面里的滚动框和吸顶标题按现在的样子截', px && near(px.stick, [37, 99, 235]) && near(px.roll, [124, 58, 237]), JSON.stringify(px))
+    check('并排四个内嵌页都截到；缩小的内嵌页还是缩小的', px && near(px.fourth, [124, 58, 237]) && near(px.small, [124, 58, 237]) && near(px.past, [255, 255, 255]), JSON.stringify(px))
+    check('滚动框里隔了一层、以滚动框为准的绝对定位卡片跟着滚到了', px && near(px.deep, [22, 163, 74]), JSON.stringify(px))
+    check('居中排列的横滚条：截到的和屏幕上一样', px && live && near(px.mid, live[0]) && near(px.mid2, live[1]), JSON.stringify({ px: px && [px.mid, px.mid2], live }))
+  }
+
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/scrolled4.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1500)
+    await ev("__send({ type: 'capture', id: 's4', full: false, scale: 1 })")
+    const ys = [5, 40, 60, 100, 150, 200, 250, 290]
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) { await sleep(150); px = await ev(`window.__px.s4 ? ${JSON.stringify(ys)}.map((y) => __px.s4(187, y)) : null`) }
+    const { frameTree } = await chrome.cdp('Page.getFrameTree', {}, sessionId)
+    const w = await chrome.cdp('Page.createIsolatedWorld', { frameId: frameTree.childFrames[0].frame.id }, sessionId)
+    const live = (await chrome.cdp('Runtime.evaluate', { contextId: w.executionContextId, returnByValue: true,
+      expression: `${JSON.stringify(ys)}.map((y) => { let e = document.elementFromPoint(187, y); while (e && /rgba\\(0, 0, 0, 0\\)|transparent/.test(getComputedStyle(e).backgroundColor)) e = e.parentElement; return e ? getComputedStyle(e).backgroundColor.match(/\\d+/g).slice(0, 3).map(Number) : [255, 255, 255] })` }, sessionId)).result.value
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && !!rgb && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    check('滚动框里边距往外叠的卡片列表：截到的和屏幕上一样', px && live && ys.every((_, i) => near(px[i], live[i])), JSON.stringify({ px, live }))
+  }
+
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/chart.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1200)
+    await ev("__send({ type: 'capture', id: 'c5', full: false, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) { await sleep(150); px = await ev("window.__px.c5 ? { grad: __px.c5(187, 50), clipIn: __px.c5(50, 150), clipOut: __px.c5(250, 150) } : null") }
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    check('SVG 图表：渐变填充和裁剪（页内 url(#id)）照样截到', px && near(px.grad, [220, 38, 38]) && near(px.clipIn, [22, 163, 74]) && near(px.clipOut, [255, 255, 255]), JSON.stringify(px))
+  }
+
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/scrolled5.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1500)
+    await ev("__send({ type: 'capture', id: 'c6', full: false, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) { await sleep(150); px = await ev("window.__px.c6 ? { bg: __px.c6(187, 400), g1: __px.c6(75, 130), g2: __px.c6(275, 130) } : null") }
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    check('页面滚过：body::before 铺的固定背景还在', px && near(px.bg, [15, 118, 110]), JSON.stringify(px))
+    check('两个内嵌页里同名的渐变各是各的颜色', px && near(px.g1, [220, 38, 38]) && near(px.g2, [37, 99, 235]), JSON.stringify(px))
   }
 
   const dark = await run('dark.html', 'web', '1280x800')

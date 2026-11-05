@@ -38,7 +38,7 @@ If DSH can't reach the npm registry, it falls back to a mirror in China. To upda
 ## What it does
 
 - **Pick from three directions:** three different first screens side by side, then the full set in the one you pick. Any single screen can also get two alternative takes.
-- **Click to edit:** click an element or drag over an area, and it lands in the input as a ready-made description; just add how to change it. Changed spots flash in the preview.
+- **Click to edit:** click an element or drag over an area, and a small chip lands in the input (hover it for details); just add how to change it. The model still gets the full location and styles. Changed spots flash in the preview. You can also draw circles, arrows and notes right on the page and hand the marked-up screenshot to the model.
 - **Design check:** one click finds overflowing text, low contrast, small tap targets and tiny text, marked right on the page. In Design mode the model also checks its own work and fixes what it finds.
 - **Versions and compare:** every turn is saved; drag a slider to compare, and go back to any version.
 - **Export and phone preview:** showcase images, PDF and PowerPoint (links between screens still work); scan a QR code to see it on your phone at real size.
