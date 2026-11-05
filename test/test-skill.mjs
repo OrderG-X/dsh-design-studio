@@ -221,8 +221,12 @@ try {
   const std = fs.readFileSync(req.resolve('@deepseek-ai/dsh-web-app/presets/standard.patch.yml'), 'utf8')
   const names = (t) => new Set([...t.matchAll(/name: '(@deepseek-ai\/[^']+)'/g)].map((m) => m[1]))
   const mine = names(patch)
-  const missing = [...names(std)].filter((n) => !mine.has(n) && n !== '@deepseek-ai/dsh-agent-preset')
+  // list-agents 只有 0.2.1 有、0.2.2 去掉了；写上它新版就装不上，所以旧版少它不算
+  const missing = [...names(std)].filter((n) => !mine.has(n) && n !== '@deepseek-ai/dsh-agent-preset' && n !== '@deepseek-ai/dsh-tool-subagent-control/list-agents')
   check('和装好的 DSH 标准模式一致', missing.length === 0, missing.join(','))
+  // 反过来：标准模式里已经没有的插件（比如 0.2.2 去掉的 list-agents），设计模式也不能留——装不上会让整个设计模式不出来
+  const extra = [...mine].filter((n) => !names(std).has(n))
+  check('设计模式没有 DSH 已经去掉的插件', extra.length === 0, extra.join(','))
 } catch { /* 没装 DSH 就不比 */ }
 
 console.log(`\n${pass} 通过，${fail} 失败`)

@@ -377,6 +377,110 @@ main .btn { font-size: 17px }
 <body><div class="nav"><h1>小店</h1><button>搜索</button></div><main><p>商品</p></main></body></html>`
   fs.writeFileSync(path.join(site, 'mini.html'), miniPage('right'))
   fs.writeFileSync(path.join(site, 'mini-ok.html'), miniPage('left'))
+  // 手机的规矩：灵动岛、底部横条区、标签栏项数、小程序导航栏
+  const phHead = (title, css) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}` +
+    `.sb{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 24px;font-size:15px}.nv{height:44px;display:flex;align-items:center;justify-content:center;font-size:17px}` +
+    `main{padding:16px 16px 140px}main p{margin:0 0 12px}.tb{position:fixed;left:0;right:0;bottom:0;display:flex;background:#fafafa;border-top:1px solid #eee}.tb a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:#333;text-decoration:none;padding-top:6px}.tb svg{width:24px;height:24px}${css}</style></head><body>`
+  const icon = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#999"/></svg>'
+  const tabs = (names) => names.map((n) => `<a href="#">${icon}<span>${n}</span></a>`).join('')
+  const body = '<main>' + Array.from({ length: 6 }, (_, i) => `<p>第 ${i + 1} 行内容</p>`).join('') + '</main>'
+  fs.writeFileSync(path.join(site, 'ph-ok.html'), phHead('合规', '.tb{height:84px;padding-bottom:34px;box-sizing:border-box}.tb i{position:absolute;left:10px;top:0;width:20px;height:2px;background:#c00}') +
+    `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv">首页</div>${body}<nav class="tb"><i></i>${tabs(['首页', '分类', '购物车', '我的'])}</nav></body></html>`)
+  fs.writeFileSync(path.join(site, 'ph-bad.html'), phHead('不合规', '.sb{justify-content:center}.tb{height:56px}') +
+    `<div class="sb"><b>9:41</b></div><div class="nv">首页</div>${body}<nav class="tb">${tabs(['首页', '分类', '发现', '消息', '购物车', '我的'])}</nav></body></html>`)
+  // 审查补的几种：页面壳（body 撑满一屏、底栏在普通流里）、一排 6 个操作按钮、多行截断藏起来的字、伪元素图标、行内元素的 overflow
+  fs.writeFileSync(path.join(site, 'ph-shell.html'), phHead('页面壳', 'body{height:100vh;display:flex;flex-direction:column}main{flex:1;overflow:auto}.tabs{display:flex;height:56px;background:#fafafa}.tabs a{flex:1;display:flex;flex-direction:column;align-items:center;font-size:11px;color:#333;text-decoration:none;padding-top:6px}.tabs a.on{color:#c00}.tabs svg{width:24px;height:24px}') +
+    `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv">首页</div>${body.replace('<main>', '<main>' + body.slice(6, -7).repeat(4))}<div class="tabs">${tabs(['首页', '分类', '发现', '消息', '购物车', '我的']).replace('<a href="#">', '<a class="on">').replace(/<a href="#">/g, '<a>')}</div></body></html>`)
+  fs.writeFileSync(path.join(site, 'ph-tools.html'), phHead('操作按钮', '.tl{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;display:flex;background:#222}.tl button{flex:1;border:0;background:none;color:#fff;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}.tl svg{width:24px;height:24px}') +
+    `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv">编辑图片</div>${body}<div class="tl">${['裁剪', '旋转', '滤镜', '调色', '贴纸', '文字'].map((n) => `<button>${icon}<span>${n}</span></button>`).join('')}</div></body></html>`)
+  fs.writeFileSync(path.join(site, 'ph-clamp.html'), phHead('多行截断', '.ft{position:fixed;left:0;right:0;bottom:0;height:84px;padding:6px 16px 34px;box-sizing:border-box;background:#fafafa}.ft p{margin:0;font-size:12px;line-height:18px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}') +
+    `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv">协议</div>${body}<div class="ft"><p>${'继续即表示你同意用户协议和隐私政策，'.repeat(8)}</p></div></body></html>`)
+  fs.writeFileSync(path.join(site, 'ph-pseudo.html'), phHead('伪元素图标', '.bb{position:fixed;left:0;right:0;bottom:0;height:56px;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 16px 4px;box-sizing:border-box;background:#fafafa}.bb button{width:44px;height:44px;border:0;background:none;padding:10px}.bb button::before{content:"★";font-size:22px;line-height:24px;display:block}') +
+    `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv">详情</div>${body}<div class="bb"><button aria-label="收藏"></button></div></body></html>`)
+  fs.writeFileSync(path.join(site, 'ph-inline.html'), phHead('行内截断', '.nv{justify-content:flex-start;padding-left:16px}.nv span{overflow:hidden;white-space:nowrap}') +
+    `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv"><span>邻里鲜社区团购·今日特价专场一直写到右边</span></div>${body}</body></html>`)
+  // 复查补的：选中态的工具栏、只改图标颜色的标签栏、徽标和遮罩、往下伸的伪元素、页面末尾的商品轮播、收到屏幕下面的面板
+  const bot = (css) => `.ft{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;display:flex;background:#fafafa}.ft>*{flex:1;display:flex;flex-direction:column;align-items:center;font-size:11px;color:#333;padding-top:6px}.ft svg{width:24px;height:24px}${css}`
+  const cells = (names, cls = '', on = 0) => names.map((n, i) => `<div class="${cls}${i === on ? ' active' : ''}">${icon}<span>${n}</span></div>`).join('')
+  const phPage = (key, title, css, inner) => fs.writeFileSync(path.join(site, key), phHead(title, css) + `<div class="sb"><b>9:41</b><span>●●● ▮</span></div><div class="nv">${title}</div>${body}${inner}</body></html>`)
+  phPage('ph-tools-on.html', '编辑图片', bot('.ft>.active{color:#c00}'), `<nav class="ft">${cells(['裁剪', '旋转', '滤镜', '调色', '贴纸', '文字'])}</nav>`)
+  phPage('ph-tab-class.html', '精选', bot('.ft .tab-item.active svg circle{fill:#c00}') + '.tab-bar{flex:1;display:flex;flex-direction:row!important;padding:0!important}.tab-bar>*{flex:1;display:flex;flex-direction:column;align-items:center}',
+    `<div class="ft"><div class="tab-bar">${cells(['精选', '好物', '优惠', '新品', '榜单', '店铺'], 'tab-item')}</div></div>`)
+  phPage('ph-tab-words.html', '首页', bot('.ft>div:first-child svg circle{fill:#c00}'), `<div class="ft">${cells(['首页', '分类', '发现', '消息', '购物车', '我的'], 'it', -1)}</div>`)
+  phPage('ph-badge.html', '详情', bot('.ft>div{position:relative}.ft>div::after{content:"3";position:absolute;right:20px;top:0;min-width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;border-radius:8px;background:#c00;color:#fff}.ft::before{content:" ";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#fafafa)}'),
+    `<div class="ft">${cells(['客服', '店铺', '购物车'], 'it', -1)}</div>`)
+  phPage('ph-pseudo-down.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:90px;background:#fafafa}.bb button{position:relative;width:44px;height:44px;margin:4px 16px;border:0;background:none}.bb button::before{content:"★";position:absolute;left:10px;top:44px;font-size:22px;line-height:24px}',
+    '<div class="bb"><button aria-label="收藏"></button></div>')
+  phPage('ph-carousel.html', '商城', 'body{height:100vh;display:flex;flex-direction:column}main{flex:1;overflow:auto;padding-bottom:0}.like{height:120px;padding:0 0 34px;box-sizing:content-box;display:flex;gap:8px;overflow-x:auto;background:#f5f5f5}.like a{flex:0 0 110px;display:flex;flex-direction:column;align-items:center;font-size:12px;color:#333;text-decoration:none}.like svg{width:80px;height:80px}',
+    `<section class="like">${['卫衣', '球鞋', '耳机', '水杯', '台灯', '背包'].map((n) => `<a href="#">${icon}<span>${n}</span></a>`).join('')}</section>`)
+  phPage('ph-sheet.html', '文章', bot('.ft>div{position:static}.sheet{position:absolute;left:0;right:0;top:0;height:200px;transform:translateY(130%);background:#fff;display:flex;flex-direction:row!important;gap:16px;padding:16px}'),
+    `<div class="ft">${cells(['点赞', '评论', '分享'], 'it', -1)}<div class="sheet"><span>微信好友</span><span>朋友圈</span><span>复制链接</span></div></div>`)
+  // 第三轮：写明了的导航 / 工具栏压过词表、字符图标、负边距的一排、伪元素自己的 transform、flex 里挨着字的伪元素
+  const links = (names) => names.map((n) => `<a href="#">${icon}<span>${n}</span></a>`).join('')
+  phPage('ph-nav-toolwords.html', '首页', bot('.ft>a{text-decoration:none}'), `<div class="ft tabbar">${links(['首页', '模板', '相册', '音乐', '收藏', '我的'])}</div>`)
+  phPage('ph-toolbar-role.html', '插入素材', bot('.ft>button{border:0;background:none}'), `<div class="ft" role="toolbar">${['视频', '图片', '音频', '文字', '素材', '收藏'].map((n) => `<button>${icon}<span>${n}</span></button>`).join('')}</div>`)
+  phPage('ph-tools-glyph.html', '编辑图片', bot('.ft>.active{color:#c00}'), `<div class="ft">${['✂ 裁剪', '↻ 旋转', '◐ 滤镜', '◑ 调色', '☺ 贴纸', 'T 文字'].map((n, i) => `<div class="${i ? '' : 'active'}"><span>${n}</span></div>`).join('')}</div>`)
+  phPage('ph-negmargin.html', '首页', bot('.ft{display:block}.ft>.row{display:flex;flex-direction:row;margin:0 -8px;padding:0!important;overflow-x:clip}.row>div{flex:1;padding:6px 8px 0;display:flex;flex-direction:column;align-items:center}.row>.active{color:#c00}'),
+    `<div class="ft"><div class="row">${cells(['首页', '精选', '好物', '店铺', '消息', '我的'])}</div></div>`)
+  phPage('ph-pseudo-xf.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;background:#fafafa}.bb button{position:absolute;left:50%;top:0;width:60px;height:50px;margin-left:-30px;border:0;background:none}.bb button::before{content:"★";position:absolute;left:50%;top:50%;width:32px;height:32px;font-size:28px;line-height:32px;transform:translate(-50%,-50%)}',
+    '<div class="bb"><button aria-label="收藏"></button></div>')
+  phPage('ph-pseudo-flex.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:90px;background:#fafafa}.bb button{width:100%;height:90px;border:0;background:none;display:flex;flex-direction:column;justify-content:center;align-items:center;font-size:15px;line-height:21px}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px}',
+    '<div class="bb"><button>展开更多</button></div>')
+  phPage('ph-pseudo-end.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:60px;background:#fafafa}.bb button{width:60px;height:60px;border:0;background:none;display:flex;align-items:flex-end;justify-content:center;padding:0}.bb button::before{content:"★";font-size:22px;line-height:24px}',
+    '<div class="bb"><button aria-label="收藏"></button></div>')
+  // 第四轮：项自己叫 tools、套了一层的 role=toolbar、占位链接做的操作、space-between 和行高撑开的伪元素
+  phPage('ph-nav-toolsid.html', '首页', bot('.ft>div.on{color:#c00}'), `<div class="ft" role="tablist">${['首页', '工具', '资源', '社区', '消息', '我的'].map((n, i) => `<div role="tab"${i === 1 ? ' class="tools" id="tab-tools"' : i ? '' : ' class="on"'}>${icon}<span>${n}</span></div>`).join('')}</div>`)
+  phPage('ph-toolbar-nested.html', '编辑图片', bot('.ft>section{display:block!important;padding:0!important}.tabs{display:flex}.tabs>button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;font-size:11px}'),
+    `<footer class="ft"><section role="toolbar"><div class="tabs">${['裁剪', '旋转', '滤镜', '调色', '贴纸', '文字'].map((n) => `<button>${icon}<span>${n}</span></button>`).join('')}</div></section></footer>`)
+  phPage('ph-tools-links.html', '编辑图片', bot('.ft>a{text-decoration:none}.ft>a.on{color:#c00}'), `<div class="ft">${['裁剪', '旋转', '滤镜', '调色', '贴纸', '文字'].map((n, i) => `<a href="#"${i ? '' : ' class="on"'} onclick="return false">${icon}<span>${n}</span></a>`).join('')}</div>`)
+  phPage('ph-pseudo-between.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:90px;background:#fafafa}.bb button{width:100%;height:90px;border:0;background:none;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:0;font-size:15px;line-height:21px}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px}',
+    '<div class="bb"><button>展开更多</button></div>')
+  phPage('ph-pseudo-lh.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:100px;background:#fafafa}.bb button{width:100%;height:100px;border:0;background:none;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0;font-size:15px;line-height:40px}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px}',
+    '<div class="bb"><button>展开更多</button></div>')
+  // 第五轮：#/ 路由的链接、放不下时的 space-between、子项带外边距的 space-around
+  phPage('ph-nav-hash.html', '首页', bot('.ft>a{text-decoration:none}.ft>a:first-child{color:#c00}'), `<div class="ft">${['首页', '模板', '相册', '音乐', '收藏', '我的'].map((n, i) => `<a href="#/page/${i}">${icon}<span>${n}</span></a>`).join('')}</div>`)
+  phPage('ph-pseudo-tight.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:86px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{width:100%;height:52px;border:0;background:none;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:8px 0;box-sizing:border-box;font-size:15px;line-height:32px}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px;flex:none}.bb span{flex:none}',
+    '<div class="bb"><button><span>展开更多</span></button></div>')
+  phPage('ph-pseudo-around.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:120px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{width:100%;height:86px;border:0;background:none;display:flex;flex-direction:column;justify-content:space-around;align-items:center;padding:0;font-size:15px;line-height:21px}.bb span{margin-top:8px}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px}',
+    '<div class="bb"><button><span>展开更多</span></button></div>')
+  // 第六轮：前后两个伪元素一起排、块布局里外边距合并
+  phPage('ph-pseudo-both.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:120px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{width:100%;height:86px;border:0;background:none;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:0;font-size:15px;line-height:21px}.bb button::before{content:"☰";font-size:20px;line-height:24px;height:24px}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px}',
+    '<div class="bb"><button>展开更多</button></div>')
+  phPage('ph-pseudo-block.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:120px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.more{height:86px;padding-top:30px;box-sizing:border-box;text-align:center;font-size:15px}.more span{display:block;line-height:21px;margin-bottom:12px}.more::after{content:"⌄";display:block;font-size:20px;line-height:24px;height:24px;margin-top:12px}',
+    '<div class="bb"><div class="more" role="button"><span>展开更多</span></div></div>')
+  // 第七轮：行内块的外边距不合并、只有边框的伪元素分隔线（高 0）
+  phPage('ph-pseudo-ib.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:90px;background:#fafafa}.more{height:90px;padding-top:20px;box-sizing:border-box;text-align:center;font-size:15px}.more span{display:inline-block;line-height:21px;margin-bottom:12px}.more::after{content:"⌄";display:block;font-size:20px;line-height:24px;height:24px;margin-top:12px}',
+    '<div class="bb"><div class="more" role="button"><span>展开更多</span></div></div>')
+  phPage('ph-pseudo-line.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:110px;padding-bottom:20px;box-sizing:border-box;background:#fafafa}.bb button{width:100%;height:90px;border:0;background:none;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:0;font-size:15px;line-height:21px}.bb button::before{content:"";width:40px;border-top:1px solid #ccc}.bb button::after{content:"⌄";font-size:20px;line-height:24px;height:24px}',
+    '<div class="bb"><button>展开更多</button></div>')
+  // 第八轮：普通行内 span 的上下外边距不起作用
+  phPage('ph-pseudo-inline.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:94px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.more{height:60px;text-align:center;font-size:15px;line-height:20px}.more span{margin-bottom:16px}.more::after{content:"⌄";display:block;font-size:20px;line-height:24px;height:24px;margin-top:16px}',
+    '<div class="bb"><div class="more" role="button"><span>展开更多</span></div></div>')
+  phPage('ph-pseudo-strut.html', '列表', '.bb{position:fixed;left:0;right:0;bottom:0;height:94px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.more{height:60px;text-align:center;font-size:15px;line-height:32px}.more span{line-height:20px;margin-bottom:16px}.more::after{content:"⌄";display:block;font-size:20px;line-height:24px;height:24px;margin-top:16px}',
+    '<div class="bb"><div class="more" role="button"><span>展开更多</span></div></div>')
+  // 第十轮：父子外边距合并的块里的伪元素、行里底对齐的小字后面的块级箭头（按样式推不准，无头体检问浏览器要真实框）
+  phPage('ph-pseudo-collapse.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:86px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.btn{height:52px}.btn span{display:block;line-height:20px}.ic::before{content:"★";display:block;height:24px;line-height:24px;margin-top:8px}',
+    '<div class="bb"><div class="btn" role="button"><span>收藏</span><div class="ic"></div></div></div>')
+  phPage('ph-pseudo-valign.html', '付款', '.bb{position:fixed;left:0;right:0;bottom:0;height:110px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.pay{height:76px;font-size:15px;line-height:40px}.pay .d{vertical-align:bottom;line-height:20px;font-size:12px}.pay::after{content:"⌄";display:block;height:24px;line-height:24px;margin-top:12px}',
+    '<div class="bb"><div class="pay"><span>¥99</span> <span class="d">明细</span></div></div>')
+  // 第十一轮：按钮自己 overflow:hidden 藏起来的伪元素
+  phPage('ph-pseudo-hidden.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{position:relative;overflow:hidden;width:50px;height:50px;border:0;background:none}.bb button::before{content:"♡";position:absolute;left:9px;top:9px;font-size:28px;line-height:32px}.bb button::after{content:"♥";position:absolute;left:9px;top:50px;width:32px;height:32px;font-size:28px;line-height:32px;color:#c00}',
+    '<div class="bb"><button aria-label="收藏"></button></div>')
+  // 第十二轮：伪元素绝对定位到按钮，中间有一层 overflow:hidden（不包它，不裁它）；overflow:clip 带 clip-margin
+  phPage('ph-pseudo-skip.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{position:relative;width:50px;height:50px;border:0;background:none;padding:0}.bb .clip{display:block;overflow:hidden;width:50px;height:50px}.bb i::after{content:"♥";position:absolute;left:9px;top:50px;width:32px;height:32px;font-size:28px;line-height:32px;color:#c00}',
+    '<div class="bb"><button aria-label="收藏"><span class="clip"><i></i></span></button></div>')
+  phPage('ph-pseudo-clipmargin.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{position:relative;overflow:clip;overflow-clip-margin:32px;width:50px;height:50px;border:0;background:none}.bb button::after{content:"♥";position:absolute;left:9px;top:50px;width:32px;height:32px;font-size:28px;line-height:32px;color:#c00}',
+    '<div class="bb"><button aria-label="收藏"></button></div>')
+  // 第十三轮：中间层的 clip-path、will-change: contain，overflow-clip-margin 带参考盒
+  phPage('ph-pseudo-clippath.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{position:relative;width:50px;height:50px;border:0;background:none;padding:0}.bb i::after{content:"♥";position:absolute;left:9px;top:50px;width:32px;height:32px;font-size:28px;line-height:32px;color:#c00}.bb .clip{display:block;overflow:hidden;clip-path:inset(0);width:50px;height:50px}', '<div class="bb"><button aria-label="收藏"><span class="clip"><i></i></span></button></div>')
+  phPage('ph-pseudo-wcontain.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{position:relative;width:50px;height:50px;border:0;background:none;padding:0}.bb i::after{content:"♥";position:absolute;left:9px;top:50px;width:32px;height:32px;font-size:28px;line-height:32px;color:#c00}.bb .clip{display:block;overflow:hidden;will-change:contain;width:50px;height:50px}', '<div class="bb"><button aria-label="收藏"><span class="clip"><i></i></span></button></div>')
+  phPage('ph-pseudo-ocmbox.html', '详情', '.bb{position:fixed;left:0;right:0;bottom:0;height:84px;padding-bottom:34px;box-sizing:border-box;background:#fafafa}.bb button{position:relative;overflow:clip;overflow-clip-margin:border-box 32px;width:50px;height:50px;border:0;background:none}.bb button::after{content:"♥";position:absolute;left:9px;top:50px;width:32px;height:32px;font-size:28px;line-height:32px;color:#c00}', '<div class="bb"><button aria-label="收藏"></button></div>')
+  // 桌面软件：Mac 红绿灯在左上、Windows 三个按钮在右上
+  const dkHead = (title, meta, css) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><meta name="dsh-design" content="${meta}"><style>body{margin:0;font:13px/1.4 -apple-system,sans-serif;background:#fff;color:#111;height:100vh;display:flex}aside{width:240px;background:#f2f2f4}.tb{height:52px;display:flex;align-items:center;gap:8px;padding:0 12px}${css}</style></head><body>`
+  fs.writeFileSync(path.join(site, 'dk-ok.html'), dkHead('Mac 合规', 'desktop', 'aside .tb{padding-left:84px}') + '<aside><div class="tb"><button>新建</button></div><p>收件箱</p></aside><main><div class="tb"><b>收件箱</b></div></main></body></html>')
+  fs.writeFileSync(path.join(site, 'dk-bad.html'), dkHead('Mac 挡住', 'desktop', '') + '<aside><div class="tb"><b>邮件</b><button>新建</button></div></aside><main><div class="tb"><b>收件箱</b></div></main></body></html>')
+  fs.writeFileSync(path.join(site, 'dk-win.html'), dkHead('Windows 挡住', 'desktop windows', 'main{flex:1;background:#1f1f24;color:#fff}main .tb{justify-content:flex-end;height:32px;padding:0 4px}') + '<aside><div class="tb"><b>邮件</b><button>新建</button></div></aside><main><div class="tb"><button>设置</button></div></main></body></html>')
+  fs.writeFileSync(path.join(site, 'ph-nonav.html'), phHead('没导航栏', 'main{padding-top:120px}') + `<div class="sb"><b>9:41</b><span>●●● ▮</span></div>${body}</body></html>`)
   // 深色顶栏上盖着装饰 SVG 和半透明渐变：胶囊还是要画白的
   fs.writeFileSync(path.join(site, 'mini-dark.html'), `<!doctype html><html><head><meta charset="utf-8"><title>我的</title>
 <style>body{margin:0}header{position:relative;height:240px;background:#1F1C17}header::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 60% at 88% 6%,rgba(178,58,47,.55),transparent 62%)}
@@ -546,6 +650,88 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     const cap = capOf(mp.find((r) => r.key === 'mini.html'))
     check('真浏览器：小程序顶栏右边的按钮伸进胶囊，报一条（按钮和它的字算一处），说清伸进多少、从哪起空着', cap.length === 1 && cap[0].sev === 2 && cap[0].text === '搜索' && cap[0].px > 30 && cap[0].x === 281 && detailOf(cap[0]).includes('x 281 以右'), JSON.stringify(cap))
     check('真浏览器：按钮放左边、标题居中的不报胶囊', !capOf(mp.find((r) => r.key === 'mini-ok.html')).length, JSON.stringify(mp.find((r) => r.key === 'mini-ok.html')))
+    const phKeys = ['ph-ok.html', 'ph-bad.html', 'ph-nonav.html']
+    const ph = await measureAll(b, { screens: phKeys.map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [375, 667]], kind: 'miniprogram' })
+    const phApp = await measureAll(b, { screens: ['ph-nonav.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[390, 844]], kind: 'app' })
+    const phT = (key, h, list = ph) => { const r = list.find((x) => x.key === key && x.h === h); return r ? r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar'].includes(x.type)) : null }
+    const bad812 = phT('ph-bad.html', 812), bad667 = phT('ph-bad.html', 667)
+    check('真浏览器手机规矩：合规的一屏（状态栏两边、导航栏标题、4 项标签栏让出横条区、当前项小横线）什么都不报', phT('ph-ok.html', 812).length === 0 && phT('ph-ok.html', 667).length === 0, JSON.stringify([phT('ph-ok.html', 812), phT('ph-ok.html', 667)]))
+    check('真浏览器手机规矩：时间居中被灵动岛挡住、标签栏伸进横条区、6 项标签栏都报（小程序的标签栏算严重）', bad812.some((x) => x.type === 'island' && x.text === '9:41' && x.sev === 2) && bad812.some((x) => x.type === 'homebar' && x.px > 20 && x.bar === 'nav.tb') && bad812.some((x) => x.type === 'tabbar' && x.n === 6 && x.sev === 2) && detailOf(bad812.find((x) => x.type === 'tabbar')).includes('6 项'), JSON.stringify(bad812))
+    check('真浏览器手机规矩：矮屏（375×667）没有灵动岛和横条，只报标签栏项数', bad667.map((x) => x.type).join() === 'tabbar', JSON.stringify(bad667))
+    const rv = await measureAll(b, { screens: ['ph-shell.html', 'ph-tools.html', 'ph-clamp.html', 'ph-pseudo.html', 'ph-inline.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812]], kind: 'miniprogram' })
+    const rvT = (key) => { const r = rv.find((x) => x.key === key); return r ? r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)) : null }
+    check('真浏览器手机规矩：页面壳里普通流的底栏（body 撑满一屏、内容区自己滚）照样查横条区和 6 项标签栏', rvT('ph-shell.html').some((x) => x.type === 'homebar') && rvT('ph-shell.html').some((x) => x.type === 'tabbar' && x.n === 6), JSON.stringify(rvT('ph-shell.html')))
+    check('真浏览器手机规矩：一排 6 个操作按钮（裁剪、旋转…）不当标签栏报', rvT('ph-tools.html').length === 0, JSON.stringify(rvT('ph-tools.html')))
+    check('真浏览器手机规矩：多行截断藏起来的字不算伸进横条区', rvT('ph-clamp.html').length === 0, JSON.stringify(rvT('ph-clamp.html')))
+    check('真浏览器手机规矩：伪元素画的图标伸进横条区照样报', rvT('ph-pseudo.html').some((x) => x.type === 'homebar'), JSON.stringify(rvT('ph-pseudo.html')))
+    const rv2 = await measureAll(b, { screens: ['ph-tools-on.html', 'ph-tab-class.html', 'ph-tab-words.html', 'ph-badge.html', 'ph-pseudo-down.html', 'ph-carousel.html', 'ph-sheet.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv2T = (key) => rv2.filter((x) => x.key === key).flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    check('真浏览器手机规矩：工具栏有选中态（在 nav 里、当前工具变色）也不当标签栏报', rv2T('ph-tools-on.html').length === 0, JSON.stringify(rv2T('ph-tools-on.html')))
+    check('真浏览器手机规矩：项的类名是 tab-item、当前项只改图标颜色的 6 项标签栏照样报', rv2T('ph-tab-class.html').filter((x) => x.type === 'tabbar' && x.n === 6).length === 2, JSON.stringify(rv2T('ph-tab-class.html')))
+    check('真浏览器手机规矩：项是首页、分类、我的这些页面名的 6 项标签栏照样报', rv2T('ph-tab-words.html').filter((x) => x.type === 'tabbar' && x.n === 6).length === 2, JSON.stringify(rv2T('ph-tab-words.html')))
+    check('真浏览器手机规矩：徽标小红点、空白内容的渐变遮罩不算伸进横条区', rv2T('ph-badge.html').length === 0, JSON.stringify(rv2T('ph-badge.html')))
+    check('真浏览器手机规矩：按钮在横条区上面、伪元素图标往下伸进去照样报', rv2T('ph-pseudo-down.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv2T('ph-pseudo-down.html')))
+    check('真浏览器手机规矩：页面末尾横着滑的商品（链接、等宽）不当标签栏报', !rv2T('ph-carousel.html').some((x) => x.type === 'tabbar'), JSON.stringify(rv2T('ph-carousel.html')))
+    check('真浏览器手机规矩：收到屏幕下面看不见的面板不算伸进横条区', rv2T('ph-sheet.html').length === 0, JSON.stringify(rv2T('ph-sheet.html')))
+    const rv3 = await measureAll(b, { screens: ['ph-nav-toolwords.html', 'ph-toolbar-role.html', 'ph-tools-glyph.html', 'ph-negmargin.html', 'ph-pseudo-xf.html', 'ph-pseudo-flex.html', 'ph-pseudo-end.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv3T = (key) => rv3.filter((x) => x.key === key).flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    const tabs6 = (key) => rv3T(key).filter((x) => x.type === 'tabbar' && x.n === 6).length === 2
+    check('真浏览器手机规矩：写明了是标签栏（class tabbar、链接）的 6 项，项名像操作（模板、相册、音乐）也照样报', tabs6('ph-nav-toolwords.html'), JSON.stringify(rv3T('ph-nav-toolwords.html')))
+    check('真浏览器手机规矩：写明了 role=toolbar 的 6 个按钮，项名像页面（视频、收藏）也不报', rv3T('ph-toolbar-role.html').length === 0, JSON.stringify(rv3T('ph-toolbar-role.html')))
+    check('真浏览器手机规矩：工具名前带字符图标（✂ 裁剪）的工具栏不报', rv3T('ph-tools-glyph.html').length === 0, JSON.stringify(rv3T('ph-tools-glyph.html')))
+    check('真浏览器手机规矩：一排用负边距铺满的 6 项标签栏照样报', tabs6('ph-negmargin.html'), JSON.stringify(rv3T('ph-negmargin.html')))
+    check('真浏览器手机规矩：伪元素图标用 translate(-50%,-50%) 居中、在横条区上面，不报', rv3T('ph-pseudo-xf.html').length === 0, JSON.stringify(rv3T('ph-pseudo-xf.html')))
+    check('真浏览器手机规矩：flex 竖排「字 + ::after 箭头」，箭头伸进横条区照样报', rv3T('ph-pseudo-flex.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv3T('ph-pseudo-flex.html')))
+    check('真浏览器手机规矩：flex 底对齐的伪元素图标伸进横条区照样报', rv3T('ph-pseudo-end.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv3T('ph-pseudo-end.html')))
+    const rv4 = await measureAll(b, { screens: ['ph-nav-toolsid.html', 'ph-toolbar-nested.html', 'ph-tools-links.html', 'ph-pseudo-between.html', 'ph-pseudo-lh.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv4T = (key) => rv4.filter((x) => x.key === key).flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    check('真浏览器手机规矩：role=tablist 的 6 项里有一项叫 tools，照样报标签栏', rv4T('ph-nav-toolsid.html').filter((x) => x.type === 'tabbar' && x.n === 6).length === 2, JSON.stringify(rv4T('ph-nav-toolsid.html')))
+    check('真浏览器手机规矩：套了一层的 role=toolbar（里面的一排类名叫 tabs）不报', rv4T('ph-toolbar-nested.html').length === 0, JSON.stringify(rv4T('ph-toolbar-nested.html')))
+    check('真浏览器手机规矩：占位链接（href="#"）做的一排操作不报', rv4T('ph-tools-links.html').length === 0, JSON.stringify(rv4T('ph-tools-links.html')))
+    check('真浏览器手机规矩：flex 竖排 space-between，::after 箭头被推到底伸进横条区照样报', rv4T('ph-pseudo-between.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv4T('ph-pseudo-between.html')))
+    check('真浏览器手机规矩：字的行高撑开（line-height:40px），后面的 ::after 伸进横条区照样报', rv4T('ph-pseudo-lh.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv4T('ph-pseudo-lh.html')))
+    const rv5 = await measureAll(b, { screens: ['ph-nav-hash.html', 'ph-pseudo-tight.html', 'ph-pseudo-around.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv5T = (key) => rv5.filter((x) => x.key === key).flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    check('真浏览器手机规矩：链到 #/page/… 路由的 6 项，项名像操作也照样报标签栏', rv5T('ph-nav-hash.html').filter((x) => x.type === 'tabbar' && x.n === 6).length === 2, JSON.stringify(rv5T('ph-nav-hash.html')))
+    check('真浏览器手机规矩：space-between 放不下时箭头接在字后面，伸进横条区照样报', rv5T('ph-pseudo-tight.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv5T('ph-pseudo-tight.html')))
+    check('真浏览器手机规矩：space-around 里字带外边距，箭头在横条区上面，不报', rv5T('ph-pseudo-around.html').length === 0, JSON.stringify(rv5T('ph-pseudo-around.html')))
+    const rv6 = await measureAll(b, { screens: ['ph-pseudo-both.html', 'ph-pseudo-block.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv6T = (key) => rv6.filter((x) => x.key === key).flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    check('真浏览器手机规矩：「::before 图标 + 字 + ::after 箭头」space-between 排、都在横条区上面，不报', rv6T('ph-pseudo-both.html').length === 0, JSON.stringify(rv6T('ph-pseudo-both.html')))
+    check('真浏览器手机规矩：块布局里字和箭头的上下外边距合并，箭头在横条区上面，不报', rv6T('ph-pseudo-block.html').length === 0, JSON.stringify(rv6T('ph-pseudo-block.html')))
+    const rv7 = await measureAll(b, { screens: ['ph-pseudo-ib.html', 'ph-pseudo-line.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv7T = (key) => rv7.filter((x) => x.key === key).flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    check('真浏览器手机规矩：行内块的字和块级箭头的外边距不合并，箭头伸进横条区照样报', rv7T('ph-pseudo-ib.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv7T('ph-pseudo-ib.html')))
+    check('真浏览器手机规矩：::before 只是一条边框线（高 0），space-between 的箭头伸进横条区照样报', rv7T('ph-pseudo-line.html').filter((x) => x.type === 'homebar').length === 2, JSON.stringify(rv7T('ph-pseudo-line.html')))
+    const rv8 = await measureAll(b, { screens: [{ key: 'ph-pseudo-inline.html', url: `${entry.origin}/ph-pseudo-inline.html`, label: 'ph-pseudo-inline.html' }], sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv8T = rv8.flatMap((r) => r.issues.filter((x) => ['island', 'homebar', 'tabbar', 'navbar', 'capsule'].includes(x.type)))
+    check('真浏览器手机规矩：普通 span 写的上下外边距（不起作用）不算，箭头在横条区上面，不报', rv8T.length === 0, JSON.stringify(rv8T))
+    const rv9 = await measureAll(b, { screens: [{ key: 'ph-pseudo-strut.html', url: `${entry.origin}/ph-pseudo-strut.html`, label: 'ph-pseudo-strut.html' }], sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+    const rv9T = rv9.flatMap((r) => r.issues.filter((x) => x.type === 'homebar'))
+    check('真浏览器手机规矩：父元素行高（32px）比 span 的大，那一行按父元素的算，箭头伸进横条区照样报', rv9T.length === 2, JSON.stringify(rv9T))
+    // 伪元素：无头体检问浏览器要真实框（page.pseudo），实时预览没有这个、按样式推；两种都过一遍
+    const xf = await b.withPage({ url: `${entry.origin}/ph-pseudo-xf.html`, w: 430, h: 932 }, async (p) => {
+      const n = await p.pseudo()
+      return { n, box: await p.eval("(() => { const e = document.querySelector('.bb button'); const r = e.getBoundingClientRect(); return { got: e.__dshPseudo && e.__dshPseudo['::before'], cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 } })()") }
+    })
+    const g = xf.box.got
+    check('伪元素真实框：浏览器给的框是视口坐标、算上了 translate(-50%,-50%)（32×32 居中在按钮上）', xf.n >= 1 && g && Math.abs((g.l + g.r) / 2 - xf.box.cx) < 1 && Math.abs((g.t + g.b) / 2 - xf.box.cy) < 1 && Math.abs(g.r - g.l - 32) < 1, JSON.stringify(xf))
+    const est = { withPage: (o, fn) => b.withPage(o, (p) => fn({ ...p, pseudo: undefined })) }
+    const PSEUDO = { 'ph-pseudo.html': true, 'ph-badge.html': false, 'ph-pseudo-down.html': true, 'ph-pseudo-xf.html': false, 'ph-pseudo-flex.html': true, 'ph-pseudo-end.html': true, 'ph-pseudo-between.html': true, 'ph-pseudo-lh.html': true, 'ph-pseudo-tight.html': true, 'ph-pseudo-around.html': false, 'ph-pseudo-both.html': false, 'ph-pseudo-block.html': false, 'ph-pseudo-ib.html': true, 'ph-pseudo-line.html': true, 'ph-pseudo-inline.html': false, 'ph-pseudo-strut.html': true, 'ph-pseudo-hidden.html': false, 'ph-pseudo-skip.html': true, 'ph-pseudo-clipmargin.html': true, 'ph-pseudo-clippath.html': false, 'ph-pseudo-wcontain.html': false, 'ph-pseudo-ocmbox.html': true }
+    const EXACT_ONLY = { 'ph-pseudo-collapse.html': false, 'ph-pseudo-valign.html': false }
+    for (const [mode, br, cases] of [['真实框', b, { ...PSEUDO, ...EXACT_ONLY }], ['按样式推', est, PSEUDO]]) {
+      const rows = await measureAll(br, { screens: Object.keys(cases).map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[375, 812], [430, 932]], kind: 'miniprogram' })
+      const wrong = Object.entries(cases).filter(([key, want]) => rows.filter((r) => r.key === key).some((r) => r.issues.some((x) => x.type === 'homebar') !== want))
+      check(`伪元素图标伸没伸进横条区（${mode}）：${Object.keys(cases).length} 种写法都对`, wrong.length === 0, JSON.stringify(wrong))
+    }
+    check('真浏览器手机规矩：行内 span 写了 overflow:hidden（不起作用）一直写到胶囊下面，照样报', rvT('ph-inline.html').some((x) => x.type === 'capsule') && !rvT('ph-inline.html').some((x) => x.type === 'navbar'), JSON.stringify(rvT('ph-inline.html')))
+    const dk = await measureAll(b, { screens: ['dk-ok.html', 'dk-bad.html', 'dk-win.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[1280, 800]], kind: 'desktop' })
+    const winOf = (key) => { const r = dk.find((x) => x.key === key); return r ? r.issues.filter((x) => x.type === 'winctl') : null }
+    check('真浏览器桌面软件：Mac 侧栏顶上空出红绿灯不报；标题从左上角写起报（被红绿灯挡住）；Windows 右上角的按钮报、Mac 的位置不报', winOf('dk-ok.html').length === 0 && winOf('dk-bad.html').map((x) => x.text).sort().join() === ['邮件', '新建'].sort().join() && winOf('dk-bad.html').every((x) => x.os === 'mac' && detailOf(x).includes('红绿灯')) && winOf('dk-win.html').length === 1 && winOf('dk-win.html')[0].text === '设置' && winOf('dk-win.html')[0].os === 'win' && detailOf(winOf('dk-win.html')[0]).includes('关闭'), JSON.stringify(dk.map((r) => [r.key, r.issues])))
+    const dkDraw = await b.withPage({ url: `${entry.origin}/dk-win.html`, w: 1280, h: 800 }, async (p) => [await p.eval("window.__dshDesign.winctl('solid')"), await p.eval('window.__dshDesign.info().topDark'), await p.eval("document.querySelectorAll('dsh-design-fx').length"), (await p.eval("window.__dshDesign.check('desktop')")).issues.filter((x) => x.type === 'winctl').length])
+    const dkMac = await b.withPage({ url: `${entry.origin}/dk-ok.html`, w: 1280, h: 800 }, async (p) => [await p.eval("window.__dshDesign.winctl('solid')"), await p.eval('window.__dshDesign.info().topDark')])
+    check('真浏览器桌面软件：截图用的窗口按钮画上去（Windows 深色标题栏按白的量），不影响体检；Mac 的照 Mac 画', JSON.stringify(dkDraw) === '[{"os":"win"},true,1,1]' && JSON.stringify(dkMac) === '[{"os":"mac"},false]', JSON.stringify([dkDraw, dkMac]))
+    check('真浏览器手机规矩：小程序顶上 44–88 什么都没有报「没有导航栏」，App 不报', phT('ph-nonav.html', 812).some((x) => x.type === 'navbar' && x.t === 44 && x.b === 88) && phT('ph-nonav.html', 844, phApp).length === 0 && !phT('ph-ok.html', 812).some((x) => x.type === 'navbar'), JSON.stringify([phT('ph-nonav.html', 812), phT('ph-nonav.html', 844, phApp)]))
     const topOf = (key) => b.withPage({ url: `${entry.origin}/${key}`, w: 375, h: 812 }, (p) => p.eval('window.__dshDesign.info().topDark'))
     const tops = [await topOf('mini-ok.html'), await topOf('mini-dark.html'), await topOf('clean.html')]
     check('真浏览器：胶囊跟着顶栏深浅——绿色顶栏、盖着装饰 SVG 的深色顶栏画白的，白底画黑的', JSON.stringify(tops) === '[true,true,false]', JSON.stringify(tops))

@@ -136,6 +136,8 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   check('交接说明：网页设计没有小程序要点', !md.includes('小程序要点'))
   const mp = handoffMd({ root: design, rows, kind: 'miniprogram', size: [375, 812], framework: 'react', dest, project: null, system: '', htmlByKey })
   check('交接说明：小程序设计讲清 rpx 换算、状态栏和胶囊不用做、tabBar 写进 app.json', mp.includes('## 小程序要点') && mp.includes('1px = 2rpx') && mp.includes('wx.getMenuButtonBoundingClientRect()') && mp.includes('`tabBar`'), mp)
+  const dk = handoffMd({ root: design, rows, kind: 'desktop', size: [1280, 800], framework: 'react', dest, project: null, system: '', htmlByKey })
+  check('交接说明：桌面软件讲清 Electron / Tauri、窗口按钮系统画、拖动区；网页和小程序没有这段', dk.includes('## 桌面软件要点') && dk.includes('hiddenInset') && dk.includes('-webkit-app-region: drag') && dk.includes('138×32') && !md.includes('桌面软件要点') && !mp.includes('桌面软件要点'))
   const t2 = path.join(tmp, 'empty-tokens')
   fs.mkdirSync(t2)
   fs.writeFileSync(path.join(t2, 'tokens.css'), '.x { color: red }')

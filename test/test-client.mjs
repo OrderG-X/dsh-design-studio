@@ -128,7 +128,7 @@ check('结尾留一个换行（光标落在下一行，接着打字）', out.end
 
 // ── 类型、画布排版 ──
 const { parseMeta, sizeOf, layoutGrid, fitCam } = mod._test
-check('页面 meta：类型 + 尺寸', JSON.stringify(parseMeta('poster 1080x1920')) === JSON.stringify({ kind: 'poster', size: '1080x1920' }))
+check('页面 meta：类型 + 尺寸', JSON.stringify(parseMeta('poster 1080x1920')) === JSON.stringify({ kind: 'poster', size: '1080x1920', os: '' }))
 check('页面 meta：别名、乱写', parseMeta('mobile').kind === 'app' && parseMeta('hello').kind === '' && parseMeta('').size === '')
 check('尺寸：没给就按类型默认', sizeOf('', 'app').join('x') === '390x844' && sizeOf('1080x1920', 'poster').join('x') === '1080x1920' && sizeOf('9x9', 'web').join('x') === '1280x800')
 let L = layoutGrid(4, 412, 866, 880, 570)
@@ -270,6 +270,7 @@ check('连线：看不见的按钮那条是虚线', flowMarks([low], 1).find(([,
 
 // ── 多尺寸并排 ──
 check('小程序：meta 认 miniprogram / 小程序，默认 375×812；外框是手机 + 胶囊，矮屏没灵动岛但胶囊还在', mod._test.parseMeta('miniprogram').kind === 'miniprogram' && mod._test.parseMeta('小程序').kind === 'miniprogram' && mod._test.sizeOf('', 'miniprogram').join('x') === '375x812' && mod._test.frameOf('miniprogram', 375, 812).island > 0 && mod._test.frameOf('miniprogram', 375, 812).capsule && mod._test.frameOf('miniprogram', 375, 667).island === 0 && mod._test.frameOf('miniprogram', 375, 667).capsule)
+check('桌面软件：meta 认 desktop / 桌面软件 / windows，windows 记成 win、默认 Mac；1280×800，外框是带窗口按钮的窗口', mod._test.parseMeta('desktop').kind === 'desktop' && mod._test.parseMeta('desktop').os === '' && mod._test.parseMeta('desktop windows 1440x900').os === 'win' && mod._test.parseMeta('desktop windows 1440x900').size === '1440x900' && mod._test.parseMeta('windows').kind === 'desktop' && mod._test.parseMeta('桌面软件').kind === 'desktop' && mod._test.parseMeta('app').os === '' && mod._test.sizeOf('', 'desktop').join('x') === '1280x800' && mod._test.frameOf('desktop', 1280, 800).win && !mod._test.frameOf('desktop', 1280, 800).island && mod._test.frameOf('desktop', 1280, 800).pad === 0)
 check('外框：标准手机有灵动岛，SE 那种矮屏没有', mod._test.frameOf('app', 393, 852).island > 0 && mod._test.frameOf('app', 375, 667).island === 0 && mod._test.frameOf('tablet', 744, 1133).pad === 14)
 const { layoutRow } = mod._test
 const row = layoutRow([[390, 844], [848, 1208], [1440, 934]], 700, 600)
@@ -364,7 +365,7 @@ const lum = (hex) => { const v = hex.slice(1).match(/../g).map((x) => parseInt(x
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
 const lowC = STYLES.flatMap((x) => [['text', x.c.text, x.c.bg], ['muted', x.c.muted, x.c.bg], ['muted', x.c.muted, x.c.surface], ['on', x.c.on, x.c.primary], ['link', x.c.link, x.c.bg], ['link', x.c.link, x.c.surface]]
   .filter(([, a, b]) => ratio(a, b) < 4.5).map(([k, a, b]) => `${x.id}.${k} ${ratio(a, b).toFixed(2)}`))
-check('风格卡：十五种，正文 / 次要文字 / 主色按钮上的字 / 链接色都 ≥ 4.5:1', STYLES.length === 15 && !lowC.length, lowC.join(', '))
+check('风格卡：二十种、不重名，正文 / 次要文字 / 主色按钮上的字 / 链接色都 ≥ 4.5:1', STYLES.length === 20 && new Set(STYLES.map((x) => x.id)).size === 20 && !lowC.length, lowC.join(', '))
 // 点缀色怎么用由对比度定：说能写大字的 ≥ 3:1；只做色块的，色块上的正文色 ≥ 4.5:1
 const accBad = STYLES.flatMap((x) => {
   const u = accentUse(x.c)
@@ -381,6 +382,18 @@ const tz2 = (k, v = {}) => ({ lang: 'zh', styleText: '〔风格〕{name}——{d
 const warm = formatStyle(tz2, STYLES.find((x) => x.id === 'warm'), false)
 check('风格卡：开局的字带名字、配色、字体、圆角、要点，最后让模型照着做', warm.startsWith('〔风格〕温暖手作——纸感底色') && warm.includes('底色 #F6EFE6，主色 #A9542A') && warm.includes('Songti SC') && warm.includes('圆角 16px') && warm.endsWith('照这个风格来做：'), warm)
 check('风格卡：换风格的字 + 玻璃的底色光斑', formatStyle(tz2, STYLES.find((x) => x.id === 'glass'), true).includes('；叠 radial-gradient') && formatStyle(tz2, STYLES[0], true).endsWith('把现在的设计换成这个风格。\n'))
+// 样板上的小标签照点缀色的用法上色：能写字就写点缀色，色块就配正文色，只做图形的换主色
+const { styleLook } = mod._test
+const chipBad = STYLES.flatMap((x) => {
+  const k = styleLook(x).chip
+  const fg = k.color
+  const bg = k.background || x.c.surface
+  // 描边的小标签写在卡片上（杂志风格的卡片是透明的，写在底色上），两种都量
+  const r = k.background ? ratio(fg, bg) : Math.min(ratio(fg, x.c.surface), ratio(fg, x.c.bg))
+  return r >= 4.5 ? [] : [`${x.id} ${r.toFixed(2)}`]
+})
+check('风格卡样板：小标签是小字，都 ≥ 4.5:1', !chipBad.length, chipBad.join(', '))
+check('风格卡样板：招牌细节——粗野主义 3px 黑框、运动标题斜体、没写的用风格自己的阴影', styleLook(STYLES.find((x) => x.id === 'brutal')).card.border === '3px solid #000000' && styleLook(STYLES.find((x) => x.id === 'sport')).head.fontStyle === 'italic' && styleLook(STYLES.find((x) => x.id === 'warm')).card.boxShadow === STYLES.find((x) => x.id === 'warm').shadow)
 
 // ── 插进输入框：前后怎么接，光标落在哪 ──
 const { padInsert } = mod._test

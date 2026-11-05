@@ -582,9 +582,14 @@ try {
   await sleep(400) // 面板淡入完再截图
   await shot('8-styles')
   await page(`[...document.querySelectorAll('.ddp-sc')].find((x) => x.querySelector('.nm')?.textContent === '温暖手作').click()`)
+  const sam = await until(`document.querySelector('.ddp-samview .meta b')?.textContent`, 3000)
+  await sleep(300)
+  await shot('8b-sample')
+  check('换风格：点卡片先看原大样板，输入框还没动', sam === '温暖手作' && !/〔风格〕/.test(await page(composerText)), sam)
+  await page(`document.querySelector('.ddp-samview .ddp-go').click()`)
   await sleep(500)
   const styTxt = await page(composerText)
-  check('换风格：十五张风格卡，点「温暖手作」→ 输入框里是〔风格〕、整套配色和换风格的要求', cards === 15 && /〔风格〕温暖手作/.test(styTxt) && styTxt.includes('#F6EFE6') && /把现在的设计换成这个风格/.test(styTxt) && !(await page(`!!document.querySelector('.ddp-styles')`)),
+  check('换风格：二十张风格卡，样板上点「用这个风格」→ 输入框里是〔风格〕、整套配色和换风格的要求', cards === 20 && /〔风格〕温暖手作/.test(styTxt) && styTxt.includes('#F6EFE6') && /把现在的设计换成这个风格/.test(styTxt) && !(await page(`!!document.querySelector('.ddp-styles')`)),
     `${cards} 张；${styTxt.slice(-300)}`)
 
   // ⑨ 远程看：同一个会话换个地址打开（remote.test 指向本机，DSH 信任这个域名；页面里 127.0.0.1 指的是「那台设备自己」，预览连不上）

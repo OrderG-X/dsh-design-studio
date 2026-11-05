@@ -87,6 +87,30 @@ const clientWanted = (() => {
 })()
 console.log(`已安装 ${pkgName}`)
 
+// 2b. 配置里引用的 DSH 自带插件（比如照抄标准模式的预设）在这个版本里都还在：少一个，引用它的那一组就整个起不来，日志里也不一定有字
+{
+  const pkgDir = path.join(profile, 'node_modules', pkgName)
+  let text = ''
+  const patch = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).dsh?.bundle?.patch
+  for (const f of [].concat(patch || [])) { // 一个路径或一组路径
+    try { text += fs.readFileSync(path.join(pkgDir, f), 'utf8') + '\n' } catch (e) { problems.push(`读不到 dsh.bundle.patch 写的 ${f}：${e.message}`) }
+  }
+  text = text.replace(/(^|\s)#.*$/gm, '$1') // YAML 注释里的插件名不算
+  const refs = [...new Set([...text.matchAll(/^\s*(?:-\s+)?name:\s*['"]?(@deepseek-ai\/[\w.-]+(?:\/[\w./-]+)?)/gm)].map((m) => m[1]))]
+  const roots = [path.join(tmp, 'cli', 'node_modules'), path.join(cliDir, 'node_modules'), path.join(profile, 'node_modules')]
+  // exports 里有这个子路径：照写的键，或 "./x/*" 这种通配
+  const exported = (ex, sub) => Object.keys(ex).some((k) => k === sub || (k.includes('*') && new RegExp(`^${k.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.+')}$`).test(sub)))
+  const gone = refs.filter((ref) => {
+    const [scope, base, ...sub] = ref.split('/')
+    const dir = roots.map((r) => path.join(r, scope, base)).find((d) => fs.existsSync(path.join(d, 'package.json')))
+    if (!dir) return true
+    if (!sub.length) return false
+    const ex = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).exports
+    return Boolean(ex && typeof ex === 'object') && !exported(ex, `./${sub.join('/')}`) // 没写 exports 的不好判断，放过
+  })
+  if (gone.length) problems.push(`配置里引用的 DSH 插件在 ${dshVersion} 里没有了：${gone.join('、')}（引用它们的那一组会整个起不来）`)
+}
+
 // 3. 启动 Web 版，等它打印地址；启动日志里「did not activate」提到我们就算失败
 let log = ''
 const url = await new Promise((resolve) => {

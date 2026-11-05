@@ -314,6 +314,7 @@ check('类型：认得标准名', parseKind('app') === 'app' && parseKind('Slide
 check('类型：常见别名', parseKind('mobile') === 'app' && parseKind('ppt') === 'slides' && parseKind('social') === 'poster' && parseKind('website') === 'web')
 check('类型：认不出 → 空', parseKind('banana') === '' && parseKind('') === '')
 check('类型：小程序和它的别名（miniapp 以前算 App）', ['miniprogram', 'MiniProgram', '小程序', 'weapp', 'miniapp', 'wechat'].every((k) => parseKind(k) === 'miniprogram'))
+check('类型：桌面软件和它的别名；dashboard 还是网页', ['desktop', 'Desktop', '桌面软件', 'electron', 'tauri', 'windows', 'mac'].every((k) => parseKind(k) === 'desktop') && parseKind('dashboard') === 'web')
 check('尺寸：x / × 都认', parseSize('1080x1920') === '1080x1920' && parseSize(' 1080 × 1350 ') === '1080x1350')
 check('尺寸：太小 / 乱写 → 空', parseSize('10x10') === '' && parseSize('big') === '')
 
