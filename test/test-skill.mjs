@@ -86,13 +86,14 @@ studio.tracker = saved
 {
   const routes = {}
   const disposers = []
+  const live = [] // DSH 里活着的会话（插件问会话目录用）
   apply({
     logger: { warn: () => {} },
     effect: (fn) => { const d = fn(); if (typeof d === 'function') disposers.push(d) },
     webServer: { register: (r) => { routes[r.path.split('/').pop()] = r.handler; return () => {} }, getOrigin: () => 'http://127.0.0.1:1' },
     tools: { register: () => {} },
     on: () => {},
-    get: () => null,
+    get: (name) => (name === 'sessions' ? { list: () => live } : null),
   })
   const call = (name, method, url, body) => new Promise((resolve) => {
     const req = Readable.from(body ? [Buffer.from(JSON.stringify(body))] : [])
@@ -166,6 +167,21 @@ studio.tracker = saved
     const none = await call('locate', 'POST', '/x', { session: 'nobody', items: [{ href: `${o}/home.html`, sel: '.btn', n: 0 }] })
     check('调样式找行号：别的会话（没开着预览）一律给空', JSON.stringify(none.body.items) === '[null]', JSON.stringify(none.body))
     fs.rmSync(dir, { recursive: true, force: true })
+  }
+  // 转成代码面板：新会话（没跑过工具，插件不知道目录）从设计库打开了小程序设计 → 问 DSH 要会话目录，认出 HBuilderX 项目（issue #4）
+  {
+    const hb = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-hbx-')))
+    fs.writeFileSync(path.join(hb, 'manifest.json'), '{ "vueVersion": "3" }')
+    fs.writeFileSync(path.join(hb, 'pages.json'), '{ "pages": [] }')
+    fs.mkdirSync(path.join(hb, '面馆'))
+    fs.writeFileSync(path.join(hb, '面馆', 'menu.html'), '<!doctype html><meta name="dsh-design" content="miniprogram"><title>点单</title><p>点单')
+    await realTracker.setTarget('sHbx', parseTarget(path.join(hb, '面馆', 'menu.html')), { source: 'user' })
+    const before = await call('project', 'GET', '/x?session=sHbx')
+    live.push({ id: 'sHbx', header: { cwd: hb } })
+    const r = await call('project', 'GET', '/x?session=sHbx')
+    check('转成代码面板：新会话问 DSH 要目录 → 认出 HBuilderX 项目，默认「跟项目一样」、放进项目；小程序设计带上 kind', r.body.cwd === hb && r.body.fw === 'same' && r.body.dest === hb && r.body.kind === 'miniprogram' && r.body.project.framework === 'uniapp' && before.body.cwd !== hb, JSON.stringify([before.body.cwd, r.body.cwd, r.body.fw, r.body.dest, r.body.kind]))
+    live.length = 0
+    fs.rmSync(hb, { recursive: true, force: true })
   }
   studio.tracker = { snapshot: () => ({ url: 'http://127.0.0.1:9/home.html' }) }
   const t0 = Date.now()
