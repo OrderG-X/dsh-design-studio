@@ -20,7 +20,8 @@ let fail = 0
 function check(name, ok, extra = '') {
   if (ok) { pass++; console.log(`✓ ${name}`) } else { fail++; console.log(`✗ ${name} ${extra}`) }
 }
-const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-handoff-')))
+// 用 native：Windows 的临时目录是 RUNNER~1 这种短名，projectFor 往上找时按真实路径（长名）走
+const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-handoff-')))
 
 // ── 项目 ──
 {
