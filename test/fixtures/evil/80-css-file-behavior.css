@@ -1,0 +1,2 @@
+/* expect: cssProp */
+.a{behavior:url(ok.png)}

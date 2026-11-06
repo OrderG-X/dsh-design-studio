@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Design library offline",
+    "description": "When on, the library's Gallery uses no network and shows only designs already downloaded; My designs and Inspiration still work. When off, the Gallery only downloads designs from npm mirrors (npmmirror, Tencent Cloud, Huawei Cloud, npmjs); nothing is uploaded or tracked."
+  }
+}

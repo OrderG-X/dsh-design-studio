@@ -1,0 +1,2 @@
+/* expect: fontUrl */
+@font-face{font-family:X;src:url("ok.png") format("woff2")}

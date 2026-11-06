@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/hero.jpg" alt="Design Studio: one sentence gives three directions; pick one, get the full set, click to edit" width="480" />
+![Design Studio: one sentence gives three directions; pick one, get the full set, click to edit](assets/hero-sm.jpg)
 
 <p>
   <a href="https://github.com/OrderG-X/dsh-design-studio/releases"><img src="https://img.shields.io/github/v/release/OrderG-X/dsh-design-studio?label=release&color=4D6BFE" alt="release" /></a>
@@ -27,7 +27,7 @@
 
 **Requirements:** works in the DSH desktop app and the web version, on Mac and Windows. The design check needs Chrome or Edge on your computer.
 
-If DSH can't reach the npm registry, it falls back to a mirror in China. To update, uninstall on the Plugins page and add it again. A new version installs by package name about a day after release; to get it right away, enter the release tarball `https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz` (needs GitHub access).
+If DSH can't reach the npm registry, it falls back to a mirror in China. To update on DSH 0.2.2 or later, open it on the Plugins page and click "Update to …"; on older DSH, uninstall it and add it again. A new version installs by package name about a day after release; to get it right away, uninstall it and enter the release tarball `https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz` (needs GitHub access) — a tarball install can't use Update later.
 
 ## Quick start
 
@@ -43,6 +43,7 @@ If DSH can't reach the npm registry, it falls back to a mirror in China. To upda
 - **Design check:** one click finds overflowing text, low contrast, small tap targets and tiny text, marked right on the page. In Design mode the model also checks its own work and fixes what it finds.
 - **Versions and compare:** every turn is saved; drag a slider to compare, and go back to any version.
 - **Export and phone preview:** showcase images, PDF and PowerPoint (links between screens still work); scan a QR code to see it on your phone at real size.
+- **Design library and gallery:** everything you've designed, plus saved references and styles, lives in the Library. Browse templates, design systems and style cards others shared, and "Start from this" copies one for you to keep editing. Share your own with "Share to the gallery": it's checked, zipped and submitted on a web page, and listed once reviewed. The gallery catalog comes from npm mirrors and is used only when its signature and checksums match; to keep it offline, turn on "Design library offline" on the Plugins page.
 - **Your brand, and real code:** give a site URL to extract a brand design system and design with it from then on; turn a finished design into React / Vue / HTML, compared screen by screen against the design.
 
 See [all features](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/features.md) for every feature, the tool parameters and the security design, and [development](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/development.md) for dev setup and tests.

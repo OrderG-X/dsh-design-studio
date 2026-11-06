@@ -192,7 +192,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const patch = fs.readFileSync(path.join(root, 'cordis.patch.yml'), 'utf8').replace(/\r\n/g, '\n') // Windows 上签出可能是 CRLF
 const rowNames = [...patch.matchAll(/^\s+name: '?(dsh-design-studio[^'\s]*)'?$/gm)].map((m) => m[1])
 check('patch 里的几行都能从包里找到', rowNames.length >= 6 && rowNames.every((n) => n === 'dsh-design-studio' || pkg.exports['./' + n.split('/')[1]]), rowNames.join(','))
-for (const sub of ['auto', 'tool', 'skill', 'preset']) {
+for (const sub of ['auto', 'offline', 'tool', 'skill', 'preset']) {
   const ok = ['zh', 'en'].every((l) => {
     const f = pkg.exports[`./${sub}/locale/*.json`]
     const meta = f && JSON.parse(fs.readFileSync(path.join(root, f.replace('*', l)), 'utf8')).meta

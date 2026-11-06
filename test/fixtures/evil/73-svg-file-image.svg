@@ -1,0 +1,2 @@
+<!-- expect: external -->
+<svg xmlns="http://www.w3.org/2000/svg"><image href="https://evil.example/x.png"/></svg>

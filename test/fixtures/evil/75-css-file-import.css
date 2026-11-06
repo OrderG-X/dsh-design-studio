@@ -1,0 +1,2 @@
+/* expect: cssImport */
+@import url("https://evil.example/x.css");

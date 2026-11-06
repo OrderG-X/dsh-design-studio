@@ -1,0 +1,2 @@
+<!-- expect: svgDoctype -->
+<!DOCTYPE svg [<!ENTITY x "&#60;script&#62;alert(1)&#60;/script&#62;">]><svg xmlns="http://www.w3.org/2000/svg">&x;</svg>

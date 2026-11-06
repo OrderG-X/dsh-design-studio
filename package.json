@@ -25,6 +25,9 @@
     "./auto": "./lib/auto.js",
     "./auto/locale/*.json": "./locale/auto/*.json",
     "./auto/icon": "./icon.svg",
+    "./offline": "./lib/offline.js",
+    "./offline/locale/*.json": "./locale/offline/*.json",
+    "./offline/icon": "./icon.svg",
     "./tool": "./lib/tool.js",
     "./tool/locale/*.json": "./locale/tool/*.json",
     "./tool/icon": "./icon.svg",
@@ -34,6 +37,7 @@
     "./preset": "./lib/preset.js",
     "./preset/locale/*.json": "./locale/preset/*.json",
     "./preset/icon": "./icon.svg",
+    "./gallery": "./lib/gallery/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./icon.svg": "./icon.svg",
@@ -46,7 +50,9 @@
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
-    "README.en.md"
+    "README.en.md",
+    "assets/hero-sm.jpg",
+    "assets/demo.gif"
   ],
   "icon": "./icon.svg",
   "dsh": {

@@ -1,0 +1,2 @@
+/* expect: external */
+.a{background:url(//evil.example/x.png)}

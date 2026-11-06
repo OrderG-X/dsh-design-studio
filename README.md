@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/hero.jpg" alt="设计工作台：一句话做出三个方向，挑一个做全套，点一下就改" width="480" />
+![设计工作台：一句话做出三个方向，挑一个做全套，点一下就改](assets/hero-sm.jpg)
 
 <p>
   <a href="https://github.com/OrderG-X/dsh-design-studio/releases"><img src="https://img.shields.io/github/v/release/OrderG-X/dsh-design-studio?label=release&color=4D6BFE" alt="release" /></a>
@@ -27,7 +27,7 @@
 
 **需要什么**：DSH 桌面版、网页版都能用，Mac、Windows 都行。「设计体检」要电脑上装着 Chrome 或 Edge。
 
-连不上 npm 时 DSH 会自动换国内镜像。更新：在「插件」页卸载，再添加一次。新版发布后大约一天，按包名才装得到；急的话填发布包地址 `https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`（要能连上 GitHub）。
+连不上 npm 时 DSH 会自动换国内镜像。更新：DSH 0.2.2 起，在「插件」页点开它，点「更新到 …」；更老的 DSH 先卸载，再添加一次。新版发布后大约一天，按包名才装得到；急的话卸载后填发布包地址 `https://github.com/OrderG-X/dsh-design-studio/releases/latest/download/dsh-design-studio.tgz`（要能连上 GitHub），不过这样装的以后不能点更新。
 
 ## 三步上手
 
@@ -43,6 +43,7 @@
 - **设计体检**：一键查文字溢出、对比度不够、按钮太小、字太小，问题直接标在页面上；模型做完也会自己查一遍再改。
 - **版本和对比**：每轮自动存一版，左右拖动对比，随时回到任意一版。
 - **导出和手机上看**：导出展示图、PDF、PPT（屏和屏之间的跳转照样能点）；扫码在手机上按真机尺寸看。
+- **设计库和设计市场**：以前做过的设计、收的参考图和风格都在「设计库」里；市场里逛大家分享的模板、设计系统和风格卡，点「用这个开始」复制一份接着改。自己做的点「分享到设计市场」，查过打成 zip，在网页里交上去，审过就上架。市场目录从 npm 镜像取，签了名、核对过才用；不想让它联网，在插件页打开「设计库不联网」。
 - **照品牌风格做、转成代码**：给官网地址，提一套品牌设计系统，以后都照它做；做好的设计转成 React / Vue / HTML，逐屏和设计稿比对。
 
 全部功能、工具参数和安全设计见[完整功能](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/功能详解.md)；开发和测试见[开发说明](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/开发.md)。

@@ -1,0 +1,2 @@
+/* expect: cssBad */
+.a{background:url(ok.png"onerror)}

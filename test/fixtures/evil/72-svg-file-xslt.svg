@@ -1,0 +1,2 @@
+<!-- expect: svgDoctype -->
+<?xml-stylesheet type="text/xsl" href="https://evil.example/x.xsl"?><svg xmlns="http://www.w3.org/2000/svg"></svg>

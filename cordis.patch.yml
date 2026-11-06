@@ -7,6 +7,11 @@
     # 自动打开预览（模型写了设计用的 HTML、开发服务器起来时）
     - id: dsh-design-studio-auto
       name: dsh-design-studio/auto
+    # 设计库不联网（默认关）：打开后「市场」不访问任何网址，只看下载过的。
+    # 反着来是故意的：老版本升级上来没有这一行时，市场照常联网
+    - id: dsh-design-studio-offline
+      name: dsh-design-studio/offline
+      disabled: true
     # 其他模式（标准、创造 …）也能用预览工具、设计技能；设计模式里自带一份，不受这两行影响
     - id: dsh-design-studio-tool
       name: dsh-design-studio/tool
