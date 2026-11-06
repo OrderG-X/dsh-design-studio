@@ -12,7 +12,7 @@
  *     再拖字号「交给模型」→ 输入框里是〔调样式〕；退出 → 没写回的改动撤掉
  *   ⑧ 换风格：设计规范面板里「换个风格…」→ 一排风格卡，点「温暖手作」→ 输入框里是〔风格〕和整套配色
  *   ⑧b 画笔标注：工具栏「画笔标注」→ 在页面上画圈、箭头、写字，撤销 / 重做 →「交给模型」→ refs/ 里一张标注图（页面截图叠着画的），
- *     输入框里是〔标注〕和图的路径，叫模型先用 read_image 看
+ *     输入框里是〔标注〕和图的路径，叫模型先用 read_image 看；画布上画到两屏点「复制」→ 同一张图进剪贴板、不存文件（测试里换掉剪贴板，不碰真的）
  *   ⑨ 远程看：换个地址（remote.test，像手机走外网）打开同一个会话 → 连不上本机预览，右侧栏把这一屏打包放进沙盒 iframe：
  *     样式、写回的 style 都在，<base> 指着原地址（不漏 DSH 的地址），设计变量照样报上来；点页面里的链接换到那一屏；文件改了跟着变；体检照样量、导出照样能导
  *
@@ -286,7 +286,25 @@ try {
     fs.writeFileSync(path.join(SHOTS, `${name}.png`), Buffer.from(data, 'base64'))
   }
   const composer = '[contenteditable="true"], textarea'
-  const composerText = `(() => { const el = document.querySelector('${composer}'); return el ? (el.value ?? el.innerText) : '' })()`
+  // 输入框里看得到的字（标签只显示短名字）
+  const composerVisible = `(() => { const el = document.querySelector('${composer}'); return el ? (el.value ?? el.innerText) : '' })()`
+  // 输入框里的整段：标签换回它存的那段（和发给模型的一样）
+  const composerText = `(() => { const el = document.querySelector('${composer}'); if (!el) return ''; if (el.value != null) return el.value
+    const ed = el.__lexicalEditor; const map = ed && ed.getEditorState()._nodeMap
+    const walk = (n) => { if (n.nodeType === 3) return n.textContent
+      if (n.dataset && n.dataset.composerChip != null) { const k = Object.keys(n).find((x) => x.startsWith('__lexicalKey_')); const nd = map && k ? map.get(n[k]) : null; return nd && typeof nd.__ref === 'string' ? '\\n' + nd.__ref + '\\n' : n.innerText }
+      let s = ''; for (const c of n.childNodes) s += walk(c); if (n.tagName === 'P') s += '\\n'; return s }
+    return walk(el) })()`
+  // DSH 0.2.1 起我们的整段在输入框里是标签：最后一个这种标签上的字（不算图标）
+  const chipDsh = !/^0\.([01]\.|2\.0)/.test(dshVersion)
+  const chipLabel = (i) => page(`(() => { const c = [...document.querySelectorAll('[data-composer-chip="dsh-design-studio${i ? '-' + i : ''}"]')].pop(); if (!c) return ''; const ic = c.querySelector('[aria-hidden]'); return (ic ? c.innerText.replace(ic.textContent, '') : c.innerText).trim() })()`)
+  // 新版：输入框里是这个标签、看不到整段；旧版：看得到整段
+  const asChip = async (i, label, head) => {
+    if (!chipDsh) return { ok: head.test(await page(composerText)), why: 'old dsh' }
+    const got = await chipLabel(i)
+    const vis = await page(composerVisible)
+    return { ok: got === label && !head.test(vis), why: JSON.stringify({ got, vis: vis.slice(-120) }) }
+  }
   if (!check('界面加载出输入框', await until(`!!document.querySelector('${composer}')`, 120000))) throw new Error('没有输入框')
 
   const CONTINUE = `[...document.querySelectorAll('button, [role="button"]')].find((x) => /^\\s*(继续|continue)\\s*$/i.test(x.textContent || ''))`
@@ -390,11 +408,17 @@ try {
   check('「交给模型修」把清单放进输入框', asked, await page(composerText))
   if (asked) console.log(`  （输入框：${asked.replace(/\n/g, ' ⏎ ').slice(0, 260)}…）`)
   check('清单写明哪一屏、什么问题', /首页|home/.test(asked || '') && /对比度|contrast/i.test(asked || ''), asked)
+  const ckChip = await asChip('check', `体检 · ${((asked || '').match(/发现 (\d+) 个问题/) || [])[1]} 个问题`, /〔设计体检〕/)
+  check('体检清单在输入框里是一个标签「体检 · N 个问题」' + (chipDsh ? '' : '（旧版 DSH 插成字）'), ckChip.ok, ckChip.why)
   await page(`(() => { const el = document.querySelector('${composer}'); el.focus(); return true })()`)
   await enter()
   const end = Date.now() + 20000
   while (Date.now() < end && !fixAsk) await sleep(500)
   check('发出去模型收到体检清单', fixAsk, JSON.stringify(llmLog.slice(-3)))
+  if (chipDsh) {
+    const bubble = await until(`(() => { const p = [...document.querySelectorAll('.ddp-pickpill[data-i="check"]')].pop(); return p && p.innerText })()`, 5000)
+    check('发出去的消息里也是「体检 · N 个问题」标签，不是一大段字', /^体检 · \d+ 个问题$/.test(bubble || '') && !/〔设计体检〕/.test(await page('document.body.innerText')), bubble)
+  }
 
   // ④ 模型改好首屏 → 这一轮完了自动再量，按钮上的数字没了；打开面板也是干净的
   const gone = await until(`!${BADGE}`, 20000)
@@ -491,6 +515,8 @@ try {
   await sleep(600)
   const pickText = await page(composerText)
   check('点「就要这个」→ 输入框里是〔选定方向〕，原版挪进 drafts/', picked === 'ok' && /〔选定方向〕就用/.test(pickText) && /home\.html/.test(pickText) && /drafts\//.test(pickText), `${picked}：${pickText.slice(0, 160)}`)
+  const dirChip = await asChip('layers', '选定方向', /〔选定方向〕/)
+  check('选定方向在输入框里是一个标签', dirChip.ok, dirChip.why)
   await shot('6-pick')
 
   // ⑦ 调样式：先单看菜单屏（画布可能挪过，元素在画面外点不到）
@@ -571,6 +597,8 @@ try {
   await sleep(500)
   const askTxt = await page(composerText)
   check('调样式：再拖字号「交给模型」→ 输入框里是〔调样式〕和改了什么', /〔调样式〕a\.go/.test(askTxt) && /字号 16px → 18px/.test(askTxt) && askTxt.includes(path.join(DESIGN, 'menu.html')), askTxt.slice(0, 200))
+  const styChip = await asChip('style', '样式改动', /〔调样式〕/)
+  check('调样式在输入框里是一个标签「样式改动」', styChip.ok, styChip.why)
   await shot('7-style')
   await page(`document.querySelector('button[title^="调样式"]').click()`)
   await sleep(600)
@@ -582,15 +610,15 @@ try {
   await sleep(300)
   await clickIn('menu.html', 'a.go')
   await sleep(800)
-  const pq = await page(`(() => { const c = [...document.querySelectorAll('[data-composer-chip="dsh-design-studio"]')]; const last = c[c.length - 1]; const r = last && last.getBoundingClientRect(); return { n: c.length, h: r ? Math.round(r.height) : 0, x: r ? r.x + r.width / 2 : 0, y: r ? r.y + r.height / 2 : 0, text: last ? (last.querySelector('[aria-hidden]') ? last.innerText.replace(last.querySelector('[aria-hidden]').textContent, '') : last.innerText).trim() : '', mark: last && last.querySelector('[aria-hidden]') ? getComputedStyle(last.querySelector('[aria-hidden]')).fontSize : '', quotes: document.querySelectorAll('[data-composer-quote]').length, all: ${composerText} } })()`)
-  const chipDsh = !/^0\.([01]\.|2\.0)/.test(dshVersion)
-  check('点选元素 → 输入框里' + (chipDsh ? '是一个短标签「加入购物车」' : '是〔选中元素〕a.go（旧版 DSH 插成字）'),
-    chipDsh ? pq.n === 1 && pq.text === '加入购物车' && pq.mark !== '' && pq.mark === '0px' && pq.h > 0 && pq.h < 32 && pq.quotes === 0 && !/〔选中元素〕/.test(pq.all) : pq.n === 0 && /〔选中元素〕a\.go/.test(pq.all) && /HTML：/.test(pq.all), JSON.stringify({ ...pq, all: pq.all.slice(-200), dshVersion }))
+  const pq = await page(`(() => { const c = [...document.querySelectorAll('[data-composer-chip="dsh-design-studio"]')]; const last = c[c.length - 1]; const r = last && last.getBoundingClientRect(); return { n: c.length, h: r ? Math.round(r.height) : 0, x: r ? r.x + r.width / 2 : 0, y: r ? r.y + r.height / 2 : 0, text: last ? (last.querySelector('[aria-hidden]') ? last.innerText.replace(last.querySelector('[aria-hidden]').textContent, '') : last.innerText).trim() : '', mark: last && last.querySelector('[aria-hidden]') ? getComputedStyle(last.querySelector('[aria-hidden]')).fontSize : '', quotes: document.querySelectorAll('[data-composer-quote]').length, all: ${composerText}, vis: ${composerVisible} } })()`)
+  check('点选元素 → 输入框里' + (chipDsh ? '是一个短标签「1 个元素」' : '是〔选中元素〕a.go（旧版 DSH 插成字）'),
+    chipDsh ? pq.n === 1 && pq.text === '1 个元素' && pq.mark !== '' && pq.mark === '0px' && pq.h > 0 && pq.h < 32 && pq.quotes === 0 && /〔选中元素〕a\.go/.test(pq.all) && !/〔选中元素〕/.test(pq.vis) : pq.n === 0 && /〔选中元素〕a\.go/.test(pq.all) && /HTML：/.test(pq.all), JSON.stringify({ ...pq, all: pq.all.slice(-200), dshVersion }))
   if (chipDsh) {
     await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pq.x, y: pq.y }, sessionId)
     const card = await until(`(() => { const c = document.querySelector('.ddp-pickcard'); return c && c.style.display !== 'none' && c.innerText })()`, 3000)
     const cardBg = await page(`getComputedStyle(document.querySelector('.ddp-pickcard')).backgroundColor`)
     check('点选标签：悬停出详情卡（元素、位置、文件，有底色）', !!card && /a\.go/.test(card) && /menu\.html/.test(card) && !/rgba\(0, 0, 0, 0\)|transparent/.test(cardBg), card + ' ' + cardBg)
+    await sleep(300) // 卡片淡入完再截图
     await shot('7b-pick-chip')
     await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 }, sessionId)
     await sleep(200)
@@ -599,8 +627,8 @@ try {
     // 点完直接打字：字要接在标签后面（光标别跑到输入框最前面）
     await chrome.cdp('Input.insertText', { text: '改成红色' }, sessionId)
     await sleep(300)
-    const typed = await page(composerText)
-    check('点选标签：接着打的字在标签后面', typed.indexOf('加入购物车') >= 0 && typed.indexOf('改成红色') > typed.indexOf('加入购物车'), JSON.stringify({ chip: typed.indexOf('加入购物车'), typed: typed.indexOf('改成红色'), len: typed.length, head: typed.slice(0, 30), active: await page(`(() => { const a = document.activeElement; return a ? a.tagName + (a.getAttribute('data-lexical-editor') ? '[lexical]' : '') + (a.tagName === 'IFRAME' ? a.src : '') : null })()`) }))
+    const typed = await page(composerVisible)
+    check('点选标签：接着打的字在标签后面', typed.indexOf('1 个元素') >= 0 && typed.indexOf('改成红色') > typed.indexOf('1 个元素'), JSON.stringify({ chip: typed.indexOf('1 个元素'), typed: typed.indexOf('改成红色'), len: typed.length, head: typed.slice(0, 30), active: await page(`(() => { const a = document.activeElement; return a ? a.tagName + (a.getAttribute('data-lexical-editor') ? '[lexical]' : '') + (a.tagName === 'IFRAME' ? a.src : '') : null })()`) }))
   }
 
   // ⑧ 换风格：设计规范面板 →「换个风格…」→ 点一张卡
@@ -620,6 +648,8 @@ try {
   const styTxt = await page(composerText)
   check('换风格：二十张风格卡，样板上点「用这个风格」→ 输入框里是〔风格〕、整套配色和换风格的要求', cards === 20 && /〔风格〕温暖手作/.test(styTxt) && styTxt.includes('#F6EFE6') && /把现在的设计换成这个风格/.test(styTxt) && !(await page(`!!document.querySelector('.ddp-styles')`)),
     `${cards} 张；${styTxt.slice(-300)}`)
+  const lookChip = await asChip('look', '风格 · 温暖手作', /〔风格〕/)
+  check('风格在输入框里是一个标签「风格 · 温暖手作」', lookChip.ok, lookChip.why)
 
   // ⑧b 画笔标注：真鼠标在台面上画（CDP 的鼠标事件，和人点的一样走 pointer 事件）
   const mouse = (type, x, y) => chrome.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }, sessionId)
@@ -633,11 +663,20 @@ try {
   const markOn = await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
   check('画笔标注：盖上画布，工具栏有七种笔 + 撤销 / 重做 / 清掉，颜色和粗细', markOn && await page(`document.querySelectorAll('.ddp-mk-tools > .ddp-btn').length`) === 10 &&
     await page(`document.querySelectorAll('.ddp-mk-sz .ddp-btn').length`) === 3 && await page(`!!document.querySelector('.ddp-mk-color')`), await page(`document.querySelector('.ddp-mark')?.innerText || '没有标注层'`))
+  // 不知道怎么用的人：中间有三步说明，底栏写着现在这支笔怎么画；「交给模型」先是淡的
+  const how0 = await page(`({ coach: document.querySelector('.ddp-mk-coach')?.innerText || '', bar: document.querySelector('.ddp-mk-bar span')?.innerText || '', idle: !!document.querySelector('.ddp-mk-bar .go.idle') })`)
+  await sleep(250)
+  await shot('8c0-markup-how')
+  check('画笔标注：打开就教怎么用（中间三步、底栏写现在这支笔怎么画、交给模型先是淡的）', /直接在页面上画/.test(how0.coach) && /交给模型/.test(how0.coach) && /画笔/.test(how0.bar) && /按住拖动/.test(how0.bar) && how0.idle, JSON.stringify(how0))
   // 画在台面上看得到的那一屏中间
   const fr = await page(`(() => { const s = document.querySelector('.ddp-stage').getBoundingClientRect(); const r = [...document.querySelectorAll('.ddp-stage iframe')].map((x) => x.getBoundingClientRect()).find((r) => r.width > 80 && r.height > 80 && r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null })()`)
   if (fr) {
     await tool('圆圈')
+    const ovalHow = await page(`document.querySelector('.ddp-mk-bar span')?.innerText || ''`)
+    check('画笔标注：换成圆圈，底栏跟着说怎么圈', /圆圈/.test(ovalHow) && /圈出要改的地方/.test(ovalHow), ovalHow)
     await drag(fr.x - 40, fr.y - 30, fr.x + 40, fr.y + 30)
+    const how1 = await page(`({ coach: !!document.querySelector('.ddp-mk-coach'), idle: !!document.querySelector('.ddp-mk-bar .go.idle') })`)
+    check('画笔标注：画了第一笔，说明收起、「交给模型」亮起来', !how1.coach && !how1.idle, JSON.stringify(how1))
     await tool('箭头')
     await drag(fr.x - 90, fr.y + 90, fr.x - 45, fr.y + 35)
     await tool('文字')
@@ -701,6 +740,17 @@ try {
   check('画笔标注：「交给模型」→ 标注图存进设计目录的 refs/，输入框里是〔标注〕、图的路径、用 read_image 看的要求和图上写的字', markGone && path.dirname(markFile) === path.join(DESIGN, 'refs') &&
     /^markup-/.test(path.basename(markFile)) && /read_image/.test(markTxt) && /图上写的字：「这里改大」、「间距」/.test(markTxt) && markPng && markPng.readUInt32BE(0) === 0x89504e47 && pw >= 160 && ph >= 160 && markPng.length > 8000 &&
     fs.readdirSync(path.join(DESIGN, 'refs')).length === refsBefore + 1, `${markTxt.slice(-260)} / ${markFile} ${pw}×${ph} ${markPng ? markPng.length : 0}B`)
+  const mkChip = await asChip('mark', '标注图', /〔标注〕/)
+  check('标注在输入框里是一个标签「标注图」', mkChip.ok, mkChip.why)
+  if (chipDsh) {
+    const mc = await page(`(() => { const c = [...document.querySelectorAll('[data-composer-chip="dsh-design-studio-mark"]')].pop(); const r = c && c.getBoundingClientRect(); return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null })()`)
+    if (mc) await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: mc.x, y: mc.y }, sessionId)
+    const mcard = await until(`(() => { const c = document.querySelector('.ddp-pickcard'); const im = c && c.querySelector('img'); return c && c.style.display !== 'none' && im && im.complete && im.naturalWidth > 50 && c.innerText })()`, 3000)
+    await sleep(300)
+    await shot('8d-mark-chip')
+    check('标注标签：悬停看得到标注图的小图和图上写的字', !!mcard && /标注图/.test(mcard) && /这里改大/.test(mcard), mcard)
+    await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 }, sessionId)
+  }
   await sleep(1200)
   check('画笔标注：存图不算设计改动（不报「已更新」）', !(await page(`(document.body.innerText.match(/(已更新|Updated) coffee-app[^\\n]*/) || [''])[0]`)))
   // 画布上一笔自由线从一屏画到另一屏：窗口变窄画布换了行，两头各跟各的屏；取消后回单页
@@ -745,7 +795,31 @@ try {
   }
   const hit = pen && pen.tries.find((x) => x.wrapped)
   check('画笔标注：画布上自由线从一屏画到另一屏，换行后两头各跟各的屏', !!hit && [...pen.at0, ...hit.at, ...pen.at2].every((n) => n > 4) && pen.tries.every((x) => x.gone || x.at.every((n) => n > 4)), JSON.stringify(pen || two0))
-  await page(`[...document.querySelectorAll('.ddp-mk-bar button')].find((x) => x.textContent === '取消').click()`)
+  // 「复制」（issue #6）：拼成同一张图放进剪贴板，标注层关上，不往 refs/ 存文件。剪贴板换成假的：收下图量一下尺寸，不碰机器上真的剪贴板
+  // 记下调 write 那一刻还算不算用户点的（拼完图再写，Safari 这类就不让写了）；收下的图数一数蓝色笔迹
+  await page(`(() => { window.__ddpClip = null
+    navigator.clipboard.write = async (items) => {
+      const act = navigator.userActivation ? navigator.userActivation.isActive : null
+      const it = items[0]; const b = await it.getType('image/png'); const bm = await createImageBitmap(b)
+      const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height; const x = c.getContext('2d'); x.drawImage(bm, 0, 0)
+      const d = x.getImageData(0, 0, c.width, c.height).data; let blue = 0
+      for (let i = 0; i < d.length; i += 4) if (d[i] < 120 && d[i + 1] > 90 && d[i + 1] < 180 && d[i + 2] > 200) blue++
+      window.__ddpClip = { act, n: items.length, types: [...it.types], type: b.type, size: b.size, w: bm.width, h: bm.height, blue } }
+    return true })()`)
+  const refsCp = fs.readdirSync(path.join(DESIGN, 'refs')).length
+  // 画标注时画布的缩放按钮被标注层盖着点不到：收起来，不和底栏叠在一起；关了标注再出来
+  const zoomShown = `(() => { const z = document.querySelector('.ddp-zoom'); return !!z && getComputedStyle(z).display !== 'none' })()`
+  const zoomHid = !(await page(zoomShown))
+  const cpBtn = await page(`(() => { const b = [...document.querySelectorAll('.ddp-mk-bar button')].find((x) => x.textContent === '复制'); if (!b) return null; const r = b.getBoundingClientRect(); return { title: b.title, x: r.left + r.width / 2, y: r.top + r.height / 2 } })()`) || { title: '', x: 0, y: 0 }
+  await mouse('mousePressed', cpBtn.x, cpBtn.y)
+  await mouse('mouseReleased', cpBtn.x, cpBtn.y)
+  const copied = await until(`!document.querySelector('.ddp-mark') && window.__ddpClip`, 30000)
+  const cpSaid = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /标注图复制好了/.test(x)) || ''`, 3000)
+  const zoomBack = await page(zoomShown)
+  // 两屏并排拼一张：宽高比比一屏手机（约 0.46）宽得多；蓝色那一笔在图上
+  check('画笔标注：「复制」→ 点的这一下就交给剪贴板，标注图（两屏 + 画的蓝线）进剪贴板、标注层关上、提示复制好了，不往 refs/ 存文件', /剪贴板/.test(cpBtn.title) && /C\)$/.test(cpBtn.title) && !!copied && copied.act !== false && copied.n === 1 && copied.type === 'image/png' &&
+    copied.types.join() === 'image/png' && copied.w / copied.h > 0.75 && copied.blue > 150 && copied.size > 8000 && !!cpSaid && fs.readdirSync(path.join(DESIGN, 'refs')).length === refsCp, JSON.stringify({ cpBtn, copied, cpSaid }))
+  check('画笔标注：画的时候画布的缩放按钮收起来（点不到，免得压在底栏下），关了标注再出来', zoomHid && zoomBack, JSON.stringify({ zoomHid, zoomBack }))
   await until(`!document.querySelector('.ddp-mark')`, 3000)
   await page(`document.querySelector('.ddp-bar button[title^="单页"]').click()`)
   await sleep(900)
@@ -850,6 +924,252 @@ try {
   const exMsg = await runtil(`(document.body.innerText.match(/(已导出|导出失败)[^\\n]*/) || [''])[0]`, 30000)
   check('远程看：导出这一屏照样能导（沙盒里也画得出图）', /已导出/.test(exMsg || '') && pngs().length > pngBefore, `${exMsg} / ${pngs().join(',')}`)
   await chrome.cdp('Target.closeTarget', { targetId: rt }).catch(() => {})
+
+  // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
+  const OTHER = path.join(tmp, 'work', 'other-site')
+  fs.mkdirSync(OTHER, { recursive: true })
+  fs.writeFileSync(path.join(OTHER, 'landing.html'), `${HEAD('落地页')}</head><body><main><h1>落地页</h1></main></body></html>`)
+  fs.utimesSync(path.join(OTHER, 'landing.html'), Date.now() / 1000 - 30, Date.now() / 1000 - 30)
+  fs.writeFileSync(path.join(OTHER, 'about.html'), `${HEAD('关于')}</head><body><main><h1>关于我们</h1></main></body></html>`)
+  const BROWSE = `document.querySelector('.ddp-bar button[title="选一个本地 HTML 文件打开"]')`
+  const addrText = `(document.querySelector('.ddp-addr span') || {}).textContent || ''`
+  const openAddr = async () => { await page(`document.querySelector('.ddp-addr')?.click()`).catch(() => {}); return until(`!!document.querySelector('.ddp-bar .ddp-input')`, 3000) }
+  const NOTES = path.join(tmp, 'work', 'notes.txt')
+  fs.writeFileSync(NOTES, 'x')
+  const DROPDIR = path.join(tmp, 'work', 'drop-dir')
+  fs.mkdirSync(DROPDIR, { recursive: true })
+  fs.writeFileSync(path.join(DROPDIR, 'first.html'), `${HEAD('第一屏')}</head><body><main><h1>第一屏</h1></main></body></html>`)
+  // 真拖放（浏览器自己发的 dragenter / dragover / drop，带真文件）：落点默认是右侧栏的地址栏；at 给的是别的元素（比如预览页面的 iframe）
+  const centerOf = (sel) => page(`(() => { const els = [...document.querySelectorAll(${JSON.stringify(sel)})].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0).sort((a, b) => b.width * b.height - a.width * a.height); const r = els[0]; return r ? [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)] : null })()`)
+  const realDrop = async (files, at = '.ddp-bar') => {
+    const pt = await centerOf(at)
+    if (!pt) return `找不到 ${at}`
+    const [x, y] = pt
+    const data = { items: [], files, dragOperationsMask: 1 }
+    await chrome.cdp('Input.dispatchDragEvent', { type: 'dragEnter', x, y, data }, sessionId)
+    await chrome.cdp('Input.dispatchDragEvent', { type: 'dragOver', x, y, data }, sessionId)
+    const shown = await until(`!!document.querySelector('.ddp-drop') && document.querySelector('.ddp-drop').innerText`, 3000)
+    await chrome.cdp('Input.dispatchDragEvent', { type: 'dragOver', x, y, data }, sessionId)
+    if (await page(DSH_MASK)) dshMask.push(`拖着 ${path.basename(files[0])} 时`)
+    await chrome.cdp('Input.dispatchDragEvent', { type: 'drop', x, y, data }, sessionId)
+    await sleep(300)
+    if (await page(DSH_MASK)) dshMask.push(`${path.basename(files[0])} 松手后`)
+    return shown || '没出蒙层'
+  }
+  // DSH 自己的「文件或图片拖动到此处即可添加」（整页蒙层，挂在 body 上）：拖进右侧栏时不该出来，松手后更不能卡着
+  const DSH_MASK = `[...document.querySelectorAll('[role=status]')].some((e) => !e.closest('.ddp') && /拖动到此处|添加文件或图片/.test(e.textContent || ''))`
+  const dshMask = []
+  await openAddr()
+  const webBrowse = await page(`!!${BROWSE}`)
+  await page(`document.querySelector('.ddp-bar .ddp-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`).catch(() => {})
+  await sleep(300)
+  const webDrop = await realDrop([path.join(OTHER, 'about.html')])
+  const webToast = await until(`(document.querySelector('.ddp-toast') || {}).innerText || ''`, 3000)
+  check('打开已有的 HTML：网页版没有「浏览…」，拖 HTML 进来说清楚要输路径、不乱开', !webBrowse && /网页版拿不到/.test(webDrop) && /网页版拿不到/.test(webToast || '') && !/about\.html/.test(await page(addrText)), JSON.stringify({ webBrowse, webDrop, webToast }))
+  // 装上假桥：pathFor 按文件名查表（真桌面版是 Electron 的 webUtils.getPathForFile），选文件夹给一个固定的目录
+  await page(`(() => { window.__e2ePaths = ${JSON.stringify({ 'landing.html': path.join(OTHER, 'landing.html'), 'about.html': path.join(OTHER, 'about.html'), 'drop-dir': DROPDIR })}
+    window.__DSH_HOST_PATHS__ = { pathFor: (f) => window.__e2ePaths[f.name] || '' }
+    window.__e2eDir = ${JSON.stringify(path.join(tmp, 'work', 'app-code'))}
+    window.__DSH_DIRECTORY_PICKER__ = { pick: async () => window.__e2eDir }; return true })()`)
+  await chrome.cdp('Page.enable', {}, sessionId)
+  await chrome.cdp('Page.setInterceptFileChooserDialog', { enabled: true }, sessionId)
+  await openAddr()
+  const hasBrowse = await until(`!!${BROWSE}`, 3000)
+  await shot('10-browse')
+  const evFrom = chrome.events.length
+  // 选文件窗口要「用户点的」才弹：按真点击算（userGesture）
+  await chrome.cdp('Runtime.evaluate', { expression: `${BROWSE}.click()`, userGesture: true }, sessionId)
+  let chooser = null
+  for (let i = 0; i < 20 && !chooser; i++) { chooser = chrome.events.slice(evFrom).find((m) => m.method === 'Page.fileChooserOpened' && m.sessionId === sessionId); if (!chooser) await sleep(150) }
+  if (chooser) await chrome.cdp('DOM.setFileInputFiles', { files: [path.join(OTHER, 'landing.html')], backendNodeId: chooser.params.backendNodeId }, sessionId)
+  const browsed = await until(`/landing\\.html/.test(${addrText}) && ${addrText}`, 15000)
+  check('打开已有的 HTML：地址栏旁「浏览…」→ 系统选文件 → 直接打开这个文件', hasBrowse && !!chooser && !!browsed && chooser.params.mode === 'selectSingle', JSON.stringify({ hasBrowse, chooser: chooser && chooser.params, browsed, addr: await page(addrText) }))
+  await chrome.cdp('Page.setInterceptFileChooserDialog', { enabled: false }, sessionId).catch(() => {})
+  const pageDrop = await realDrop([path.join(OTHER, 'about.html')])
+  const dropped = await until(`/about\\.html/.test(${addrText}) && ${addrText}`, 15000)
+  check('打开已有的 HTML：把 HTML 文件拖进右侧栏 → 蒙层写「打开这个页面」，松手就打开', /打开这个页面/.test(pageDrop) && !!dropped, JSON.stringify({ pageDrop, dropped, addr: await page(addrText) }))
+  const otherDrop = await realDrop([NOTES])
+  await sleep(500)
+  check('打开已有的 HTML：拖别的文件 → 说只接 HTML、文件夹或图片，不动预览', /只接 HTML/.test(otherDrop) && /about\.html/.test(await page(addrText)) && !(await page(`!!document.querySelector('.ddp-drop')`)), otherDrop)
+  check('打开已有的 HTML：拖进右侧栏的文件不会掉进对话框当附件', !(await page(`document.body.innerText.includes('notes.txt')`)))
+  // 文件夹（没有 index.html）→ 开最先做的那屏
+  await openAddr()
+  await page(`(() => { const el = document.querySelector('.ddp-bar .ddp-input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, ${JSON.stringify(OTHER)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+  await page(`document.querySelector('.ddp-bar form').requestSubmit()`)
+  const dirOpen = await until(`/landing\\.html/.test(${addrText}) && ${addrText}`, 15000)
+  check('打开已有的 HTML：输一个没有 index.html 的文件夹 → 开最先做的那屏', !!dirOpen, await page(addrText))
+  // 拖文件夹进来 → 开里面的页面
+  const dirDrop = await realDrop([DROPDIR])
+  const dirDropped = await until(`/first\.html/.test(${addrText}) && ${addrText}`, 15000)
+  check('打开已有的 HTML：把文件夹拖进来 → 蒙层写「打开这个文件夹或 HTML」，开里面的页面', /松开，打开这个文件夹或 HTML/.test(dirDrop) && !!dirDropped, JSON.stringify({ dirDrop, addr: await page(addrText) }))
+  // 单页铺满时拖到预览页面上（iframe 会把拖动吃掉）：页面转告右侧栏，照样盖上蒙层、松手打开
+  await page(`[...document.querySelectorAll('.ddp-bar .ddp-btn')].find((b) => b.title === '单页：只看一屏')?.click()`).catch(() => {})
+  await until(`!!document.querySelector('.ddp iframe')`, 8000)
+  await sleep(800)
+  const frameDrop = await realDrop([path.join(OTHER, 'about.html')], '.ddp iframe')
+  const frameDropped = await until(`/about\.html/.test(${addrText}) && ${addrText}`, 15000)
+  check('打开已有的 HTML：拖到铺满的预览页面上 → 也出蒙层、松手打开', /打开这个页面/.test(frameDrop) && !!frameDropped, JSON.stringify({ frameDrop, addr: await page(addrText) }))
+  // 同一次拖动：拖进预览页面 → 拖到对话区 → 再拖回同一处，蒙层得再出来、DSH 自己的蒙层不能卡着
+  // （同站的预览页面里，浏览器回到同一元素时不再给 dragenter，所以 picker 也报 dragover；这里的环境不一定复现得出那个情况）
+  await sleep(1500)
+  {
+    const fp = await centerOf('.ddp iframe')
+    const cp = await centerOf(composer)
+    const data = { items: [], files: [path.join(OTHER, 'landing.html')], dragOperationsMask: 1 }
+    const at = ([x, y], type) => chrome.cdp('Input.dispatchDragEvent', { type, x, y, data }, sessionId)
+    let back = ''
+    if (fp && cp) {
+      await at(fp, 'dragEnter'); await at(fp, 'dragOver')
+      const first = await until(`!!document.querySelector('.ddp-drop')`, 3000)
+      await at(cp, 'dragOver'); await sleep(250); await at(cp, 'dragOver')
+      const gone = await until(`!document.querySelector('.ddp-drop')`, 3000)
+      await at(fp, 'dragOver'); await sleep(250); await at(fp, 'dragOver')
+      back = await until(`!!document.querySelector('.ddp-drop') && document.querySelector('.ddp-drop').innerText`, 3000)
+      // 蒙层没出来就别松手（会掉进页面或对话框），取消这次拖动
+      await at(fp, back ? 'drop' : 'dragCancel')
+      back = first && gone ? back : `first=${first} gone=${gone}`
+    }
+    const againOk = await until(`/landing\\.html/.test(${addrText}) && ${addrText}`, 15000)
+    const stuck = await page(DSH_MASK)
+    check('打开已有的 HTML：拖进预览页面、拖到对话区、再拖回同一处 → 蒙层照样出来、松手打开，DSH 自己的蒙层不卡着', /打开这个页面/.test(back || '') && !!againOk && !stuck, JSON.stringify({ back, stuck, addr: await page(addrText) }))
+  }
+  // 页面自己有上传区：先经过页面空白处（出提示）再拖进上传区 → 提示收起，文件归页面，不打开、不当参考图
+  // z1 只 preventDefault；z2 还拦住不让冒泡
+  {
+    const UP = path.join(OTHER, 'upload.html')
+    const zone = (id, top, stop) => `<div id="${id}" style="position:fixed;left:50%;top:${top}%;width:200px;height:90px;margin-left:-100px;background:#eef">拖到这里上传</div>
+<script>${id}.addEventListener('dragover', (e) => { e.preventDefault()${stop ? '; e.stopPropagation()' : ''} })
+${id}.addEventListener('drop', (e) => { e.preventDefault()${stop ? '; e.stopPropagation()' : ''}; document.body.setAttribute('data-got', (document.body.getAttribute('data-got') || '') + '${id}:' + [...e.dataTransfer.files].map((f) => f.name).join(',') + ';') })</script>`
+    fs.writeFileSync(UP, `${HEAD('上传')}</head><body><main><h1>上传</h1>${zone('z1', 30, false)}${zone('z2', 65, true)}</main></body></html>`)
+    await openAddr()
+    await page(`(() => { const el = document.querySelector('.ddp-bar .ddp-input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, ${JSON.stringify(UP)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+    await page(`document.querySelector('.ddp-bar form').requestSubmit()`)
+    await until(`/upload\\.html/.test(${addrText})`, 15000)
+    // 同目录有几屏时会回到画布（卡片上盖着点选层）：切回单页铺满，拖动才落在页面里
+    await page(`[...document.querySelectorAll('.ddp-bar .ddp-btn')].find((b) => b.title === '单页：只看一屏')?.click()`).catch(() => {})
+    await sleep(1200)
+    const FRAME = `[...document.querySelectorAll('.ddp iframe')].filter((f) => /upload\\.html/.test(f.src) && f.getBoundingClientRect().width > 0).pop()`
+    // 在预览页面里求值（同站 iframe：拿到它的 frameId，开一个隔离环境，DOM 是同一份）
+    const inFrame = async (expr) => {
+      const { result } = await chrome.cdp('Runtime.evaluate', { expression: FRAME }, sessionId)
+      if (!result || !result.objectId) return null
+      const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
+      const { executionContextId } = await chrome.cdp('Page.createIsolatedWorld', { frameId: node.frameId, worldName: 'e2e-up' }, sessionId)
+      const r = await chrome.cdp('Runtime.evaluate', { expression: expr, contextId: executionContextId, returnByValue: true }, sessionId)
+      return r.result && r.result.value
+    }
+    // 页面里的元素 → 外层坐标（预览可能缩放）
+    const ptOf = async (id) => {
+      const fr = await page(`(() => { const r = ${FRAME}.getBoundingClientRect(); return [r.left, r.top, r.width] })()`)
+      const inner = await inFrame(`(() => { const r = document.getElementById('${id}').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2, innerWidth] })()`)
+      if (!fr || !inner) return null
+      const k = fr[2] / inner[2]
+      return [Math.round(fr[0] + inner[0] * k), Math.round(fr[1] + inner[1] * k)]
+    }
+    const blank = await page(`(() => { const r = ${FRAME}.getBoundingClientRect(); return [Math.round(r.left + 30), Math.round(r.top + r.height * 0.5)] })()`)
+    const PNG = path.join(OTHER, 'ref.png')
+    fs.writeFileSync(PNG, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'))
+    const said0 = await page(composerText)
+    const res = []
+    for (const id of ['z1', 'z2']) {
+      const zp = await ptOf(id)
+      const data = { items: [], files: [NOTES, PNG], dragOperationsMask: 1 }
+      const at = ([x, y], type) => chrome.cdp('Input.dispatchDragEvent', { type, x, y, data }, sessionId)
+      if (!zp || !blank) { res.push(`${id}: 找不到位置`); continue }
+      await at(blank, 'dragEnter'); await at(blank, 'dragOver'); await sleep(250); await at(blank, 'dragOver')
+      const hint = await until(`!!document.querySelector('.ddp-drop.soft')`, 3000)
+      await at(zp, 'dragOver'); await sleep(250); await at(zp, 'dragOver')
+      const off = await until(`!document.querySelector('.ddp-drop')`, 3000)
+      await at(zp, 'drop')
+      await sleep(600)
+      const got = await inFrame(`document.body.getAttribute('data-got') || ''`)
+      const under = await page(`(() => { const e = document.elementFromPoint(${blank[0]}, ${blank[1]}); return e ? e.tagName + '.' + e.className : '' })()`)
+      res.push({ id, hint, off, got, under })
+    }
+    // 整页上传：页面用 type=module 的脚本在 window 上挂（比注入的 picker 晚注册）→ 不出提示，文件只归页面
+    const ALL = path.join(OTHER, 'upload-all.html')
+    fs.writeFileSync(ALL, `${HEAD('整页上传')}</head><body><main><h1>整页上传</h1></main><script type="module">addEventListener('dragover', (e) => e.preventDefault())
+addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute('data-got', (document.body.getAttribute('data-got') || '') + 'all:' + [...e.dataTransfer.files].map((f) => f.name).join(',') + ';') })</script></body></html>`)
+    await openAddr()
+    await page(`(() => { const el = document.querySelector('.ddp-bar .ddp-input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, ${JSON.stringify(ALL)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+    await page(`document.querySelector('.ddp-bar form').requestSubmit()`)
+    await until(`/upload-all\\.html/.test(${addrText})`, 15000)
+    await page(`[...document.querySelectorAll('.ddp-bar .ddp-btn')].find((b) => b.title === '单页：只看一屏')?.click()`).catch(() => {})
+    await sleep(1200)
+    {
+      const FR = `[...document.querySelectorAll('.ddp iframe')].filter((f) => /upload-all\\.html/.test(f.src) && f.getBoundingClientRect().width > 0).pop()`
+      const pt = await page(`(() => { const f = ${FR}; if (!f) return null; const r = f.getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)] })()`)
+      const data = { items: [], files: [path.join(OTHER, 'about.html'), PNG], dragOperationsMask: 1 }
+      const at = ([x, y], type) => chrome.cdp('Input.dispatchDragEvent', { type, x, y, data }, sessionId)
+      let all = { pt }
+      if (pt) {
+        await at(pt, 'dragEnter'); await at(pt, 'dragOver'); await sleep(250); await at(pt, 'dragOver'); await sleep(400)
+        const hint = await page(`!!document.querySelector('.ddp-drop')`)
+        await at(pt, 'drop'); await sleep(800)
+        const { result } = await chrome.cdp('Runtime.evaluate', { expression: FR }, sessionId)
+        let got = ''
+        if (result && result.objectId) {
+          const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
+          const { executionContextId } = await chrome.cdp('Page.createIsolatedWorld', { frameId: node.frameId, worldName: 'e2e-all' }, sessionId)
+          got = ((await chrome.cdp('Runtime.evaluate', { expression: `document.body.getAttribute('data-got') || ''`, contextId: executionContextId, returnByValue: true }, sessionId)).result || {}).value
+        }
+        all = { hint, got, addr: await page(addrText) }
+      }
+      res.push({ id: 'all', hint: !all.hint, off: true, got: all.got, all })
+    }
+    const addrNow = await page(addrText)
+    const said1 = await page(composerText)
+    check('打开已有的 HTML：页面自己有上传区（只拦 dragover / 还拦冒泡 / module 脚本挂在 window 上的整页上传）→ 文件只归页面（不打开、不当参考图）',
+      res.every((r) => r && r.hint && r.off && new RegExp(`${r.id}:${r.id === 'all' ? 'about\\.html' : 'notes\\.txt'},ref\\.png;`).test(r.got || '')) && /upload-all\.html/.test(addrNow) && said1 === said0,
+      JSON.stringify({ res, addrNow, said: said1 === said0 ? '没变' : String(said1).slice(-200) }))
+  }
+  check('打开已有的 HTML：拖进右侧栏时 DSH 自己的「拖到这里添加」不出来、松手后也不卡着', !dshMask.length, dshMask.join('；'))
+  // 转成代码的「代码放在」：旁边的选文件夹按钮 → 填进去
+  await page(`document.querySelector('.ddp-bar button[title="转成代码"]')?.click()`).catch(() => {})
+  const hoDir = await until(`!!document.querySelector('.ddp-ho .ddp-dirbtn')`, 8000)
+  if (hoDir) await page(`document.querySelector('.ddp-ho .ddp-dirbtn').click()`)
+  const hoVal = await until(`(document.querySelector('.ddp-ho .pathrow input') || {}).value === ${JSON.stringify(path.join(tmp, 'work', 'app-code'))}`, 5000)
+  check('转成代码：「代码放在」旁的选文件夹按钮 → 选的目录填进去', hoDir && hoVal, await page(`(document.querySelector('.ddp-ho') || {}).innerText || '没有面板'`))
+  // 检查文件夹还没回来时「开始」点不了；这时自己点了框架，检查回来也不改掉
+  const PROJ = path.join(tmp, 'work', 'vue-proj')
+  fs.mkdirSync(PROJ, { recursive: true })
+  fs.writeFileSync(path.join(PROJ, 'package.json'), '{"dependencies":{"vue":"3"}}')
+  await page(`(() => { const f = window.fetch; window.__e2eFetch = f; window.fetch = (u, o) => (/project\\?.*dest=/.test(String(u)) ? new Promise((r) => setTimeout(r, 1500)).then(() => f(u, o)) : f(u, o)); window.__e2eDir = ${JSON.stringify(PROJ)}; document.querySelector('.ddp-ho .ddp-dirbtn').click(); return true })()`)
+  const busyGo = await until(`(document.querySelector('.ddp-ho .go') || {}).disabled === true && /正在看这个文件夹/.test(document.querySelector('.ddp-ho').innerText)`, 3000)
+  await page(`[...document.querySelectorAll('.ddp-ho .opt')].find((b) => /纯 HTML/.test(b.textContent))?.click()`)
+  const kept = await until(`(() => { const ho = document.querySelector('.ddp-ho'); const on = ho && ho.querySelector('.opt.on'); return !!ho && !/正在看这个文件夹/.test(ho.innerText) && /Vue/.test(ho.innerText) && !ho.querySelector('.go').disabled && !!on && on.textContent })()`, 8000)
+  await page(`(() => { if (window.__e2eFetch) window.fetch = window.__e2eFetch; return true })()`)
+  check('转成代码：检查文件夹时「开始」点不了；这时自己点了框架，检查回来也不改掉', !!busyGo && /纯 HTML/.test(kept || ''), JSON.stringify({ busyGo, kept, ho: await page(`(document.querySelector('.ddp-ho') || {}).innerText || ''`) }))
+  // 先自己点了框架，再选个纯 HTML 站点：不按文件夹自动改成「纯 HTML」
+  const STATIC = path.join(tmp, 'work', 'static-site')
+  fs.mkdirSync(STATIC, { recursive: true })
+  fs.writeFileSync(path.join(STATIC, 'index.html'), '<h1>x</h1>')
+  await page(`[...document.querySelectorAll('.ddp-ho .opt')].find((b) => /Vue 3/.test(b.textContent))?.click()`)
+  await page(`(() => { window.__e2eDir = ${JSON.stringify(STATIC)}; document.querySelector('.ddp-ho .ddp-dirbtn').click(); return true })()`)
+  const keptVue = await until(`(() => { const ho = document.querySelector('.ddp-ho'); const on = ho && ho.querySelector('.opt.on'); return (ho.querySelector('.pathrow input') || {}).value === ${JSON.stringify(STATIC)} && !ho.querySelector('.go').disabled && !!on && on.textContent })()`, 5000)
+  check('转成代码：先点了 Vue 再选纯 HTML 站点 → 框架还是 Vue', /Vue 3/.test(keptVue || ''), JSON.stringify({ keptVue }))
+  // 选了个有别的东西的文件夹（比如 ~/Projects）→ 在里面新建 <设计名>-app，下面说一声
+  const PARENT = path.join(tmp, 'work', 'picked-parent')
+  fs.mkdirSync(PARENT, { recursive: true })
+  fs.writeFileSync(path.join(PARENT, 'notes.md'), 'x')
+  await page(`(() => { window.__e2eDir = ${JSON.stringify(PARENT)}; document.querySelector('.ddp-ho .ddp-dirbtn').click(); return true })()`).catch(() => {})
+  const nested = path.join(PARENT, 'other-site-app')
+  const hoNest = await until(`(document.querySelector('.ddp-ho .pathrow input') || {}).value === ${JSON.stringify(nested)} && (document.querySelector('.ddp-ho .moved') || {}).innerText`, 5000)
+  check('转成代码：选了有别的东西的文件夹 → 改放进里面新建的 <设计名>-app，下面说一声', /已经有别的东西/.test(hoNest || '') && /other-site-app/.test(hoNest || ''), await page(`(document.querySelector('.ddp-ho') || {}).innerText || '没有面板'`))
+  await page(`document.querySelector('.ddp-ho .go')?.click()`).catch(() => {})
+  const goTxt = await until(`(() => { const t = ${composerText}; return t.includes(${JSON.stringify(nested)}) && t })()`, 5000)
+  check('转成代码：点「开始转成代码」→ 交给模型的目录就是新建的那个', !!goTxt, String(await page(composerText)).slice(-300))
+  await page(`document.querySelector('.ddp-ho header .ddp-btn')?.click()`).catch(() => {})
+  // 地址栏输错打不开 → 报错；点到别处还是会收起来（不能把工具栏一直藏着）
+  await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {})
+  await openAddr()
+  await page(`(() => { const el = document.querySelector('.ddp-bar .ddp-input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '/没有这个/x.html'); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+  await page(`document.querySelector('.ddp-bar form').requestSubmit()`)
+  const addrErr = await until(`(document.querySelector('.ddp-bar .ddp-err') || {}).innerText`, 5000)
+  await page(`(() => { const c = [...document.querySelectorAll('textarea, [contenteditable=true]')].find((e) => !e.closest('.ddp')); (c || document.body).focus(); if (!c) document.querySelector('.ddp-bar .ddp-input').blur(); return !!c })()`)
+  const barBack = await until(`!document.querySelector('.ddp-bar.editing') && !!document.querySelector('.ddp-addr')`, 3000)
+  check('地址栏：输错路径报错后点到别处 → 照样收起、工具栏回来', !!addrErr && !!barBack, JSON.stringify({ addrErr, editing: await page(`!!document.querySelector('.ddp-bar.editing')`) }))
+  await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
   const errs = webLog.split('\n').filter((l) => /dsh-design-studio/i.test(l) && /error|fail|失败/i.test(l))
   check('DSH 日志里没有设计台的报错', !errs.length, errs.slice(0, 5).join('\n'))
 } catch (e) {

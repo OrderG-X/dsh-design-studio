@@ -86,6 +86,31 @@ mod._test.poller('sEmpty').state = { url: '' }
 const emptyView = body.comp({ ...body.opts.inject('sEmpty') })
 const emptyText = text(emptyView)
 check('空状态：三步说明 + 地址框', emptyText.includes('还没有要预览的页面') && emptyText.includes('点「选择」') && emptyText.includes('打开'), emptyText)
+check('空状态：网页版（没有桌面版的桥）不显示「浏览…」，提示照旧', !emptyText.includes('浏览…') && emptyText.includes('也可以直接输入 HTML 文件路径或端口'), emptyText)
+globalThis.__DSH_HOST_PATHS__ = { pathFor: (f) => '/Users/me/site/' + f.name }
+const deskText = text(body.comp({ ...body.opts.inject('sEmpty') }))
+check('空状态：桌面版有「浏览…」，提示说能选、能拖', deskText.includes('浏览…') && deskText.includes('直接拖进来'), deskText)
+// 按钮本身：找树里 className 是 ddp-browse 的按钮（不光看字）
+function findEl(el, ok) {
+  if (el == null || el === false || typeof el !== 'object') return null
+  if (Array.isArray(el)) { for (const x of el) { const r = findEl(x, ok); if (r) return r } return null }
+  if (typeof el.type === 'function') return findEl(el.type(el.props), ok)
+  if (ok(el)) return el
+  return findEl(el.props && el.props.children, ok) || findEl(el.children || [], ok)
+}
+const isBrowse = (el) => el.type === 'button' && el.props && el.props.className === 'ddp-browse'
+const deskBtn = findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse)
+check('空状态：桌面版真有「浏览…」按钮、点得动', !!deskBtn && typeof deskBtn.props.onClick === 'function' && deskBtn.props.type === 'button')
+// 排在哪：看空状态那一层的孩子顺序（地址框 / 两行参考图、设计系统 都在风格卡前面）
+const emptyBox = findEl(body.comp({ ...body.opts.inject('sEmpty') }), (el) => el.props && el.props.className === 'ddp-empty')
+const kids = emptyBox ? [].concat(emptyBox.children || emptyBox.props.children || []).flat() : []
+const at = (ok) => kids.findIndex((k) => k && typeof k === 'object' && ok(k))
+const formAt = at((k) => k.props && k.props.className === 'ddp-form')
+const pickAt = at((k) => k.props && k.props.className === 'ddp-stylepick')
+const reflineAt = kids.map((k, i) => (k && k.props && k.props.className === 'ddp-refline' ? i : -1)).filter((i) => i >= 0)
+check('空状态：地址框（带「浏览…」）和两行入口排在风格卡前面（右侧栏矮也不被挤到下面）', formAt >= 0 && pickAt > formAt && reflineAt.length === 2 && reflineAt.every((i) => i < pickAt), JSON.stringify({ formAt, pickAt, reflineAt }))
+delete globalThis.__DSH_HOST_PATHS__
+check('空状态：网页版树里没有「浏览…」按钮', !findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse))
 
 // ── 选中内容 → 文字 ──
 const { formatPick, whereOf } = mod._test
@@ -165,7 +190,9 @@ check('变量分组：字体', kindOf('--font-sans', '"PingFang SC", system-ui')
 check('变量分组：字号 vs 间距', kindOf('--text-lg', '20px') === 'size' && kindOf('--space-4', '16px') === 'space' && kindOf('--gap', '1rem') === 'space')
 check('变量分组：圆角、阴影、其他', kindOf('--radius-md', '12px') === 'radius' && kindOf('--shadow-1', '0 1px 2px rgba(0,0,0,.1)') === 'shadow' && kindOf('--ease', 'cubic-bezier(.2,.8,.2,1)') === 'other')
 out = formatToken({ name: '--primary', value: '#c2410c', href: 'http://127.0.0.1:9/tokens.css' }, fileSt)
-check('点变量 → 输入框文字带名字、值、文件', out === '〔设计变量〕--primary: #c2410c\n文件：/Users/me/我的 站/tokens.css\n', out)
+check('点变量 → 输入框文字带名字、值、文件', out === '〔设计变量〕--primary: #c2410c（文件：/Users/me/我的 站/tokens.css）\n', out)
+out = formatToken({ name: '--shadow', value: '0 1px 2px #0001,\n    0 4px 8px #0002', href: 'http://127.0.0.1:9/tokens.css' }, fileSt)
+check('点变量：分几行写的值合成一行', out === '〔设计变量〕--shadow: 0 1px 2px #0001, 0 4px 8px #0002（文件：/Users/me/我的 站/tokens.css）\n', out)
 
 // ── 导出、版本 ──
 const { splitTitles, pickColors, hhmm } = mod._test
@@ -419,15 +446,15 @@ check('插入：直接发的字不加空行', pi('〔选定方向〕…\n', '', 
 // ── 点选标签（DSH 0.2.1 起：输入框里一个短标签，悬停看详情，发出去是整段） ──
 const { pickInfo, pickLabel, pickRule } = mod._test
 const src0 = sources[0]
-check('点选标签：注册成 @ 的来源，不出候选、不占菜单标题', sources.length === 1 && src0.name === 'dsh-design-studio' && src0.trigger === '@' && src0.showGroupTitle === false && (await src0.candidates()).length === 0)
+check('标签：每种图标注册一个 @ 的来源，不出候选、不占菜单标题', sources.length === 9 && src0.name === 'dsh-design-studio' && sources.every((x) => x.name.startsWith('dsh-design-studio') && x.trigger === '@' && x.showGroupTitle === false) && new Set(sources.map((x) => x.name)).size === 9 && (await src0.candidates()).length === 0, sources.map((x) => x.name).join(','))
 check('点选标签：复制出来、发给模型都是整段，前后空一行', src0.codec.clipboardText('〔选中元素〕a') === '\n\n〔选中元素〕a\n\n' && (await src0.codec.serialize('〔选中元素〕a')) === '\n\n〔选中元素〕a\n\n')
 check('点选标签：消息里的规则和标签都注册了', rules.length === 1 && rules[0].id === 'ddp-pick' && slots.some((s) => s.opts.name === 'conversation.user.text.node' && s.opts.key === 'ddp-pick'))
 const PK = formatPick(el, fileSt).trim()
 const inf = pickInfo(PK)
-check('点选标签：读出元素名、字、大小、文件', inf.kind === 'el' && inf.name === el.name && inf.text && pickLabel(inf, (k) => k) === inf.text && /^\d+×\d+$/.test(inf.size) && inf.file === 'index.html', JSON.stringify(inf))
+check('点选标签：读出元素名、字、大小、文件', inf.kind === 'el' && inf.name === el.name && inf.text && pickLabel(inf, (k) => k) === 'chipOne' && /^\d+×\d+$/.test(inf.size) && inf.file === 'index.html', JSON.stringify(inf))
 const AREA = '〔选中区域〕页面上 (0, 0) 起 300×200 的一块\n文件：/a/b.html\n包含：\n- a.go「去点单」\n- h1'
 const ai = pickInfo(AREA)
-check('点选标签：区域写几个元素', ai.kind === 'area' && ai.n === 2 && ai.size === '300×200' && pickLabel(ai, (k, v) => k + (v ? v.n : '')) === 'pickAreaN2', JSON.stringify(ai))
+check('点选标签：区域写几个元素', ai.kind === 'area' && ai.n === 2 && ai.size === '300×200' && pickLabel(ai, (k, v) => k + (v ? v.n : '')) === 'pickElems2', JSON.stringify(ai))
 const MSG = '改成绿色\n\n' + PK + '\n\n再大一点'
 const nodes = []
 for (let at = 0, n; (n = pickRule.match(MSG, at)); at = n.end) nodes.push(n)
@@ -436,7 +463,158 @@ check('点选标签：发出去的消息里整块认成一个标签，前后空�
 check('点选标签：用户自己打的字不认', !pickRule.match('〔选中元素〕是什么意思？\n- 请解释格式', 0) && !pickRule.match('〔选中元素〕是什么意思？', 0) && !pickRule.match('〔选中元素〕是什么意思？\n位置：在工具栏里\n- 请解释格式', 0) && !pickRule.match('〔选中区域〕是啥\n文件：a.html', 0) && !pickRule.match('〔选中元素〕请解释这个格式\n位置：顶上\nHTML：一段代码\n样式：随便\n- 列表', 0) && !pickRule.match('随便说说', 0))
 check('点选标签：页面地址带 ?参数 也读出文件名', pickInfo('〔选中元素〕a\n页面：http://localhost:3000/index.html?theme=dark#top\n位置：a').file === 'index.html')
 const pill = slots.find((s) => s.opts.name === 'conversation.user.text.node').comp({ node: { data: { text: PK } } })
-check('点选标签：消息里显示成标签（只有元素的字）', pill.props.className === 'ddp-pickpill' && text(pill) === inf.text, text(pill))
+check('点选标签：消息里显示成标签（固定写「1 个元素」）', pill.props.className === 'ddp-pickpill' && /^(1 个元素|1 element)$/.test(text(pill)) && pill.props['data-i'] === 'pick', text(pill))
+
+// ── 别的整段（标注、调样式、风格、体检…）也做成标签：中英文模板都认，消息里整段收成一个标签 ──
+const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks } = mod._test
+const tZ = makeT({})
+const tE = makeT({ locale: { bind: () => (k) => LE[k] } })
+check('翻译：填进去的内容里有「{notes}」也原样保留', tZ('mkAsk', { path: '/d/project-{notes}/refs/m.png', where: 'home', notes: '' }).startsWith('〔标注〕/d/project-{notes}/refs/m.png\n这是'))
+check('中文 / 英文翻译都拿得到', tZ('chipMark') === '标注图' && tE('chipMark') === 'Markup' && LZ.chipOne === '1 个元素')
+{
+  // 两套文案一个不少，占位符也对得上（漏一边或写错 {名字} 时界面上会露出键名 / 花括号）
+  const holes = (v) => [...String(v).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',')
+  const zk = Object.keys(LZ).filter((k) => typeof LZ[k] === 'string')
+  const ek = Object.keys(LE).filter((k) => typeof LE[k] === 'string')
+  const miss = [...zk.filter((k) => !(k in LE)).map((k) => 'EN 缺 ' + k), ...ek.filter((k) => !(k in LZ)).map((k) => 'ZH 缺 ' + k)]
+  const diff = new Set(['vMore']) // 故意不同：中文「等 {n} 个」、英文「and {rest} more」，调用时两个都给
+  const bad = zk.filter((k) => k in LE && !diff.has(k) && holes(LZ[k]) !== holes(LE[k])).map((k) => `${k}: ${holes(LZ[k])} ≠ ${holes(LE[k])}`)
+  check('中文 / 英文文案：键一个不少、占位符一致', !miss.length && !bad.length, [...miss, ...bad].slice(0, 10).join('\n'))
+}
+const W = '文件：/d/home.html'
+const issue = { type: 'contrast', sel: 'p.tip', text: '小字', fg: '#cccccc', bg: '#ffffff', ratio: 1.6, size: 12 }
+for (const [tt, lang] of [[tZ, '中文'], [tE, '英文']]) {
+  const cases = [
+    ['mark', 'chipMark', tt('mkAsk', { path: '/d/refs/markup-home.png', where: 'home · menu', notes: tt('mkNotes', { notes: '「这里改大」' }) })],
+    ['mark', 'chipMark', tt('mkAsk', { path: '/d/refs/markup-home.png', where: 'home', notes: '' })],
+    ['text', 'chipText', tt('textAsk', { before: '去点单', after: '马上点（快）', where: W })],
+    ['style', 'chipStyle', formatStyleAsk(tt, sty, { target: { kind: 'file', file: '/d/home.html', root: '/d' } })],
+    ['layers', 'chipVariant', tt('variantText', { name: '首页', b: 'home', where: W })],
+    ['layers', 'chipDir', tt('pickText', { name: '首页 B', where: W, others: 'home.html、home-c.html', base: 'home' })],
+    ['layers', 'chipDir', tt('pickKeep', { name: '首页', where: W, others: 'home-b.html' })],
+    ['check', 'chipCheck', formatCheck(tt, [{ label: '首页', url: 'http://127.0.0.1:9/home.html', issues: [issue, { ...issue, sel: 'h1' }] }, { label: '菜单', url: 'http://127.0.0.1:9/menu.html', issues: [issue] }], fileSt)],
+    ['code', 'chipCode', tt('hoText', { fw: 'React + Vite', dest: '/d/app', scope: tt('lang') === 'en' ? 'All screens' : '全部屏', key: 'react', only: '' })],
+    ['image', 'chipRef', formatRef(tt, { path: '/d/refs/a.png', w: 1280, h: 800, palette: { light: true, colors: [{ hex: '#F4EDE4', share: 0.7 }, { hex: '#E8572A', share: 0.004, accent: true }] }, hasDesign: true })],
+    ['image', 'chipRef', formatRef(tt, { path: '/d/refs/a.png', w: 1280, h: 800, palette: { light: false, colors: [] }, hasDesign: false })],
+    ['style', 'chipTweak', formatTweaks(tt, [{ id: 'gap', label: '留白', value: 16, var: '--gap', unit: 'px', type: 'range', min: 0, max: 40 }], { gap: 24 })],
+    ['style', 'chipTwMake', tt('twMakeText') + '\n'],
+    ['style', 'chipTwFix', tt('twFixText', { errs: 'gap 没有 var；radius 超出范围' }) + '\n'],
+    ['look', 'chipSysEx', tt('sysExtractText', { src: 'https://example.com' }) + '\n'],
+    ['look', 'chipSysAp', tt('sysApplyText', { name: 'Acme', dir: '/Users/me/.dsh/design-systems/acme' }) + '\n'],
+    ['look', 'chipLook', formatStyle(tt, STYLES.find((x) => x.id === 'warm'), false)],
+    ['look', 'chipLook', formatStyle(tt, STYLES.find((x) => x.id === 'glass'), true)],
+    ['look', '--brand', formatToken({ name: '--brand', value: '#c2410c', href: 'http://127.0.0.1:9/tokens.css' }, fileSt)],
+    ['look', 'chipTokens', tt('tokensAskText') + '\n'],
+  ]
+  const bad = []
+  for (const [i, key, raw] of cases) {
+    const body = raw.trim()
+    const c = chipOf(body, tt)
+    const want = key.startsWith('--') ? key : tt(key, { n: 3, name: tt('lang') === 'en' ? 'Warm craft' : '温暖手作' })
+    if (!c || c.i !== i || (key !== 'chipLook' && c.label !== want) || !c.items().filter(Boolean).length) { bad.push(`${key}: ${c ? c.i + ' ' + c.label : '认不出'}`); continue }
+    // 消息里：前后是用户的话（中间空一行），标签正好是这一整段
+    const msg = '先说一句\n\n' + body + '\n\n再补一句'
+    const ns = []
+    for (let at = 0, n; (n = pickRule.match(msg, at)); at = n.end) ns.push(n)
+    const chip = ns.find((n) => n.id === 'ddp-pick')
+    if (ns.length !== 3 || !chip || msg.slice(chip.start, chip.end) !== body) bad.push(`${key}: 消息里 ${JSON.stringify(ns.map((n) => [n.id, msg.slice(n.start, n.end).slice(0, 20)]))}`)
+    // 旧版插成字、用户的话紧跟着（下一行 / 同一行）：没有空行分开就不认，照原样显示，用户的话不会被藏进标签
+    for (const tail of ['\n改大一点', '改大一点', '\n- 不要改导航栏', '只改 home.html', '，按钮改成「立即购买」', '（不要改导航栏）', '\n文件：/d/menu.html']) {
+      const r = mod._test.chipRanges(body + tail)
+      if (r.length) bad.push(`${key}: 旧格式 ${JSON.stringify(tail)} ${JSON.stringify(r)}`)
+      if (chipOf(body + tail, tt)) bad.push(`${key}: 后面多了字也认`)
+    }
+  }
+  check(`标签（${lang}）：标注、改字、调样式、再出两版、选定方向、体检、转成代码、参考图、滑块、设计系统、风格、设计变量都认成标签，消息里整段收起`, !bad.length, bad.join(' | '))
+}
+const twoChips = tZ('textAsk', { before: 'a', after: 'b', where: W }).trim() + '\n\n' + formatToken({ name: '--brand', value: '#c2410c', href: 'http://127.0.0.1:9/tokens.css' }, fileSt).trim()
+check('标签：两个挨着的标签各是各的', JSON.stringify(mod._test.chipRanges(twoChips).map((r) => twoChips.slice(r.start, r.end).slice(0, 4))) === JSON.stringify(['把页面上', '〔设计变']))
+check('标签：用户自己打的像开头的字不认', ['〔标注〕看看这里', '〔风格〕温暖手作', '[Style] minimal please', '〔调样式〕把按钮调大', '〔设计体检〕发现 3 个问题', '〔转成代码〕用 React', '〔参考图〕这张'].every((x) => !pickRule.match(x, 0) && !chipOf(x, tZ)))
+const mkc = chipOf(tZ('mkAsk', { path: '/d/refs/markup-home.png', where: 'home', notes: tZ('mkNotes', { notes: '「这里改大」' }) }), tZ)
+check('标签：标注图的悬停卡片有图上写的字和文件名', JSON.stringify(mkc.items().filter((x) => x && x[1])) === JSON.stringify([['b', '标注图'], ['p', '「这里改大」'], ['span', 'home'], ['span', 'markup-home.png']]), JSON.stringify(mkc.items()))
+const ck = chipOf(formatCheck(tZ, [{ label: '首页', url: 'http://127.0.0.1:9/home.html', issues: [issue, issue, issue, issue, issue] }], fileSt), tZ)
+check('标签：体检写几个问题，悬停列前 4 个', ck.label === '体检 · 5 个问题' && ck.items().filter((x) => x && x[0] === 'span').length === 5, JSON.stringify(ck.items()))
+// 0.9.0 及以前插成字发出去的（没有固定收尾）：历史消息照原样显示，不收成标签
+const oldMsgs = [
+  '把页面上的「a」改成「b」（只改这一处文字，别的不动）。\n文件：/d/home.html只改 home.html',
+  '〔调样式〕.btn（button.btn）：字号 14px → 16px。把这些写进它的样式规则（能用设计变量就用设计变量），别写成行内 style。\n文件：/d/home.html',
+  '〔标注〕/d/refs/m.png\n这是我在设计上画了标注的截图（home）。先用 read_image 看这张图，按图上的圈、箭头和文字改对应的地方；没标的地方别动。\n图上写的字：「这里」，按钮改成「立即购买」',
+  '〔调节〕我在右侧调节滑块里调成了下面这样，照这个改设计（改样式源文件，tweaks.json 里对应的 value 也改成新值）：\n- 留白：16px → 24px（--gap）（不要改导航栏）',
+  '〔设计体检〕发现 1 个问题，请逐个修好：改源文件，只动有问题的地方；颜色、字号能改设计变量就改设计变量。\n\n首页（文件：/d/home.html）\n1. 对比度：p.tip「小字」 — 1.6:1只改首页',
+  '〔设计变量〕--brand: #c2410c\n文件：/d/tokens.css',
+]
+check('标签：旧版插成字的历史消息照原样显示', oldMsgs.every((x) => !mod._test.chipRanges(x).length && !chipOf(x, tZ)), JSON.stringify(oldMsgs.map((x) => mod._test.chipRanges(x).length)))
+// 刻意造的超长一行：不卡，也不认
+for (const [name, txt] of [['调样式', '[Style] ' + 'x (y): z. '.repeat(30000) + 'end'], ['改字', '把页面上的「' + '」改成「x'.repeat(30000) + '」'], ['体检', tZ('checkAsk', { n: 1 }) + '\n\n' + '首页（文件：/d/a.html）'.repeat(20000)]]) {
+  const t1 = Date.now()
+  const r = mod._test.chipRanges(txt + '\n')
+  check(`标签：超长一行（${name}，${Math.round(txt.length / 1000)}KB）不卡`, Date.now() - t1 < 300 && !r.length, `${Date.now() - t1}ms`)
+}
+const pillMk = slots.find((s) => s.opts.name === 'conversation.user.text.node').comp({ node: { data: { text: tZ('textAsk', { before: 'a', after: 'b', where: W }).trim() } } })
+check('标签：消息里的标签带种类（换图标）', pillMk.props['data-i'] === 'text' && text(pillMk) === '改字', JSON.stringify(pillMk.props))
+
+const st2 = { target: { kind: 'file', file: '/d/home.html', root: '/d' } }
+const sa1 = formatStyleAsk(tZ, sty, st2).trim()
+const two = sa1 + '\n\n 中间补一句\n\n' + sa1
+const tw = []
+for (let at = 0, n; (n = pickRule.match(two, at)); at = n.end) tw.push(n)
+check('标签：两个调样式标签中间夹着用户的话，各是各的，中间的话显示出来', tw.filter((n) => n.id === 'ddp-pick').length === 2 && tw.some((n) => n.id !== 'ddp-pick' && /中间补一句/.test(two.slice(n.start, n.end)) || two.slice(tw[1].end, tw[2] ? tw[2].start : two.length).includes('中间补一句')), JSON.stringify(tw.map((n) => [n.id, two.slice(n.start, n.end).slice(0, 12)])))
+const ho = chipOf(tZ('hoText', { fw: 'React', dest: '/project/app', scope: '只做首页', key: 'react', only: '，screens: ["home.html"]' }), tZ)
+check('标签：只转一屏时，悬停卡片的目录对', ho && JSON.stringify(ho.items()[2]) === JSON.stringify(['span', '/project/app']), JSON.stringify(ho && ho.items()))
+const longHo = tZ('hoText', { fw: 'React', dest: '/a', scope: 'x', key: 'react', only: '' }).replace('/a）', 'x'.repeat(100000) + '）').replace('设计目录里的文件别改。', '')
+const t0 = Date.now()
+mod._test.chipRanges(longHo)
+check('标签：残缺的长整段识别不卡（< 300ms）', Date.now() - t0 < 300, `${Date.now() - t0}ms`)
+// 橡皮：手绘的圈抖出去的地方也擦得到
+const { markHit, markPath } = mod._test
+let miss = 0
+let total = 0
+for (let sd = 1; sd <= 20; sd++) {
+  const ov = { t: 'oval', a: [100, 100], b: [500, 400], w: 3, c: '#e5484d', sd: sd * 104729 }
+  for (const [a, b] of markPath(ov).filter((_, i) => i % 7 === 0)) { total++; if (!markHit(ov, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 4)) miss++ }
+}
+check('画笔标注：橡皮按手绘的线判断，圈上哪儿都擦得到', total > 100 && miss === 0, `${miss}/${total}`)
+// 橡皮：离手绘线远的地方（哪怕在标准椭圆上）不算擦到，旁边的圈不会被误删
+const segD = (x, y, a, b) => { const dx = b[0] - a[0]; const dy = b[1] - a[1]; const l = dx * dx + dy * dy; const k = l ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l)) : 0; return Math.hypot(x - a[0] - k * dx, y - a[1] - k * dy) }
+let farN = 0
+let wrong = 0
+for (let sd = 1; sd <= 20; sd++) {
+  for (const t of ['oval', 'rect', 'arrow']) {
+    const sh = { t, a: [100, 100], b: [700, 550], w: 3, c: '#e5484d', sd: sd * 7919 }
+    const segs = markPath(sh)
+    for (let i = 0; i < 200; i++) {
+      const g = (i / 200) * Math.PI * 2
+      const x = t === 'arrow' ? 100 + 600 * (i / 200) + 12 * Math.cos(g * 9) : 400 + 300 * Math.cos(g) + 10 * Math.cos(g * 7)
+      const y = t === 'arrow' ? 100 + 450 * (i / 200) + 12 * Math.sin(g * 9) : 325 + 225 * Math.sin(g) + 10 * Math.sin(g * 5)
+      const d = Math.min(...segs.map(([a, b]) => segD(x, y, a, b)))
+      if (d > 6 + 1.5 + 0.5) { farN++; if (markHit(sh, x, y, 6)) wrong++ }
+    }
+  }
+}
+check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头', farN > 100 && wrong === 0, `${wrong}/${farN}`)
+
+// ── 拖进来的东西：HTML / 文件夹 → 打开，图片 → 参考图，别的 → 说清楚 ──
+{
+  const { dragKind, droppedOf } = mod._test
+  const it = (type, name, dir = false) => ({ kind: 'file', type, getAsFile: () => ({ name, type }), webkitGetAsEntry: () => ({ isDirectory: dir }) })
+  check('拖着时：网页版拖 HTML → web（提示输路径）', dragKind({ items: [it('text/html', 'a.html')] }) === 'web')
+  globalThis.__DSH_HOST_PATHS__ = { pathFor: () => '' }
+  check('拖着时：桌面版拖 HTML → page；没类型的（文件夹）→ maybe；图片 → image；别的 → other',
+    dragKind({ items: [it('text/html', 'a.html')] }) === 'page' && dragKind({ items: [it('', 'site', true)] }) === 'maybe'
+    && dragKind({ items: [it('image/png', 'a.png')] }) === 'image' && dragKind({ items: [it('text/plain', 'a.txt')] }) === 'other'
+    && dragKind({ items: [{ kind: 'string', type: 'text/plain' }] }) === 'image')
+  // 从网页上拖下来的图：网址 + <img> 那段 HTML + 一项没类型的文件 → 图，不当文件夹
+  const webImg = [{ kind: 'string', type: 'text/uri-list' }, { kind: 'string', type: 'text/html' }, it('', '')]
+  check('拖着时：从网页拖一张图 → image（不是「打开这个页面」）；Finder 拖文件夹照旧 maybe', dragKind({ items: webImg }) === 'image' && dragKind({ items: [it('', 'site', true)] }) === 'maybe')
+  delete globalThis.__DSH_HOST_PATHS__
+  const d1 = droppedOf({ items: [it('image/png', 'ref.png'), it('', 'site', true)] })
+  const d2 = droppedOf({ items: [it('', 'page.HTM')] })
+  const d3 = droppedOf({ items: [it('text/plain', 'a.txt')] })
+  const d4 = droppedOf({ files: [{ name: 'b.html', type: 'text/html' }] })
+  check('松手：文件夹优先打开、图片另记；.HTM 大写也认；别的文件什么都不开；没有 items 用 files',
+    d1.page && d1.page.name === 'site' && d1.dir && d1.image && d1.image.name === 'ref.png'
+    && d2.page && d2.page.name === 'page.HTM' && !d3.page && !d3.image && d3.any && d4.page && d4.page.name === 'b.html', JSON.stringify([d1, d2, d3, d4]))
+}
 
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

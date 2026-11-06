@@ -11,7 +11,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import http from 'node:http'
-import { detectProject, routeOf, sharedParts, implUrl, handoffMd, buildHandoff, compareScreens, blockAt, FRAMEWORKS, defaultDest, within, localOnly } from '../lib/handoff.js'
+import { detectProject, projectFor, defaultFramework, routeOf, sharedParts, implUrl, handoffMd, buildHandoff, compareScreens, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
 import { createHub } from '../lib/serve.js'
 import { findBrowser, createBrowser } from '../lib/browser.js'
 
@@ -69,6 +69,71 @@ check('本机：localhost / 127.0.0.1 / ::1、本地文件算；外网、别的�
   check('放哪：会话目录就是设计目录（有 package.json 也一样）→ 放旁边，不放进设计目录', defaultDest(des, des, detectProject(des)) === path.join(ws, 'shop-design-app'))
   check('放哪：设计目录在别处 → 放设计目录旁边', defaultDest(des, path.join(tmp, 'other'), detectProject(path.join(tmp, 'other'))) === path.join(ws, 'shop-design-app'))
   check('放哪：已经叫 xx-app 的设计 → xx-app-code', defaultDest(path.join(tmp, 'my-app'), tmp, null) === path.join(tmp, 'my-app-code'))
+  // 会话目录有 package.json 就算项目（后端也一样）：放哪个子目录让写代码的模型看清结构定
+  const be = path.join(tmp, 'be')
+  fs.mkdirSync(path.join(be, 'designs', 'shop'), { recursive: true })
+  fs.writeFileSync(path.join(be, 'package.json'), '{"dependencies":{"express":"4"}}')
+  check('放哪：会话目录是后端项目 → 照样放会话目录（和选这个文件夹一样）', defaultDest(path.join(be, 'designs', 'shop'), be, detectProject(be)) === be && pickedDest(be, path.join(be, 'designs', 'shop')).dest === be)
+  // 右侧栏「选文件夹」选了哪个
+  const pk = path.join(tmp, 'picked')
+  fs.mkdirSync(path.join(pk, 'empty'), { recursive: true })
+  fs.writeFileSync(path.join(pk, 'empty', '.DS_Store'), '')
+  fs.mkdirSync(path.join(pk, 'proj'))
+  fs.writeFileSync(path.join(pk, 'proj', 'package.json'), '{"dependencies":{"vue":"3"}}')
+  fs.writeFileSync(path.join(pk, 'notes.md'), 'x')
+  const pd = (dir) => { const r = pickedDest(dir, des); return `${r.dest}|${r.why}` }
+  check('选的文件夹：是个项目 → 就放进去', pd(path.join(pk, 'proj')) === `${path.join(pk, 'proj')}|`)
+  check('选的文件夹：空的（只有 .DS_Store）→ 就放进去', pd(path.join(pk, 'empty')) === `${path.join(pk, 'empty')}|`)
+  check('选的文件夹：还不存在 → 就用它', pd(path.join(pk, 'new')) === `${path.join(pk, 'new')}|`)
+  check('选的文件夹：有别的东西（比如 ~/Projects）→ 在里面新建 <名字>-app', pd(pk) === `${path.join(pk, 'shop-design-app')}|nested`)
+  // 有 package.json 或 index.html 的都算项目，就放进去：后端、monorepo 根目录也一样（不猜是不是前端，交接说明让模型看清结构）
+  fs.mkdirSync(path.join(pk, 'api'))
+  fs.writeFileSync(path.join(pk, 'api', 'package.json'), '{"dependencies":{"express":"4"}}')
+  fs.mkdirSync(path.join(pk, 'mono'))
+  fs.writeFileSync(path.join(pk, 'mono', 'package.json'), '{"private":true,"workspaces":["packages/*"]}')
+  fs.mkdirSync(path.join(pk, 'static'))
+  fs.writeFileSync(path.join(pk, 'static', 'index.html'), '<h1>x</h1>')
+  fs.mkdirSync(path.join(pk, 'readme'))
+  fs.writeFileSync(path.join(pk, 'readme', 'README.md'), '# x')
+  check('选的文件夹：后端、monorepo 根目录（有 package.json）→ 就放进去', pd(path.join(pk, 'api')) === `${path.join(pk, 'api')}|` && pd(path.join(pk, 'mono')) === `${path.join(pk, 'mono')}|`)
+  check('选的文件夹：没有 package.json 的纯 HTML 站点（有 index.html）→ 就放进去', pd(path.join(pk, 'static')) === `${path.join(pk, 'static')}|` && detectProject(path.join(pk, 'static')).site && !detectProject(path.join(pk, 'static')).pkg)
+  check('选的文件夹：只有 README 的文件夹（不是项目）→ 在里面新建', pd(path.join(pk, 'readme')) === `${path.join(pk, 'readme', 'shop-design-app')}|nested`)
+  fs.mkdirSync(path.join(pk, 'repo', '.git'), { recursive: true })
+  fs.writeFileSync(path.join(pk, 'repo', 'README.md'), '# x')
+  check('选的文件夹：刚建的仓库（有 .git，只有 README）→ 就放进去', pd(path.join(pk, 'repo')) === `${path.join(pk, 'repo')}|`)
+  // 选了项目里面的子目录（src/pages）→ 就放这里，算那个项目的（不在里面另起一个新项目）
+  fs.mkdirSync(path.join(pk, 'proj', 'src', 'pages'), { recursive: true })
+  fs.writeFileSync(path.join(pk, 'proj', 'src', 'main.js'), '')
+  fs.writeFileSync(path.join(pk, 'proj', 'src', 'pages', 'Home.vue'), '')
+  const sub = path.join(pk, 'proj', 'src')
+  check('选的文件夹：现有项目里的子目录（src）→ 就放这里，框架跟那个项目', pd(sub) === `${sub}|` && projectFor(sub).dir === path.join(pk, 'proj') && defaultFramework(projectFor(sub)) === 'same' && defaultFramework(projectFor(path.join(sub, 'pages'))) === 'same')
+  if (process.platform !== 'win32') {
+    fs.symlinkSync(sub, path.join(tmp, 'src-link'))
+    check('选的文件夹：软链接到项目里的子目录 → 按真实位置认出那个项目', pd(path.join(tmp, 'src-link')) === `${path.join(tmp, 'src-link')}|` && projectFor(path.join(tmp, 'src-link')).dir === path.join(pk, 'proj'))
+  }
+  check('项目：自己就是项目的不往上找；哪个项目都不在里面的、还不存在的（要新建）→ 就是它自己', projectFor(path.join(pk, 'proj')).dir === path.join(pk, 'proj') && !projectFor(path.join(pk, 'readme')).pkg && !projectFor(path.join(pk, 'proj', 'src', 'new-app')).pkg)
+  fs.mkdirSync(path.join(pk, 'shop-design-app'))
+  fs.writeFileSync(path.join(pk, 'shop-design-app', 'home.html'), 'x')
+  check('选的文件夹：本来就叫 <名字>-app（上回转成纯 HTML 放过，没有 index.html）→ 就放这里，不再套一层', pd(path.join(pk, 'shop-design-app')) === `${path.join(pk, 'shop-design-app')}|`)
+  check('选的文件夹：选了设计目录本身 → 改放设计目录旁边（说是 beside）', pd(des) === `${path.join(ws, 'shop-design-app')}|beside`)
+  fs.mkdirSync(path.join(des, 'sub'))
+  check('选的文件夹：选了设计目录里的空文件夹 → 也改放旁边', pd(path.join(des, 'sub')) === `${path.join(ws, 'shop-design-app')}|beside`)
+  // 像不像 monorepo 根目录（只用来在交接说明里提醒放进子包）：workspaces / lerna / pnpm-workspace 列了别的包；只列 '.' 的、pnpm-workspace 只写设置的不算
+  const mk = (name, files) => { const d = path.join(pk, name); for (const [f, c] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), c) } return d }
+  let mi = 0
+  const isMono = (files) => detectProject(mk(`mono-${++mi}`, files)).mono
+  check('monorepo 根目录：workspaces 数组 / {packages} / lerna.json / pnpm-workspace 两种写法都认得', isMono({ 'package.json': '{"workspaces":["apps/*"]}' }) && isMono({ 'package.json': '{"workspaces":{"packages":["apps/*"]}}' }) && isMono({ 'package.json': '{}', 'lerna.json': '{}' }) && isMono({ 'package.json': '{}', 'pnpm-workspace.yaml': 'packages:\n  - apps/*\n' }) && isMono({ 'package.json': '{}', 'pnpm-workspace.yaml': "packages: ['apps/*', \"packages/*\"]\n" }))
+  check('monorepo 根目录：只列了自己（\'.\'）、pnpm-workspace 只写设置、没有 workspaces → 不算', !isMono({ 'package.json': '{"workspaces":["."]}' }) && !isMono({ 'package.json': '{}', 'pnpm-workspace.yaml': "packages:\n  - '.'\nonlyBuiltDependencies:\n  - esbuild\n" }) && !isMono({ 'package.json': '{}', 'pnpm-workspace.yaml': 'onlyBuiltDependencies:\n  - esbuild\n' }) && !isMono({ 'package.json': '{"dependencies":{"react":"19"}}' }))
+  const preact = mk('preact', { 'package.json': '{"dependencies":{"preact":"10"}}', 'src/index.js': '' })
+  check('框架：Preact / Ember / React Native 也认得出', detectProject(preact).label === 'Preact' && detectProject(mk('ember', { 'package.json': '{"devDependencies":{"ember-source":"5"}}' })).label === 'Ember' && detectProject(mk('rn', { 'package.json': '{"dependencies":{"react":"19","react-native":"0.80"}}' })).label === 'React Native')
+  check('monorepo 根目录：Windows 换行（CRLF）、带 BOM 的 pnpm-workspace.yaml 也认得', isMono({ 'package.json': '{}', 'pnpm-workspace.yaml': 'packages:\r\n  - "apps/*"\r\n' }) && isMono({ 'package.json': '{}', 'pnpm-workspace.yaml': '\uFEFFpackages:\n  - apps/*\n' }))
+  check('monorepo 根目录：Nx 集成式（nx.json，根上没有 project.json）算；Nx 单项目（有 project.json）不算', isMono({ 'package.json': '{"devDependencies":{"nx":"20"}}', 'nx.json': '{}' }) && !isMono({ 'package.json': '{"devDependencies":{"nx":"20"}}', 'nx.json': '{}', 'project.json': '{}' }))
+  const odd = (c) => { const d = mk(`odd-${++mi}`, { 'package.json': c }); try { return detectProject(d).pkg } catch (e) { return 'throw ' + e.message } }
+  check('package.json 是 null / 数组 / 写坏了 / 带 BOM：不抛错，能读的照读', odd('null') === false && odd('[1]') === false && odd('{oops') === false && odd('\uFEFF{"dependencies":{"vue":"3"}}') === true)
+  check('默认框架：认得出的项目跟它一样、纯 HTML 站点纯 HTML、别的 React', defaultFramework(detectProject(preact)) === 'same' && defaultFramework(detectProject(path.join(pk, 'static'))) === 'html' && defaultFramework(detectProject(path.join(pk, 'api'))) === 'react' && defaultFramework(detectProject(path.join(pk, 'nope'))) === 'react' && defaultFramework(null) === 'react')
+  const ng = mk('ng', { 'package.json': '{"dependencies":{"@angular/core":"20"}}', 'src/index.html': '<app-root></app-root>', 'src/main.ts': '' })
+  const lib = mk('lib', { 'package.json': '{"name":"lib"}', 'docs/index.html': '<h1>docs</h1>' })
+  check('选的文件夹：Angular / webpack 项目里带 index.html 的 src → 算那个项目（框架跟它）；认不出框架的库仓库里的 docs/ 站点 → 还是纯 HTML', pd(path.join(ng, 'src')) === `${path.join(ng, 'src')}|` && projectFor(path.join(ng, 'src')).dir === ng && defaultFramework(projectFor(path.join(ng, 'src'))) === 'same' && projectFor(path.join(lib, 'docs')).site && !projectFor(path.join(lib, 'docs')).pkg && defaultFramework(projectFor(path.join(lib, 'docs'))) === 'html', JSON.stringify([pd(path.join(ng, 'src')), defaultFramework(projectFor(path.join(ng, 'src'))), defaultFramework(projectFor(path.join(lib, 'docs')))]))
   check('在里面：本身、子目录、还没建的子目录都算；旁边的不算', within(des, des) && within(path.join(des, 'src'), des) && within(path.join(des, 'a', 'b'), des) && !within(path.join(ws, 'Shop Design-app'), des) && !within(ws, des))
   if (process.platform !== 'win32') {
     fs.symlinkSync(des, path.join(tmp, 'alias'))
@@ -134,6 +199,41 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   check('交接说明：素材、做法（每屏 compare_design，3% 以内）', md.includes('`img/hero.jpg`') && md.includes('compare_design') && md.includes('3%'))
   const same = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'same', dest: '/x/proj', project: { dir: '/x/proj', pkg: true, name: 'proj', framework: 'vue', label: 'Vue + Vite', tailwind: true, ts: true, pm: 'pnpm' }, system: '', htmlByKey })
   check('交接说明：网页设计没有小程序要点', !md.includes('小程序要点'))
+  const bareMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest: '/x/api', project: { dir: '/x/api', pkg: true, name: 'api', framework: '', label: '', tailwind: false, ts: false, pm: 'npm' }, system: '', htmlByKey })
+  check('交接说明：现有项目没认出前端框架（后端 / monorepo 根目录）→ 让模型先看清结构再定放哪，不在原地新建项目', /没认出前端框架/.test(bareMd) && /先看清它的结构/.test(bareMd) && !/新建项目/.test(bareMd) && !/create vite@latest api/.test(bareMd) && /npm create vite@latest web/.test(bareMd), bareMd.split('\n').find((l) => l.startsWith('1. 搭骨架')))
+  // 后端仓库里用选文件夹窗口新建了个空文件夹再选它 → 就在这里新建前端项目（不说「已经有东西」，不再套一层 web）
+  const be = path.join(tmp, 'be')
+  fs.mkdirSync(path.join(be, 'frontend'), { recursive: true })
+  fs.writeFileSync(path.join(be, 'package.json'), '{"dependencies":{"express":"5"}}')
+  const freshMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest: path.join(be, 'frontend'), project: projectFor(path.join(be, 'frontend')), system: '', htmlByKey })
+  const freshStep = freshMd.split('\n').find((l) => l.startsWith('1. 搭骨架')) || ''
+  check('交接说明：认不出前端框架的项目里选了个空的新文件夹 → 就在这里新建前端项目（在上一层跑脚手架）', /新建项目 `npm create vite@latest frontend/.test(freshStep) && freshStep.includes(`在 \`${be}\` 里跑`) && !/先看清它的结构/.test(freshMd), freshStep)
+  // monorepo 里新建的空子包：根上装了 React（依赖提到根上）也照样在这里新建；pnpm 的仓库用 pnpm 装
+  const monoNew = (name, files, framework) => {
+    const r = path.join(tmp, name)
+    fs.mkdirSync(path.join(r, 'apps', 'admin'), { recursive: true })
+    for (const [f, c] of Object.entries(files)) fs.writeFileSync(path.join(r, f), c)
+    const d = path.join(r, 'apps', 'admin')
+    const md = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework, dest: d, project: projectFor(d), system: '', htmlByKey })
+    return { r, step: md.split('\n').find((l) => l.startsWith('1. 搭骨架')) || '' }
+  }
+  const mr = monoNew('mono-react', { 'package.json': '{"workspaces":["apps/*"],"devDependencies":{"react":"19"}}' }, 'same')
+  check('交接说明：monorepo 根上装了 React，选空的 apps/admin、跟项目一样 → 在 apps 里新建 React 子包，不再让模型去找别的应用', /新建项目 `npm create vite@latest admin -- --template react-ts`/.test(mr.step) && mr.step.includes(`在 \`${path.join(mr.r, 'apps')}\` 里跑`) && !/先看根目录/.test(mr.step), mr.step)
+  const mpn = monoNew('mono-pnpm', { 'package.json': '{"devDependencies":{"turbo":"2"}}', 'pnpm-workspace.yaml': 'packages:\n  - apps/*\n', 'pnpm-lock.yaml': '' }, 'next')
+  check('交接说明：pnpm 的 monorepo 里新建子包 → 脚手架和装依赖都用 pnpm', /--use-pnpm/.test(mpn.step) && !/--use-npm/.test(mpn.step) && /用 pnpm 装好依赖/.test(mpn.step), mpn.step)
+  const ms = monoNew('mono-svelte', { 'package.json': '{"workspaces":["apps/*"],"devDependencies":{"svelte":"5"}}' }, 'same')
+  const mx = monoNew('mono-nuxt', { 'package.json': '{"workspaces":["apps/*"],"devDependencies":{"nuxt":"4","vue":"3"}}' }, 'same')
+  check('交接说明：monorepo 根上是没有现成脚手架命令的框架（Svelte、Nuxt）→ 让模型在这个空文件夹里照别的子包新建，不套 Vue + Vite 的命令', /在这个空文件夹里新建一个 Svelte 子项目/.test(ms.step) && /在这个空文件夹里新建一个 Nuxt 子项目/.test(mx.step) && !/create vite|vue-router/.test(mx.step), mx.step)
+  // 已经有东西、又没有 package.json 的目录（Python 后端、别的语言的仓库）：也别在原地 / 旁边跑脚手架
+  const pyMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest: '/x/svc', project: { dir: '/x/svc', pkg: false, site: false, empty: false, name: 'svc', framework: '' }, system: '', htmlByKey })
+  check('交接说明：有东西但不是 Node 项目（Python 仓库）→ 不在原地新建，前端放进里面新的子目录', /不是 Node 项目/.test(pyMd) && /先看清它的结构/.test(pyMd) && !/新建项目：/.test(pyMd) && !/create vite@latest svc/.test(pyMd), pyMd.split('\n').filter((l) => /做到|搭骨架/.test(l)).join('\n'))
+  const siteMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'html', dest: '/x/site', project: { dir: '/x/site', pkg: false, site: true, empty: false, name: 'site', framework: '' }, system: '', htmlByKey })
+  check('交接说明：转成纯 HTML 放进已有的站点 → 提醒别覆盖现有页面，就加在这个站点里（不另建子目录）', /别覆盖现有的页面/.test(siteMd) && !/新的子目录/.test(siteMd), siteMd.split('\n').filter((l) => /做到|搭骨架/.test(l)).join('\n'))
+  const siteReact = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest: '/x/site', project: { dir: '/x/site', pkg: false, site: true, empty: false, name: 'site', framework: '' }, system: '', htmlByKey })
+  check('交接说明：已有纯 HTML 站点改用 React → 前端放进里面新的子目录，不在原地跑脚手架', /新的子目录/.test(siteReact) && !/新建项目 `/.test(siteReact))
+  const monoMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'same', dest: '/x/mono', project: { dir: '/x/mono', pkg: true, mono: true, name: 'mono', framework: 'react', label: 'React', tailwind: false, ts: false, pm: 'pnpm' }, system: '', htmlByKey })
+  check('交接说明：像 monorepo 根目录 → 先找现成的前端应用（根目录或 apps/），没有再新建子包', /monorepo 根目录：先看根目录和 apps\//.test(monoMd) && !/没认出前端框架/.test(monoMd))
+  check('交接说明：普通前端项目不多这两句', !/monorepo|没认出前端框架/.test(same))
   const mp = handoffMd({ root: design, rows, kind: 'miniprogram', size: [375, 812], framework: 'react', dest, project: null, system: '', htmlByKey })
   check('交接说明：小程序设计讲清 rpx 换算、状态栏和胶囊不用做、tabBar 写进 app.json', mp.includes('## 小程序要点') && mp.includes('1px = 2rpx') && mp.includes('wx.getMenuButtonBoundingClientRect()') && mp.includes('`tabBar`'), mp)
   const dk = handoffMd({ root: design, rows, kind: 'desktop', size: [1280, 800], framework: 'react', dest, project: null, system: '', htmlByKey })
