@@ -44,7 +44,7 @@ If DSH can't reach the npm registry, it falls back to a mirror in China. To upda
 - **Versions and compare:** every turn is saved; drag a slider to compare, and go back to any version.
 - **Export and phone preview:** showcase images, PDF and PowerPoint (links between screens still work); scan a QR code to see it on your phone at real size.
 - **Design library and gallery:** everything you've designed, plus saved references and styles, lives in the Library. Browse templates, design systems and style cards others shared, and "Start from this" copies one for you to keep editing. Share your own with "Share to the gallery": it's checked, zipped and submitted on a web page, and listed once reviewed. The gallery catalog comes from npm mirrors and is used only when its signature and checksums match; to keep it offline, turn on "Design library offline" on the Plugins page.
-- **Your brand, and real code:** give a site URL to extract a brand design system and design with it from then on; turn a finished design into React / Vue / HTML, compared screen by screen against the design.
+- **Your brand, and real code:** give a site URL to extract a brand design system and design with it from then on; turn a finished design into React / Vue / HTML (mini programs straight into uni-app or native WeChat code, HBuilderX projects included), compared screen by screen against the design.
 
 See [all features](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/features.md) for every feature, the tool parameters and the security design, and [development](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/development.md) for dev setup and tests.
 

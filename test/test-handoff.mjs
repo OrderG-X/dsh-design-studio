@@ -11,7 +11,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import http from 'node:http'
-import { detectProject, projectFor, defaultFramework, routeOf, sharedParts, implUrl, handoffMd, buildHandoff, compareScreens, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
+import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, implUrl, handoffMd, buildHandoff, compareScreens, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
 import { createHub } from '../lib/serve.js'
 import { findBrowser, createBrowser } from '../lib/browser.js'
 
@@ -37,7 +37,42 @@ const tmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-ha
   fs.writeFileSync(path.join(p, 'package.json'), JSON.stringify({ dependencies: { nuxt: '3', vue: '3' } }))
   check('项目：Nuxt 算 vue', detectProject(p).framework === 'vue' && detectProject(p).label === 'Nuxt')
 }
-check('框架：四种都有名字，新建命令带项目名占位', Object.keys(FRAMEWORKS).join() === 'react,vue,next,html' && FRAMEWORKS.react.create.includes('{name}') && !FRAMEWORKS.html.create)
+check('框架：六种都有名字，新建命令带项目名占位（原生小程序、纯 HTML 没有脚手架）', Object.keys(FRAMEWORKS).join() === 'react,vue,next,html,uniapp,weapp' && FRAMEWORKS.react.create.includes('{name}') && FRAMEWORKS.uniapp.create.includes('{name}') && !FRAMEWORKS.html.create && !FRAMEWORKS.weapp.create)
+
+// ── 小程序项目（issue #4）：uni-app（命令行 / HBuilderX）、微信原生、Taro ──
+{
+  const mp = path.join(tmp, 'mini')
+  const mk = (name, files) => {
+    const d = path.join(mp, name)
+    for (const [f, c] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), typeof c === 'string' ? c : JSON.stringify(c)) }
+    return d
+  }
+  const cli = mk('cli', { 'package.json': { name: 'wallet', dependencies: { '@dcloudio/uni-app': '3.0.0-4060620250520001', vue: '^3.4.21' }, devDependencies: { '@dcloudio/vite-plugin-uni': '3.0.0', typescript: '5' } }, 'src/pages.json': { pages: [{ path: 'pages/index/index' }] }, 'src/manifest.json': {}, 'index.html': '<div id="app"></div>' })
+  const d1 = detectProject(cli)
+  check('小程序：命令行建的 uni-app → uni-app（Vue 3），页面在 src/', d1.pkg && d1.framework === 'uniapp' && d1.label === 'uni-app（Vue 3）' && d1.pagesAt === 'src/' && d1.ts, JSON.stringify(d1))
+  const cli2 = mk('cli2', { 'package.json': { dependencies: { '@dcloudio/uni-app': '^2.0.2', vue: '^2.6.11' } }, 'src/pages.json': '{ "pages": [] }' })
+  check('小程序：Vue 2 的 uni-app 也认得出', detectProject(cli2).label === 'uni-app（Vue 2）')
+  const hbx = mk('hbx', { 'manifest.json': '/* 应用配置 */\n{ "name": "钱包", "vueVersion": "3" }', 'pages.json': '{\n  // 页面\n  "pages": [{ "path": "pages/index/index" }]\n}', 'App.vue': '<script>export default {}</script>', 'pages/index/index.vue': '<template><view /></template>' })
+  const d2 = detectProject(hbx)
+  check('小程序：HBuilderX 建的 uni-app（没有 package.json，配置里有注释）→ 认得出，Vue 3', !d2.pkg && d2.framework === 'uniapp' && d2.hbx && d2.label === 'uni-app（HBuilderX，Vue 3）' && d2.pagesAt === '', JSON.stringify(d2))
+  check('小程序：HBuilderX 没写 vueVersion → Vue 2', detectProject(mk('hbx2', { 'manifest.json': '{}', 'pages.json': '{"pages":[]}' })).label === 'uni-app（HBuilderX，Vue 2）')
+  const hbx3 = mk('hbx3', { 'manifest.json': '{"vueVersion":"3"}', 'pages.json': '{"pages":[]}', 'package.json': { dependencies: { 'uview-plus': '3', dayjs: '1' } } })
+  check('小程序：HBuilderX 项目装了 npm 包（有 package.json、没写 uni-app 依赖）→ 还是 HBuilderX 的 uni-app', detectProject(hbx3).framework === 'uniapp' && detectProject(hbx3).hbx && detectProject(hbx3).pkg)
+  check('小程序：只有 manifest.json（网页的 PWA 清单）、或者 pages.json 没写 pages → 不算 uni-app', !detectProject(mk('pwa', { 'manifest.json': '{"name":"x"}', 'index.html': '<p>' })).framework && !detectProject(mk('half', { 'manifest.json': '{}', 'pages.json': '{}' })).framework)
+  const wx = mk('wx', { 'project.config.json': { miniprogramRoot: 'miniprogram/', appid: 'wx123', compileType: 'miniprogram' }, 'miniprogram/app.json': { pages: ['pages/index/index'] } })
+  const d3 = detectProject(wx)
+  check('小程序：微信原生（project.config.json + miniprogram/app.json）→ 原生，页面在 miniprogram/', !d3.pkg && d3.framework === 'weapp' && d3.pagesAt === 'miniprogram/' && !d3.hbx, JSON.stringify(d3))
+  check('小程序：原生小程序 app.json 在根目录、装了 Vant Weapp → 还是原生', detectProject(mk('wx2', { 'project.config.json': { appid: 'touristappid' }, 'app.json': { pages: [] }, 'package.json': { dependencies: { '@vant/weapp': '1' } } })).framework === 'weapp')
+  check('小程序：miniprogramRoot 指到项目外面（../）不跟着走，按根目录找', detectProject(mk('wx3', { 'project.config.json': { miniprogramRoot: '../wx/miniprogram' }, 'app.json': {} })).pagesAt === '' && !detectProject(mk('wx4', { 'project.config.json': { miniprogramRoot: '../wx/miniprogram' } })).framework)
+  check('小程序：只有 project.config.json、没有 app.json → 不算', !detectProject(mk('wx5', { 'project.config.json': {} })).framework)
+  const taro = mk('taro', { 'package.json': { dependencies: { '@tarojs/taro': '4', react: '18' } }, 'project.config.json': { miniprogramRoot: 'dist/' }, 'dist/app.json': {} })
+  check('小程序：Taro（编译过、dist 里有 app.json）→ Taro，不当原生', detectProject(taro).framework === 'taro' && detectProject(taro).label === 'Taro')
+  check('默认框架：HBuilderX / 原生小程序 → 跟项目一样；小程序设计放空文件夹 → uni-app；别的设计照旧 React', defaultFramework(d2, 'miniprogram') === 'same' && defaultFramework(d3, 'web') === 'same' && defaultFramework(detectProject(path.join(mp, 'nope')), 'miniprogram') === 'uniapp' && defaultFramework(null, 'miniprogram') === 'uniapp' && defaultFramework(null, 'app') === 'react' && defaultFramework(null) === 'react')
+  const des = path.join(mp, 'wallet-design')
+  check('选的文件夹：HBuilderX 项目 / 它里面的 pages → 就放这里，算那个项目', pickedDest(hbx, des).dest === hbx && !pickedDest(hbx, des).why && pickedDest(path.join(hbx, 'pages'), des).dest === path.join(hbx, 'pages') && projectFor(path.join(hbx, 'pages', 'index')).dir === hbx && projectFor(path.join(wx, 'miniprogram')).dir === wx)
+  check('放哪：会话目录是 HBuilderX 项目 → 放会话目录', defaultDest(des, hbx, detectProject(hbx)) === hbx)
+  check('页面路径：index / home → pages/index/index，别的 pages/名字/名字；Taro 是 index', pagePathOf('home.html') === 'pages/index/index' && pagePathOf('My Cart.html') === 'pages/my-cart/my-cart' && pagePathOf('menu.html', 'taro') === 'pages/menu/index')
+}
 check('路由：index / home → /，别的 /名字', routeOf('index.html') === '/' && routeOf('Home.html') === '/' && routeOf('Order Detail.html') === '/order-detail' && routeOf('cart.htm') === '/cart')
 {
   const parts = sharedParts(new Map([
@@ -239,6 +274,26 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   check('交接说明：小程序设计讲清 rpx 换算、状态栏和胶囊不用做、tabBar 写进 app.json', mp.includes('## 小程序要点') && mp.includes('1px = 2rpx') && mp.includes('wx.getMenuButtonBoundingClientRect()') && mp.includes('`tabBar`'), mp)
   const dk = handoffMd({ root: design, rows, kind: 'desktop', size: [1280, 800], framework: 'react', dest, project: null, system: '', htmlByKey })
   check('交接说明：桌面软件讲清 Electron / Tauri、窗口按钮系统画、拖动区；网页和小程序没有这段', dk.includes('## 桌面软件要点') && dk.includes('hiddenInset') && dk.includes('-webkit-app-region: drag') && dk.includes('138×32') && !md.includes('桌面软件要点') && !mp.includes('桌面软件要点'))
+  // 小程序的写法（issue #4）
+  const mini = (framework, project, d = dest) => handoffMd({ root: design, rows, kind: 'miniprogram', size: [375, 812], framework, dest: d, project, system: '', htmlByKey })
+  check('交接说明：小程序设计选了 React（网页）→ 照网页做，要真小程序就换 uniapp / weapp 重出', mp.includes('做成网页（H5）的写法') && mp.includes('framework: uniapp') && !mp.includes('## 做成 uni-app'), mp)
+  const hb = { dir: '/x/wallet', pkg: false, name: 'wallet', framework: 'uniapp', label: 'uni-app（HBuilderX，Vue 3）', hbx: true, pagesAt: '', empty: false }
+  const uHb = mini('same', hb, '/x/wallet')
+  check('交接说明：跟 HBuilderX 项目一样 → 加页面登记进 pages.json、uni.* 的 API、page 上的变量、HBuilderX 里运行；不跑脚手架、不写包管理', uHb.includes('## 做成 uni-app') && uHb.includes('| 首页 | home.html | `pages/index/index` |') && uHb.includes('| 菜单 | menu.html | `pages/menu/menu` |') && uHb.includes('登记进 `pages.json`') && uHb.includes('uni.getMenuButtonBoundingClientRect()') && uHb.includes('`page { --color-primary') && uHb.includes('运行 → 运行到浏览器') && uHb.includes('没有 package.json') && !uHb.includes('degit') && !uHb.includes('包管理') && !uHb.includes('不是 Node 项目') && !/没认出前端框架/.test(uHb) && uHb.includes('## 屏幕和页面'), uHb)
+  const uNew = mini('uniapp', detectProject(path.join(tmp, 'nope-uni')), path.join(tmp, 'wallet-app'))
+  check('交接说明：新建 uni-app → degit 模板（附 gitee 地址）、页面在 src/pages、网页版 npm run dev:h5 拿来比、mp-weixin 出小程序', uNew.includes('npx degit dcloudio/uni-preset-vue#vite-ts wallet-app') && uNew.includes('gitee.com/dcloud/uni-preset-vue') && uNew.includes('`src/pages.json`') && uNew.includes('`src/pages/<名字>/<名字>.vue`') && uNew.includes('npm run dev:h5') && uNew.includes('#/pages/index/index') && uNew.includes('dist/dev/mp-weixin') && uNew.includes('rpx') && uNew.includes('2MB'), uNew)
+  const cliP = { dir: '/x/w', pkg: true, name: 'w', framework: 'uniapp', label: 'uni-app（Vue 3）', pagesAt: 'src/', ts: true, pm: 'pnpm', empty: false }
+  const uCli = mini('same', cliP, '/x/w')
+  check('交接说明：跟命令行 uni-app 项目一样 → 页面放 src/pages、登记 src/pages.json，包管理照项目，不新建', uCli.includes('放进 `src/pages/`，登记进 `src/pages.json`') && uCli.includes('包管理 pnpm') && !uCli.includes('degit') && uCli.includes('`src/static/`'), uCli)
+  const wNew = mini('weapp', null, path.join(tmp, 'wallet-wx'))
+  check('交接说明：新建原生小程序 → 手搭骨架（touristappid）、WXML / wx:for / setData、WXSS 别用 * 和 :hover、compare_design 比不了让用户在开发者工具看', wNew.includes('## 做成原生小程序') && wNew.includes('touristappid') && wNew.includes('wx:for') && wNew.includes('hover-class') && wNew.includes('`compare_design` 比不了') && wNew.includes('微信开发者工具') && !wNew.includes('npx') && !wNew.includes('npm run'), wNew)
+  const wHas = mini('same', { dir: '/x/wx', pkg: false, name: 'wx', framework: 'weapp', label: '微信原生小程序', pagesAt: 'miniprogram/', empty: false }, '/x/wx')
+  check('交接说明：跟原生小程序项目一样 → 页面放 miniprogram/pages、登记 miniprogram/app.json，不搭骨架', wHas.includes('`miniprogram/pages/<名字>/`') && wHas.includes('登记进 `miniprogram/app.json`') && !wHas.includes('touristappid'), wHas)
+  const wBe = mini('uniapp', { dir: '/x/api', pkg: true, name: 'api', framework: '', label: '', pm: 'npm', empty: false }, '/x/api')
+  check('交接说明：后端项目里做小程序前端（issue #4 的情况）→ 先看清结构，另建子目录用 uni-app 搭', /没认出前端框架/.test(wBe) && wBe.includes('npx degit dcloudio/uni-preset-vue#vite-ts web') && wBe.includes('## 做成 uni-app'), wBe)
+  const tr = mini('same', { dir: '/x/t', pkg: true, name: 't', framework: 'taro', label: 'Taro', pm: 'npm', empty: false }, '/x/t')
+  check('交接说明：跟 Taro 项目一样 → View / Text、designWidth、Taro.* 的 API、页面路径 pages/名字/index', tr.includes('## 做成 Taro') && tr.includes('designWidth') && tr.includes('Taro.getMenuButtonBoundingClientRect()') && tr.includes('`pages/menu/index`') && tr.includes('npm run dev:h5'), tr)
+  check('交接说明：网页设计不多小程序那几节', !md.includes('小程序') && !same.includes('## 做成'))
   const t2 = path.join(tmp, 'empty-tokens')
   fs.mkdirSync(t2)
   fs.writeFileSync(path.join(t2, 'tokens.css'), '.x { color: red }')

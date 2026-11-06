@@ -17,7 +17,7 @@ node test/test-doc.mjs     # PDF and PowerPoint export
 node test/test-look.mjs    # check_design / look_design (the real-browser part needs Chrome or Edge)
 node test/test-system.mjs  # brand design systems (the real-browser part needs Chrome or Edge)
 node test/test-tweaks.mjs  # tweaks: tweaks.json, write-back (every top-level copy of a variable), wiring check, live page
-node test/test-handoff.mjs # build as code: handoff note and screenshots, default destination, symlink guards, lossless pixel compare (inner scroll areas, data-theme dark, redirects off localhost blocked)
+node test/test-handoff.mjs # build as code: project detection (incl. uni-app from CLI or HBuilderX, Taro, native WeChat), handoff note (mini program rules per target) and screenshots, default destination, symlink guards, lossless pixel compare (inner scroll areas, data-theme dark, redirects off localhost blocked)
 node e2e/check-page.mjs    # design check in headless Chrome
 node e2e/e2e-studio.mjs    # end to end: a throwaway DSH from npm, a fake model and headless Chrome
 ```
