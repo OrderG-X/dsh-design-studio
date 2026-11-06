@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": {
+    "zh": "小账本",
+    "en": "Pocket Ledger"
+  },
+  "description": {
+    "zh": "冷灰蓝、信息密的个人记账桌面软件：总览看本月收支、分类和预算，流水表格配右侧详情",
+    "en": "A dense, cool gray-blue personal finance desktop app: a monthly overview with categories and budgets, and an entries table with a detail panel"
+  },
+  "kind": "desktop",
+  "screens": [
+    {
+      "file": "overview.html",
+      "title": {
+        "zh": "总览",
+        "en": "Overview"
+      }
+    },
+    {
+      "file": "entries.html",
+      "title": {
+        "zh": "流水",
+        "en": "Entries"
+      }
+    }
+  ],
+  "style": "tech",
+  "categories": [
+    "finance"
+  ],
+  "tags": [
+    "dashboard",
+    "chart",
+    "data-dense",
+    "list",
+    "detail",
+    "report"
+  ],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": {
+    "login": "orderg-x",
+    "id": 271418316
+  },
+  "ai": {
+    "generated": true,
+    "tool": "dsh-design-studio@0.11.0"
+  }
+}

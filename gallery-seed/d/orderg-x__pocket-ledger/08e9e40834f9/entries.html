@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="desktop">
+<title>流水 · 小账本</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+.filters { height: 44px; flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4) 0 var(--space-5); border-bottom: 1px solid var(--line); background: var(--surface); }
+.seg { display: inline-flex; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.seg span { height: 22px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: var(--radius-xs); color: var(--muted); white-space: nowrap; }
+.seg .on { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: var(--shadow); }
+.chip { height: 28px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px 0 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); white-space: nowrap; flex: none; }
+.chip:hover { background: var(--hover); }
+.chip .k { color: var(--muted); }
+.chip svg { width: 14px; height: 14px; color: var(--muted); }
+.chip.set { border-color: rgba(36, 87, 245, .35); background: var(--primary-soft); }
+.totals { margin-left: auto; display: flex; gap: var(--space-4); white-space: nowrap; }
+.totals b { font-weight: 600; }
+
+.split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.table { min-width: 0; overflow: auto; background: var(--surface); }
+.th, .tr { display: grid; grid-template-columns: 16px 52px 76px minmax(0, 1fr) 56px 104px; align-items: center; gap: var(--space-3); padding: 0 var(--space-4) 0 var(--space-5); }
+.th { position: sticky; top: 0; z-index: 1; height: 32px; background: var(--bg); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--fs-sm); font-weight: 500; }
+.th .s { display: inline-flex; align-items: center; gap: 2px; color: var(--text); }
+.th .s svg { width: 12px; height: 12px; }
+.th .r { text-align: right; justify-self: end; }
+.g { display: flex; align-items: center; height: 32px; padding: 0 var(--space-4) 0 var(--space-5); background: var(--bg); border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+.g .gsum { margin-left: auto; display: flex; gap: var(--space-3); color: var(--muted); font-weight: 400; font-size: var(--fs-sm); }
+.tr { position: relative; height: 40px; border-bottom: 1px solid var(--line); transition: background .15s var(--ease); }
+.tr:hover { background: var(--hover); }
+.tr.sel { background: var(--primary-soft); }
+.tr.sel::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--primary); }
+.chk { width: 14px; height: 14px; border: 1.5px solid #A3AFC0; border-radius: 4px; background: var(--surface); }
+.chk { display: grid; place-items: center; }
+.chk.on { background: var(--primary); border-color: var(--primary); color: var(--on); }
+.chk.on svg { width: 11px; height: 11px; stroke-width: 3; }
+.tr .cat { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tr .note { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.tr .note .tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr .acc { white-space: nowrap; color: var(--muted); }
+.tr .amt { text-align: right; font-weight: 600; }
+
+.detail { border-left: 1px solid var(--line); background: var(--surface); overflow: auto; display: flex; flex-direction: column; }
+.d-h { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 var(--space-2) 0 var(--space-4); border-bottom: 1px solid var(--line); }
+.d-h .tag { margin-right: auto; }
+.d-top { padding: var(--space-4) var(--space-4) var(--space-3); }
+.d-top .amt { font-size: var(--fs-xl); font-weight: 600; line-height: 1.15; letter-spacing: -.01em; }
+.d-top h2 { margin: var(--space-1) 0 0; font-size: var(--fs-lg); font-weight: 600; }
+.fields { margin: 0; padding: 0 var(--space-4); }
+.fields div { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--space-3); align-items: center; min-height: 32px; border-top: 1px solid var(--line); }
+.fields dt { color: var(--muted); }
+.fields dd { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.split-box { margin: var(--space-3) var(--space-4) 0; padding: var(--space-3); border-radius: var(--radius); background: var(--bg); display: flex; flex-direction: column; gap: var(--space-2); }
+.split-box .row { display: flex; align-items: center; gap: var(--space-2); }
+.split-box .row .num { margin-left: auto; }
+.ava { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--on); flex: none; }
+.receipt { margin: var(--space-3) var(--space-4) 0; display: flex; gap: var(--space-3); align-items: center; padding: var(--space-2); border: 1px dashed #C5CEDB; border-radius: var(--radius); }
+.receipt svg.pic { width: 44px; height: 56px; flex: none; }
+.receipt .t { display: flex; flex-direction: column; min-width: 0; }
+.mini { margin: var(--space-3) var(--space-4) 0; display: flex; flex-direction: column; gap: 6px; }
+.mini .row { display: flex; align-items: baseline; gap: var(--space-2); }
+.mini .row .num { margin-left: auto; }
+.bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 999px; }
+.d-foot { margin-top: auto; display: flex; gap: var(--space-2); padding: var(--space-4); }
+.d-foot .btn.danger { margin-left: auto; }
+@media (max-width: 1200px) {
+  .totals { display: none; }
+  .split { grid-template-columns: minmax(0, 1fr) 280px; }
+  .tr .note .tag { display: none; }
+  .d-foot kbd { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="win">
+  <aside class="side" aria-label="侧栏">
+    <div class="brand"><span class="logo"><svg class="i" aria-hidden="true"><use href="icons.svg#book"></use></svg></span><b>小账本</b><span class="book">日常<svg class="i" style="width:12px;height:12px" aria-hidden="true"><use href="icons.svg#down"></use></svg></span></div>
+    <nav class="nav" aria-label="主导航">
+      <a href="overview.html" class=""><svg class="i" aria-hidden="true"><use href="icons.svg#overview"></use></svg>总览</a>
+      <a href="entries.html" class="on"><svg class="i" aria-hidden="true"><use href="icons.svg#list"></use></svg>流水<span class="count num">86</span></a>
+      <span class="item"><svg class="i" aria-hidden="true"><use href="icons.svg#budget"></use></svg>预算<span class="flag"><i class="dot" style="background:var(--danger);width:6px;height:6px"></i>1 项超支</span></span>
+      <span class="item"><svg class="i" aria-hidden="true"><use href="icons.svg#report"></use></svg>报表</span>
+    </nav>
+    <h3>账户</h3>
+    <div class="acct"><svg class="i" aria-hidden="true"><use href="icons.svg#cash"></use></svg>现金<span class="num">¥1,286.40</span></div>
+    <div class="acct"><svg class="i" aria-hidden="true"><use href="icons.svg#save"></use></svg>储蓄<span class="num">¥48,200.00</span></div>
+    <div class="acct"><svg class="i" aria-hidden="true"><use href="icons.svg#credit"></use></svg>信用<span class="num">−¥3,412.80</span></div>
+    <div class="net"><span>净资产</span><b class="num">¥46,073.60</b></div>
+    <h3>常用分类</h3>
+    <div class="nav">
+      <span class="item"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span>
+      <span class="item"><i class="dot" style="background:var(--cat-shopping)"></i>购物</span>
+      <span class="item"><i class="dot" style="background:var(--cat-transit)"></i>交通</span>
+      <span class="item"><i class="dot" style="background:var(--cat-fun)"></i>娱乐</span>
+    </div>
+    <div class="side-foot"><i class="ok"></i>本地已保存 · 刚刚<span class="gear" title="设置"><svg class="i" aria-hidden="true"><use href="icons.svg#gear"></use></svg></span></div>
+  </aside>
+  <div class="main">
+    <header class="toolbar">
+      <h1>流水</h1>
+      <span class="sub">10 月 · 86 笔</span>
+      <div class="spacer"></div>
+      <div class="search"><svg class="i" aria-hidden="true"><use href="icons.svg#search"></use></svg><span>搜索备注、分类、标签</span><kbd>⌘F</kbd></div>
+      <button class="ib" aria-label="导出"><svg class="i" aria-hidden="true"><use href="icons.svg#copy"></use></svg></button>
+      <button class="btn primary"><svg class="i" aria-hidden="true"><use href="icons.svg#plus"></use></svg>记一笔<kbd>⌘N</kbd></button>
+    </header>
+    <div class="filters">
+      <span class="seg"><span class="on">全部</span><span>支出</span><span>收入</span></span>
+      <span class="chip"><svg class="i" aria-hidden="true"><use href="icons.svg#calendar"></use></svg><span class="k">日期</span>10月1日 – 31日<svg class="i" aria-hidden="true"><use href="icons.svg#down"></use></svg></span>
+      <span class="chip"><span class="k">分类</span>全部<svg class="i" aria-hidden="true"><use href="icons.svg#down"></use></svg></span>
+      <span class="chip"><span class="k">账户</span>全部<svg class="i" aria-hidden="true"><use href="icons.svg#down"></use></svg></span>
+      <span class="chip"><span class="k">标签</span>全部<svg class="i" aria-hidden="true"><use href="icons.svg#down"></use></svg></span>
+      <div class="totals"><span class="muted">支出 <b class="num" style="color:var(--text)">¥9,327.50</b></span><span class="muted">收入 <b class="num in">¥18,640.00</b></span></div>
+    </div>
+    <div class="split">
+      <div class="table" role="table" aria-label="10 月流水">
+        <div class="th" role="row"><span class="chk" aria-hidden="true"></span><span class="s">日期<svg class="i" aria-hidden="true"><use href="icons.svg#dn"></use></svg></span><span>分类</span><span>备注</span><span>账户</span><span class="r">金额</span></div>
+        <div class="g"><span>10月28日<span class="muted"> 周三</span></span><span class="gsum num"><span>支出 ¥64.00</span></span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">18:52</span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note"><span class="tx">晚饭 · 楼下沙县</span></span><span class="acc">信用</span><span class="num amt">−¥28.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">12:36</span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note"><span class="tx">午饭 · 牛肉粉</span></span><span class="acc">信用</span><span class="num amt">−¥32.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">08:15</span><span class="cat"><i class="dot" style="background:var(--cat-transit)"></i>交通</span><span class="note"><span class="tx">地铁</span></span><span class="acc">储蓄</span><span class="num amt">−¥4.00</span></div><div class="g"><span>10月27日<span class="muted"> 周二</span></span><span class="gsum num"><span class="in">收入 +¥1,200.00</span><span>支出 ¥649.50</span></span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">21:04</span><span class="cat"><i class="dot" style="background:var(--cat-shopping)"></i>购物</span><span class="note"><span class="tx">冬季被子</span><span class="tag">换季</span></span><span class="acc">信用</span><span class="num amt">−¥459.00</span></div><div class="tr sel"><span class="chk on" aria-hidden="true"><svg class="i" aria-hidden="true"><use href="icons.svg#check"></use></svg></span><span class="muted num">19:30</span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note"><span class="tx">和小林吃火锅</span><span class="tag">朋友</span><span class="tag">AA</span></span><span class="acc">信用</span><span class="num amt">−¥186.50</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">15:10</span><span class="cat"><i class="dot" style="background:var(--accent)"></i>收入</span><span class="note"><span class="tx">稿费 · 十月专栏</span></span><span class="acc">储蓄</span><span class="num amt in">+¥1,200.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">08:20</span><span class="cat"><i class="dot" style="background:var(--cat-transit)"></i>交通</span><span class="note"><span class="tx">地铁</span></span><span class="acc">储蓄</span><span class="num amt">−¥4.00</span></div><div class="g"><span>10月26日<span class="muted"> 周一</span></span><span class="gsum num"><span>支出 ¥167.00</span></span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">22:40</span><span class="cat"><i class="dot" style="background:var(--cat-fun)"></i>娱乐</span><span class="note"><span class="tx">电影《雾港》两张</span><span class="tag">朋友</span></span><span class="acc">信用</span><span class="num amt">−¥96.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">12:05</span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note"><span class="tx">午饭 · 便当</span></span><span class="acc">现金</span><span class="num amt">−¥26.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">09:30</span><span class="cat"><i class="dot" style="background:var(--cat-other)"></i>其他</span><span class="note"><span class="tx">理发</span></span><span class="acc">现金</span><span class="num amt">−¥45.00</span></div><div class="g"><span>10月25日<span class="muted"> 周日</span></span><span class="gsum num"><span>支出 ¥268.90</span></span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">16:20</span><span class="cat"><i class="dot" style="background:var(--cat-shopping)"></i>购物</span><span class="note"><span class="tx">超市 · 日用品</span></span><span class="acc">储蓄</span><span class="num amt">−¥138.60</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">11:40</span><span class="cat"><i class="dot" style="background:var(--cat-transit)"></i>交通</span><span class="note"><span class="tx">打车去火车站</span></span><span class="acc">信用</span><span class="num amt">−¥72.30</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">10:05</span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note"><span class="tx">早午餐</span></span><span class="acc">信用</span><span class="num amt">−¥58.00</span></div><div class="g"><span>10月24日<span class="muted"> 周六</span></span><span class="gsum num"><span>支出 ¥142.00</span></span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">20:15</span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note"><span class="tx">外卖 · 麻辣烫</span></span><span class="acc">信用</span><span class="num amt">−¥42.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">15:30</span><span class="cat"><i class="dot" style="background:var(--cat-fun)"></i>娱乐</span><span class="note"><span class="tx">桌游店</span></span><span class="acc">现金</span><span class="num amt">−¥88.00</span></div><div class="tr"><span class="chk" aria-hidden="true"></span><span class="muted num">09:10</span><span class="cat"><i class="dot" style="background:var(--cat-other)"></i>其他</span><span class="note"><span class="tx">快递寄书</span></span><span class="acc">现金</span><span class="num amt">−¥12.00</span></div>
+      </div>
+      <aside class="detail" aria-label="这一笔的详情">
+        <div class="d-h"><span class="tag"><i class="dot" style="background:var(--cat-food)"></i>餐饮 › 聚餐</span><button class="ib" aria-label="编辑"><svg class="i" aria-hidden="true"><use href="icons.svg#edit"></use></svg></button><button class="ib" aria-label="更多"><svg class="i" aria-hidden="true"><use href="icons.svg#more"></use></svg></button></div>
+        <div class="d-top">
+          <div class="amt num">−¥186.50</div>
+          <h2>和小林吃火锅</h2>
+        </div>
+        <dl class="fields">
+          <div><dt>时间</dt><dd class="num">2026-10-27 周二 19:30</dd></div>
+          <div><dt>账户</dt><dd><svg class="i" style="color:var(--muted)" aria-hidden="true"><use href="icons.svg#credit"></use></svg>信用</dd></div>
+          <div><dt>地点</dt><dd>老街火锅 · 二楼</dd></div>
+          <div><dt>标签</dt><dd><span class="tag">朋友</span><span class="tag">AA</span></dd></div>
+        </dl>
+        <div class="split-box">
+          <div class="row"><svg class="i" style="color:var(--muted)" aria-hidden="true"><use href="icons.svg#people"></use></svg><b style="font-weight:600">AA 两人</b><span class="muted num">每人 ¥93.25</span></div>
+          <div class="row"><span class="ava" style="background:var(--primary)">我</span>我付了<span class="num">¥186.50</span></div>
+          <div class="row"><span class="ava" style="background:var(--accent-ink)">林</span>小林应付<span class="num">¥93.25</span><span class="tag warn">未收</span></div>
+        </div>
+        <div class="receipt">
+          <svg class="pic" viewBox="0 0 44 56" aria-label="小票缩略图"><rect x=".5" y=".5" width="43" height="55" rx="4" fill="#F5F7FB" stroke="#E2E8F0"/><path d="M10 12h24M10 19h16M10 24h20M10 29h12M10 38h24" stroke="#A3AFC0" stroke-width="2" stroke-linecap="round"/><path d="M26 45h8" stroke="#55657D" stroke-width="2.5" stroke-linecap="round"/></svg>
+          <div class="t"><span>小票.jpg</span><span class="muted">拍于 19:58 · 已识别 6 项</span></div>
+        </div>
+        <div class="mini">
+          <div class="row"><span>本月餐饮</span><span class="num">¥2,148.60<span class="muted"> / 2,500</span></span></div>
+          <div class="bar"><i style="width:85.9%;background:var(--cat-food)"></i></div>
+          <span class="muted">还剩 ¥351.40，比 9 月同期少 6%</span>
+        </div>
+        <div class="d-foot">
+          <button class="btn"><svg class="i" aria-hidden="true"><use href="icons.svg#edit"></use></svg>编辑<kbd>⌘E</kbd></button>
+          <button class="btn"><svg class="i" aria-hidden="true"><use href="icons.svg#copy"></use></svg>再记一笔</button>
+          <button class="btn danger" aria-label="删除"><svg class="i" aria-hidden="true"><use href="icons.svg#trash"></use></svg></button>
+        </div>
+      </aside>
+    </div>
+    <footer class="statusbar"><span>10 月共 86 笔</span><span>已选 1 笔 · −¥186.50</span><span>按日期倒序</span><span class="ok"><i></i>本地已保存</span></footer>
+  </div>
+</div>
+</body>
+</html>

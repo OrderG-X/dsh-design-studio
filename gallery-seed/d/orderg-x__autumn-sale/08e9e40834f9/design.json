@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": { "zh": "秋日上新", "en": "Autumn Drop" },
+  "description": {
+    "zh": "服装店的秋季上新促销邮件：红橙头图、金黄锯齿优惠券、倒计时、四件商品网格和通栏主按钮，表格布局、内联样式",
+    "en": "An autumn new-arrivals sale email for a clothing shop: red-orange hero, gold notched coupons, countdown, four-product grid and a full-width button, built with tables and inline styles"
+  },
+  "kind": "email",
+  "screens": [
+    { "file": "email.html", "title": { "zh": "上新邮件", "en": "Sale email" } }
+  ],
+  "style": "sale",
+  "categories": ["retail"],
+  "tags": ["sale", "newsletter"],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": { "login": "orderg-x", "id": 271418316 },
+  "ai": { "generated": true, "tool": "dsh-design-studio@0.11.0" }
+}

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="miniprogram">
+<title>订单 · 巷口面馆</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="order-page">
+<header class="mp-top paper">
+  <div class="mp-status"><span>9:41</span><span class="mp-sys"><svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 2.2c2.5 0 4.8 1 6.5 2.6l1.2-1.3A11 11 0 0 0 8 .4 11 11 0 0 0 .3 3.5l1.2 1.3A9.3 9.3 0 0 1 8 2.2z"/><path d="M8 5.8c1.5 0 2.9.6 3.9 1.5l1.2-1.3A7.4 7.4 0 0 0 8 4a7.4 7.4 0 0 0-5.1 2l1.2 1.3c1-.9 2.4-1.5 3.9-1.5z"/><path d="M8 9.3c.6 0 1.2.2 1.6.6L8 11.6 6.4 9.9c.4-.4 1-.6 1.6-.6z"/></svg><svg width="27" height="13" viewBox="0 0 27 13" aria-hidden="true"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="18" height="9" rx="2"/><path d="M25 4.5v4c.8-.3 1.5-1.1 1.5-2s-.7-1.7-1.5-2z" opacity=".5"/></svg></span></div>
+  <div class="mp-nav"><h1>订单</h1></div>
+</header>
+<main class="mp-page">
+  <div class="tabs" role="tablist" aria-label="订单状态">
+    <button class="tab-btn on" role="tab" aria-selected="true">进行中<b>1</b></button>
+    <button class="tab-btn" role="tab" aria-selected="false">已完成</button>
+  </div>
+
+  <section class="ticket" aria-label="取餐信息">
+    <div class="ticket-top">
+      <p class="ticket-label">取餐号</p>
+      <span class="state"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21c3.9 0 6.5-2.6 6.5-6.2 0-3.3-2.3-5.6-3.9-7.8-.4 2-1.4 3.2-2.6 3.8.2-3-1.2-5.6-3.8-7.3.2 3.1-1.6 5-3 7A7.3 7.3 0 0 0 5.5 15c0 3.5 2.6 6 6.5 6z"/></svg>面已下锅</span>
+    </div>
+    <p class="pickup serif">A086</p>
+    <p class="ticket-sub">堂食 · 听到叫号，到窗口取面</p>
+    <svg class="big-bowl" viewBox="0 0 120 112" aria-hidden="true">
+<path d="M40 30c-4-5 3.5-8-.5-13.5M52 27c-4-5 3.5-8-.5-13.5" fill="none" stroke="#C2A48B" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M88 4L64 52M100 9L71 54" stroke="#8A5A3A" stroke-width="3.4" stroke-linecap="round"/>
+<path d="M68 26c-3 7 3 11 0 18s3 10 0 14M73 28c-3 7 3 11 0 18s3 10 0 13M78 30c-2.6 6.6 2.6 10 0 16.4" fill="none" stroke="#E9C474" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M14 58c1.4 23 19 37 46 37s44.6-14 46-37" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M24 76q4.2-3.8 8.4 0t8.4 0 8.4 0 8.4 0 8.4 0 8.4 0 8.4 0 8.4 0" fill="none" stroke="#A9542A" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M45 95c2 4.4 28 4.4 30 0" fill="none" stroke="#2B1D14" stroke-width="2.4" stroke-linecap="round"/>
+<ellipse cx="60" cy="58" rx="46" ry="14" fill="#9C4A26" stroke="#2B1D14" stroke-width="2.4"/>
+<path d="M24 60c4-3 8 2.6 12 0s8 2.6 12 0 8 2.6 12 0 8 2.6 12 0 8 2.6 12 0" fill="none" stroke="#F2D795" stroke-width="2.6" stroke-linecap="round"/>
+<path transform="translate(36 54) rotate(-8)" d="M-8 0c4.6-3.4 12-3 15.4.4C5.4 4.2-3.2 5-8 0z" fill="#6E3218" stroke="#2B1D14" stroke-width="1.4"/>
+<path transform="translate(50 62) rotate(5)" d="M-8 0c4.6-3.4 12-3 15.4.4C5.4 4.2-3.2 5-8 0z" fill="#6E3218" stroke="#2B1D14" stroke-width="1.4"/>
+<path d="M78 52.5c2.6-4.6 11-5.2 15-1 0 0-5 6.8-15 1z" fill="#FFFDF7" stroke="#2B1D14" stroke-width="1.4"/><circle cx="86" cy="51.8" r="3" fill="#F2B33D"/>
+<circle cx="62" cy="55" r="2" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".9"/><circle cx="70" cy="63" r="2" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".9"/><circle cx="28" cy="61" r="2" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".9"/><circle cx="88" cy="62" r="2" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".9"/>
+</svg>
+    <div class="eta">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      <p>预计 <b class="num">10:54</b> 可取<span>还要约 8 分钟 · 前面 2 单</span></p>
+    </div>
+    <ol class="steps" aria-label="制作进度">
+      <li class="done"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9"/></svg></i><b>已下单</b><span class="num">10:42</span></li>
+      <li class="done"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9"/></svg></i><b>备料</b><span class="num">10:44</span></li>
+      <li class="now"><i></i><b>煮面中</b><span>约 6 分钟</span></li>
+      <li><i></i><b>请取餐</b><span>叫号</span></li>
+    </ol>
+  </section>
+
+  <section class="card detail">
+    <header class="card-head"><h2>订单明细</h2><span class="shopname"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5l1.5-5h13l1.5 5"/><path d="M4 9.5c0 1.8 1.3 2.8 2.7 2.8S9.3 11.3 9.3 9.5c0 1.8 1.3 2.8 2.7 2.8s2.7-1 2.7-2.8c0 1.8 1.3 2.8 2.6 2.8S20 11.3 20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>巷口面馆 · 老街店</span></header>
+    <div class="row"><div><p>红烧牛肉面</p><small>中碗 · 微辣 · 加煎蛋</small></div><span class="x">×1</span><span class="num">¥29</span></div>
+    <div class="row"><div><p>葱油拌面</p><small>标准份</small></div><span class="x">×2</span><span class="num">¥28</span></div>
+    <div class="row"><div><p>凉拌黄瓜</p><small>蒜香 · 微辣</small></div><span class="x">×1</span><span class="num">¥8</span></div>
+    <hr class="dash">
+    <div class="row sub"><p>满 60 减 5</p><span class="num minus">−¥5</span></div>
+    <div class="row paid"><p>实付</p><span class="price"><small>¥</small>60</span></div>
+  </section>
+
+  <section class="card info">
+    <p><span>订单编号</span><span class="num">XK-1107-0386</span></p>
+    <p><span>下单时间</span><span class="num">11月7日 10:42</span></p>
+    <p><span>用餐方式</span><span>堂食</span></p>
+    <p><span>口味备注</span><span>不要香菜，汤多一点，面煮软一点</span></p>
+  </section>
+
+  <div class="after">
+    <a class="btn-ghost" href="menu.html">再来一单</a>
+    <button class="btn-ghost">开发票</button>
+  </div>
+</main>
+<nav class="mp-tabbar" aria-label="主导航">
+  <a href="menu.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5h17a8.5 8.5 0 0 1-17 0z"/><path d="M9 20.5h6"/><path d="M12.5 3.5l-2.5 8M18.5 4l-4.5 7.5"/></svg><span>点单</span></a>
+  <a class="on" href="order.html" aria-current="page"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2.4-1.5-2.4 1.5-2.4-1.5-2.4 1.5L6 20.5z"/><path d="M9 8.5h6M9 12.5h6M9 16h3"/></svg><span>订单</span></a>
+  <span class="tab"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1.3-3.8 4.1-5.6 7.5-5.6s6.2 1.8 7.5 5.6"/></svg><span>我的</span></span>
+</nav>
+
+<style>
+.order-page .mp-page { padding-top: 8px; padding-bottom: 116px; }
+.tabs { display: flex; gap: 24px; margin-bottom: 8px; }
+.tab-btn { position: relative; height: 44px; display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-body); color: var(--color-muted); }
+.tab-btn b { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--color-primary); color: var(--color-on-primary); font-size: var(--text-xs); line-height: 16px; text-align: center; }
+.tab-btn.on { color: var(--color-text); font-weight: 600; }
+.tab-btn.on::after { content: ""; position: absolute; left: 2px; right: 22px; bottom: 6px; height: 4px; border-radius: 2px; background: var(--color-primary); transform: rotate(-1.5deg); }
+
+.ticket { position: relative; padding: 18px 20px 16px; border-radius: var(--radius-hand); background: var(--color-surface); box-shadow: var(--shadow); overflow: hidden; }
+.ticket::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 7px; background: radial-gradient(circle at 9px 0, var(--color-bg) 5px, transparent 5.6px) 0 0 / 18px 7px repeat-x; }
+.ticket-top { display: flex; align-items: center; gap: 8px; }
+.ticket-label { font-size: var(--text-md); color: var(--color-muted); }
+.state { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 6px; border-radius: var(--radius-full); background: var(--color-primary-soft); color: var(--color-primary-deep); font-size: var(--text-sm); font-weight: 600; }
+.pickup { margin-top: 6px; font-size: var(--text-hero); line-height: 1.12; font-weight: 700; letter-spacing: .02em; color: var(--color-text); }
+.ticket-sub { margin-top: 4px; font-size: var(--text-md); color: var(--color-muted); }
+.big-bowl { position: absolute; right: 10px; top: 22px; width: 124px; height: 116px; }
+.eta { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 12px; border-radius: 12px; background: var(--color-bg); }
+.eta .ico { color: var(--color-primary); }
+.eta p { font-size: var(--text-md); line-height: 1.35; }
+.eta b { font-size: var(--text-xl); color: var(--color-primary); }
+.eta span { display: block; font-size: var(--text-sm); color: var(--color-muted); }
+
+.steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 16px; }
+.steps::before { content: ""; position: absolute; left: 12.5%; right: 12.5%; top: 13px; border-top: 2px dashed var(--color-line); }
+.steps::after { content: ""; position: absolute; left: 12.5%; width: 50%; top: 13px; border-top: 2px solid var(--color-accent); }
+.steps li { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.steps i { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--color-surface); border: 2px dashed var(--color-line); margin-bottom: 4px; }
+.steps .ico { width: 16px; height: 16px; stroke-width: 2.6; }
+.steps .done i { background: var(--color-accent); border: 0; color: var(--color-on-primary); }
+.steps .now i { background: var(--color-primary); border: 0; box-shadow: 0 0 0 5px var(--color-primary-soft); }
+.steps .now i::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--color-surface); }
+.steps b { font-size: var(--text-sm); font-weight: 600; }
+.steps span { font-size: var(--text-xs); color: var(--color-muted); }
+.steps .now b { color: var(--color-primary); }
+.steps li:not(.done):not(.now) b { color: var(--color-muted); font-weight: 400; }
+
+.detail { margin-top: 12px; }
+.shopname { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); color: var(--color-muted); }
+.row { display: flex; align-items: center; gap: 12px; padding: 6px 0; font-size: var(--text-md); }
+.row > div, .row > p { flex: 1; min-width: 0; }
+.row > div small { display: block; font-size: var(--text-sm); color: var(--color-muted); line-height: 1.3; }
+.row .x { color: var(--color-muted); }
+.row .num { min-width: 36px; text-align: right; }
+.row .minus { color: var(--color-primary-deep); font-weight: 600; }
+.paid p { font-weight: 600; }
+.paid .price { font-size: var(--text-xl); }
+
+.info p { display: flex; gap: 16px; font-size: var(--text-md); line-height: 1.5; padding: 4px 0; }
+.info p > span:first-child { flex-shrink: 0; width: 56px; color: var(--color-muted); }
+.after { display: flex; justify-content: center; gap: 12px; margin-top: 20px; }
+</style>
+</body>
+</html>

@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": {
+    "zh": "毛孩日记",
+    "en": "Paw Diary"
+  },
+  "description": {
+    "zh": "粉黄糖果色的宠物照护 App：今日待办、健康档案、预约洗护三屏",
+    "en": "A candy-pink pet care app: daily to-dos, health records and grooming booking"
+  },
+  "kind": "app",
+  "screens": [
+    {
+      "file": "home.html",
+      "title": {
+        "zh": "首页",
+        "en": "Home"
+      }
+    },
+    {
+      "file": "health.html",
+      "title": {
+        "zh": "健康",
+        "en": "Health"
+      }
+    },
+    {
+      "file": "booking.html",
+      "title": {
+        "zh": "预约洗护",
+        "en": "Book grooming"
+      }
+    }
+  ],
+  "style": "cute",
+  "categories": [
+    "pets"
+  ],
+  "tags": [
+    "profile",
+    "calendar",
+    "booking",
+    "chart",
+    "illustration"
+  ],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": {
+    "login": "orderg-x",
+    "id": 271418316
+  },
+  "ai": {
+    "generated": true,
+    "tool": "dsh-design-studio@0.11.0"
+  }
+}

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="app">
+<title>健康 · 毛孩日记</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+  .page-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-1); }
+  .page-top h1 { font-size: var(--fs-num); line-height: 1.2; }
+  .pet-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 10px 4px 4px; border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--shadow-sm); font-weight: 700; }
+  .pet-chip .avatar { width: 36px; height: 36px; box-shadow: none; }
+  .pet-chip .ico { width: 18px; height: 18px; color: var(--muted); stroke-width: 2.6; }
+
+  .sum { margin-top: var(--space-5); display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+  .sum div { padding: var(--space-3) var(--space-3) var(--space-3); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .sum .tile { width: 32px; height: 32px; border-radius: 11px; }
+  .sum .tile .ico { width: 18px; height: 18px; }
+  .sum b { display: block; margin-top: var(--space-2); font-size: var(--fs-h3); font-weight: var(--w-head); line-height: 1.3; white-space: nowrap; }
+  .sum b small { font-size: var(--fs-meta); font-weight: 700; color: var(--muted); }
+  .sum .is-soon { background: var(--accent); box-shadow: var(--shadow-accent); }
+  .sum .is-soon .tile { background: var(--surface); color: var(--text); }
+  .sum .is-soon .meta, .sum .is-soon b small { color: var(--text); }
+
+  .chart-card { margin-top: var(--space-5); padding: var(--space-4) var(--space-4) var(--space-4); }
+  .chart-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .chart-top h2 { font-size: var(--fs-h3); }
+  .seg { display: inline-flex; padding: 3px; border-radius: var(--radius-pill); background: var(--bg); }
+  .seg span { min-width: 44px; padding: 4px 10px; border-radius: var(--radius-pill); font-size: var(--fs-micro); font-weight: 700; color: var(--muted); text-align: center; line-height: 18px; }
+  .seg .on { background: var(--primary); color: var(--on); box-shadow: 0 2px 0 var(--pink-deep); }
+  .plot { margin-top: var(--space-3); width: 100%; height: auto; }
+  .plot text { font-family: var(--font-round); font-weight: 700; }
+  .tip { margin-top: var(--space-3); display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--yellow-soft); font-size: var(--fs-meta); font-weight: 600; }
+  .tip .ico { flex: 0 0 auto; width: 18px; height: 18px; color: var(--text); }
+
+  .list { list-style: none; margin: 0; padding: var(--space-2) var(--space-4); }
+  .row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; }
+  .row + .row { border-top: 2px dashed var(--line); }
+  .row .tile { width: 40px; height: 40px; border-radius: 13px; }
+  .row .tile .ico { width: 22px; height: 22px; }
+  .row-txt { flex: 1; min-width: 0; line-height: 1.4; }
+  .row-txt b { display: block; font-weight: 700; }
+  .price { font-weight: var(--w-head); font-variant-numeric: tabular-nums; }
+  .date { flex: 0 0 44px; height: 48px; border-radius: 14px; background: var(--pink-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+  .date b { font-size: var(--fs-h3); font-weight: var(--w-head); }
+  .date span { font-size: var(--fs-micro); color: var(--text); font-weight: 700; }
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="pet-corgi" viewBox="0 0 64 64">
+    <path d="M11 34 13.4 9.6c.3-2.4 3-3.4 4.8-1.8L31 19.5z" fill="#FFC93C"/>
+    <path d="M15.6 27 17 13.8 25.6 20.4z" fill="#FF9EC0"/>
+    <path d="M53 34 50.6 9.6c-.3-2.4-3-3.4-4.8-1.8L33 19.5z" fill="#FFC93C"/>
+    <path d="M48.4 27 47 13.8 38.4 20.4z" fill="#FF9EC0"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="19.5" fill="#FFC93C"/>
+    <path d="M32 21.5c-2.2 6-7.5 10-7.5 18 0 7.4 3.4 12.6 7.5 12.6s7.5-5.2 7.5-12.6c0-8-5.3-12-7.5-18z" fill="#FFFFFF"/>
+    <ellipse cx="32" cy="48" rx="11" ry="7.5" fill="#FFFFFF"/>
+    <circle cx="21.5" cy="36.5" r="3.3" fill="#3A2540"/><circle cx="22.7" cy="35.3" r="1.1" fill="#FFFFFF"/>
+    <circle cx="42.5" cy="36.5" r="3.3" fill="#3A2540"/><circle cx="43.7" cy="35.3" r="1.1" fill="#FFFFFF"/>
+    <ellipse cx="32" cy="43.2" rx="3.6" ry="2.6" fill="#3A2540"/>
+    <path d="M28.4 47.4q3.6 3.2 7.2 0" fill="none" stroke="#3A2540" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M30.2 48.6h3.6v2.2a1.8 1.8 0 0 1-3.6 0z" fill="#FF7AA8"/>
+    <ellipse cx="16.5" cy="44" rx="3.6" ry="2.3" fill="#FF7AA8" opacity=".6"/>
+    <ellipse cx="47.5" cy="44" rx="3.6" ry="2.3" fill="#FF7AA8" opacity=".6"/>
+  </symbol>
+  <symbol id="pet-cat" viewBox="0 0 64 64">
+    <path d="M12 33 13 10.5c.1-2.2 2.6-3.3 4.3-1.9L29 18.5z" fill="#FFB3CC"/>
+    <path d="M16.2 26 16.9 14.6 24 20z" fill="#FF7AA8"/>
+    <path d="M52 33 51 10.5c-.1-2.2-2.6-3.3-4.3-1.9L35 18.5z" fill="#FFB3CC"/>
+    <path d="M47.8 26 47.1 14.6 40 20z" fill="#FF7AA8"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="19" fill="#FFB3CC"/>
+    <path d="M32 21v6M25.5 22l1.6 5M38.5 22l-1.6 5" stroke="#FF7AA8" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M19.5 37.5q3.5-4 7 0M37.5 37.5q3.5-4 7 0" fill="none" stroke="#3A2540" stroke-width="2.3" stroke-linecap="round"/>
+    <ellipse cx="32" cy="46" rx="7.5" ry="5.4" fill="#FFFFFF"/>
+    <path d="M30 42.8h4l-2 2.2z" fill="#FF7AA8" stroke="#FF7AA8" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M29 47.4q1.5 1.7 3 0q1.5 1.7 3 0" fill="none" stroke="#3A2540" stroke-width="1.5" stroke-linecap="round"/>
+    <ellipse cx="16.5" cy="44.5" rx="3.6" ry="2.3" fill="#FFC93C"/>
+    <ellipse cx="47.5" cy="44.5" rx="3.6" ry="2.3" fill="#FFC93C"/>
+    <path d="M9 41.5l5.5 1M9 46.5l5.5-1.2M55 41.5l-5.5 1M55 46.5l-5.5-1.2" stroke="#3A2540" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4.5l8 6.7v7.8a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 19z"/><path d="M10 20.8v-4.6a2 2 0 0 1 4 0v4.6"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.3a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M6 4.5h10.5A1.5 1.5 0 0 1 18 6v13.5H7.5A2.5 2.5 0 0 1 5 17V5.5a1 1 0 0 1 1-1z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18"/><path d="M9.5 8.5h4"/></symbol>
+  <symbol id="i-me" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c1.3-3.6 4-5.4 7-5.4s5.7 1.8 7 5.4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 4.2a5.3 5.3 0 0 0-5.3 5.3v3.2L5 16.3h14l-1.7-3.6V9.5A5.3 5.3 0 0 0 12 4.2z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9"/></symbol>
+  <symbol id="i-bowl" viewBox="0 0 24 24"><path d="M3.5 12.5h17a8.5 7 0 0 1-17 0z"/><circle cx="9" cy="9" r="1.6"/><circle cx="14" cy="8" r="1.6"/><circle cx="12" cy="11" r=".6"/></symbol>
+  <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="7" cy="17" r="2.6"/><path d="M9 15 17.5 6.5"/><path d="M14 5.5h4.5V10"/></symbol>
+  <symbol id="i-pill" viewBox="0 0 24 24"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8.25" width="17" height="7.5" rx="3.75"/><path d="M12 8.25H7.25a3.75 3.75 0 0 0 0 7.5H12z" fill="currentColor"/></g></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M8.5 10a5 5 0 0 1 7 0"/><path d="M12 10.5l1.2-1.8"/></symbol>
+  <symbol id="i-bath" viewBox="0 0 24 24"><path d="M3.5 12h17v1.5a5.5 5.5 0 0 1-5.5 5.5H9a5.5 5.5 0 0 1-5.5-5.5z"/><path d="M6 12V6.5a2 2 0 0 1 3.6-1.2"/><path d="M8 19.5 7 21M16 19.5l1 1.5"/></symbol>
+  <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.6" cy="10.6" rx="2" ry="2.5"/><ellipse cx="9.4" cy="6.6" rx="2" ry="2.6"/><ellipse cx="14.6" cy="6.6" rx="2" ry="2.6"/><ellipse cx="18.4" cy="10.6" rx="2" ry="2.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+  <symbol id="i-syringe" viewBox="0 0 24 24"><g transform="rotate(45 12 12)"><rect x="8.5" y="7" width="7" height="10" rx="1.6"/><path d="M12 17v4.5M9 3.5h6M12 3.5V7M8.5 10.5h3M8.5 13.5h3"/></g></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.8 18.5 6v5.4c0 4.2-2.8 7.4-6.5 8.8-3.7-1.4-6.5-4.6-6.5-8.8V6z"/><path d="M9.2 12l2 2 3.8-3.8"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="7" r="2.6"/><circle cx="6.5" cy="17" r="2.6"/><path d="M8.8 8.4 19 16.5M8.8 15.6 19 7.5"/></symbol>
+  <symbol id="i-steth" viewBox="0 0 24 24"><path d="M6 4.5v5a4 4 0 0 0 8 0v-5"/><path d="M10 13.5v1.5a4.5 4.5 0 0 0 9 0v-2"/><circle cx="19" cy="11" r="2"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13.5 14-14 .5 9-5 14-12 14z"/><path d="M5 19c3-4 6-6.5 9.5-8.5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 20.5s-6-5.6-6-10.5a6 6 0 0 1 12 0c0 4.9-6 10.5-6 10.5z"/><circle cx="12" cy="10" r="2.2"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.5l2.3 4.7 5.2.7-3.8 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1-3.8-3.6 5.2-.7z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M5 19l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L9 17.5z"/></symbol>
+</svg>
+
+<header class="status" aria-hidden="true">
+  <span class="status-time">9:41</span>
+  <span class="status-icons">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="5" y="5.5" width="3" height="6.5" rx=".8"/><rect x="10" y="3" width="3" height="9" rx=".8"/><rect x="15" y="0" width="3" height="12" rx=".8"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4.3a9.5 9.5 0 0 1 13 0"/><path d="M4 7.1a6 6 0 0 1 8 0"/><circle cx="8" cy="10" r="1.3" fill="currentColor" stroke="none"/></svg>
+    <svg width="27" height="12" viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="currentColor" stroke-opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="1.8" fill="currentColor"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z" fill="currentColor" fill-opacity=".4"/></svg>
+  </span>
+</header>
+
+<main class="page">
+  <div class="page-top">
+    <h1 class="head">健康档案</h1>
+    <a class="pet-chip" href="home.html"><span class="avatar pink"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#pet-corgi"/></svg></span>团子<svg class="ico"><use href="#i-down"/></svg></a>
+  </div>
+
+  <section class="sum" aria-label="健康概况">
+    <div><span class="tile"><svg class="ico"><use href="#i-scale"/></svg></span><b>11.6 <small>kg</small></b><span class="meta">体重</span></div>
+    <div><span class="tile"><svg class="ico"><use href="#i-shield"/></svg></span><b>4 / 4 <small>项</small></b><span class="meta">疫苗已打</span></div>
+    <div class="is-soon"><span class="tile"><svg class="ico"><use href="#i-pill"/></svg></span><b>2 <small>天后</small></b><span class="meta">体内驱虫</span></div>
+  </section>
+
+  <section class="card chart-card" aria-label="体重曲线">
+    <div class="chart-top">
+      <h2 class="head">体重曲线</h2>
+      <div class="seg"><span>3 月</span><span class="on">半年</span><span>1 年</span></div>
+    </div>
+    <svg class="plot" viewBox="0 0 300 156" role="img" aria-label="近半年体重从 12.4 kg 降到 11.6 kg">
+      <defs>
+        <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF7AA8" stop-opacity=".2"/><stop offset="1" stop-color="#FF7AA8" stop-opacity="0"/></linearGradient>
+      </defs>
+      <rect x="30" y="47.5" width="266" height="55" rx="10" fill="#FFF3CC"/>
+      <text x="290" y="96" text-anchor="end" font-size="10.4" fill="#7A5E80">理想 11–12 kg</text>
+      <g stroke="#F3D3DD" stroke-width="1.5" stroke-dasharray="3 5" stroke-linecap="round">
+        <path d="M30 20h266M30 47.5h266M30 75h266M30 102.5h266M30 130h266"/>
+      </g>
+      <g font-size="10.4" fill="#7A5E80" text-anchor="end">
+        <text x="22" y="23.5">12.5</text><text x="22" y="51">12</text><text x="22" y="78.5">11.5</text><text x="22" y="106">11</text><text x="22" y="133.5">10.5</text>
+      </g>
+      <path d="M44 25.5 C 60 29, 74 33, 94 36.5 S 128 50, 144 53 S 178 58.5, 194 58.5 S 228 58.5, 244 60 S 268 66, 282 69.5 L282 130 L44 130Z" fill="url(#area)"/>
+      <path d="M44 25.5 C 60 29, 74 33, 94 36.5 S 128 50, 144 53 S 178 58.5, 194 58.5 S 228 58.5, 244 60 S 268 66, 282 69.5" fill="none" stroke="#FF7AA8" stroke-width="4" stroke-linecap="round"/>
+      <g fill="#FFFFFF" stroke="#FF7AA8" stroke-width="3">
+        <circle cx="44" cy="25.5" r="4.5"/><circle cx="94" cy="36.5" r="4.5"/><circle cx="144" cy="53" r="4.5"/><circle cx="194" cy="58.5" r="4.5"/><circle cx="244" cy="60" r="4.5"/>
+      </g>
+      <circle cx="282" cy="69.5" r="7.5" fill="#FFC93C" stroke="#3A2540" stroke-width="3"/>
+      <rect x="236" y="28" width="58" height="24" rx="12" fill="#3A2540"/>
+      <path d="M276 51.5l6 6 6-6z" fill="#3A2540"/>
+      <text x="265" y="44" text-anchor="middle" font-size="10.4" fill="#FFFFFF">11.6 kg</text>
+      <g font-size="10.4" fill="#7A5E80" text-anchor="middle">
+        <text x="44" y="152">6 月</text><text x="94" y="152">7 月</text><text x="144" y="152">8 月</text><text x="194" y="152">9 月</text><text x="244" y="152">10 月</text><text x="282" y="152">11 月</text>
+      </g>
+    </svg>
+    <p class="tip"><svg class="ico fill"><use href="#i-star"/></svg>半年瘦了 0.8 kg，已经回到理想体重啦</p>
+  </section>
+
+  <div class="section-head">
+    <h2 class="head">疫苗与驱虫</h2>
+    <span class="more">全部 6 项<svg class="ico"><use href="#i-right"/></svg></span>
+  </div>
+  <ul class="card list">
+    <li class="row">
+      <span class="tile"><svg class="ico"><use href="#i-syringe"/></svg></span>
+      <div class="row-txt"><b>狂犬疫苗</b><span class="meta">2026.03.12 · 下次 2027.03</span></div>
+      <span class="chip">已完成</span>
+    </li>
+    <li class="row">
+      <span class="tile"><svg class="ico"><use href="#i-syringe"/></svg></span>
+      <div class="row-txt"><b>犬八联</b><span class="meta">2026.03.12 · 下次 2027.03</span></div>
+      <span class="chip">已完成</span>
+    </li>
+    <li class="row">
+      <span class="tile yellow"><svg class="ico"><use href="#i-pill"/></svg></span>
+      <div class="row-txt"><b>体内驱虫</b><span class="meta">每 3 个月 · 上次 08.09</span></div>
+      <span class="chip yellow">11 月 9 日</span>
+    </li>
+    <li class="row">
+      <span class="tile yellow"><svg class="ico"><use href="#i-shield"/></svg></span>
+      <div class="row-txt"><b>体外驱虫</b><span class="meta">每月一次 · 上次 10.20</span></div>
+      <span class="chip ghost">11 月 20 日</span>
+    </li>
+  </ul>
+
+  <div class="section-head">
+    <h2 class="head">就诊记录</h2>
+    <span class="more">添加<svg class="ico"><use href="#i-plus"/></svg></span>
+  </div>
+  <ul class="card list">
+    <li class="row">
+      <span class="date"><b>18</b><span>9 月</span></span>
+      <div class="row-txt"><b>皮肤过敏复诊</b><span class="meta">豆豆动物医院 · 刘医生</span></div>
+      <span class="price">¥168</span>
+    </li>
+    <li class="row">
+      <span class="date"><b>30</b><span>8 月</span></span>
+      <div class="row-txt"><b>耳道清洁</b><span class="meta">豆豆动物医院 · 两耳都做了</span></div>
+      <span class="price">¥80</span>
+    </li>
+    <li class="row">
+      <span class="date"><b>6</b><span>5 月</span></span>
+      <div class="row-txt"><b>年度体检</b><span class="meta">血常规、心肺都正常</span></div>
+      <span class="price">¥399</span>
+    </li>
+  </ul>
+</main>
+
+<nav class="tabbar" aria-label="主导航">
+  <a class="tab" href="home.html"><span class="tab-ico"><svg class="ico"><use href="#i-home"/></svg></span>首页</a>
+  <a class="tab is-on" href="health.html" aria-current="page"><span class="tab-ico"><svg class="ico"><use href="#i-heart"/></svg></span>健康</a>
+  <span class="tab"><span class="tab-ico"><svg class="ico"><use href="#i-book"/></svg></span>日记</span>
+  <span class="tab"><span class="tab-ico"><svg class="ico"><use href="#i-me"/></svg></span>我的</span>
+</nav>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="slides">
+<title>四个节点 · 青禾年度回顾</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="deck.css">
+<style>
+  .line {
+    position: absolute;
+    top: 400px;
+    left: var(--margin);
+    width: 1152px;
+    height: var(--rule);
+    background: var(--color-line);
+  }
+  .events {
+    position: absolute;
+    top: 272px;
+    left: var(--margin);
+    width: 1152px;
+  }
+  .ev { grid-column: span 3; position: relative; }
+  .ev .mo { font-size: 104px; height: 104px; }
+  .ev .mo small { font-size: var(--text-body); font-weight: 700; letter-spacing: 0; margin-left: 4px; }
+  .ev .dot {
+    position: absolute;
+    top: 116px;
+    left: 0;
+    width: 32px;
+    height: 32px;
+    background: var(--color-line);
+  }
+  .ev h2 { margin-top: 80px; font-size: var(--text-sub); font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; }
+  .ev .desc { margin-top: 12px; width: 270px; font-size: var(--text-small); line-height: 1.5; color: var(--color-muted); }
+  .ev.hl .mo, .ev.hl h2 { color: var(--color-primary); }
+  .ev.hl .dot { background: var(--color-primary); }
+  .foot {
+    position: absolute;
+    left: var(--margin);
+    bottom: var(--margin);
+    font-size: var(--text-note);
+    line-height: 20px;
+    color: var(--color-muted);
+  }
+</style>
+</head>
+<body>
+<main class="slide">
+  <header class="top grid">
+    <span class="brand">青禾植物</span>
+    <span class="deck">2026 年度回顾</span>
+    <span class="sec">03 — 关键节点</span>
+    <a class="pg" href="05-next.html">04 / 06</a>
+  </header>
+
+  <h1 class="title">从 3 家店到 7 家，靠的是这四步</h1>
+
+  <div class="line" aria-hidden="true"></div>
+  <ol class="events grid">
+    <li class="ev">
+      <p class="mo num">03<small>月</small></p>
+      <span class="dot" aria-hidden="true"></span>
+      <h2>滨江店开业</h2>
+      <p class="desc">第 4 家店，<br>开业第一个月就打平</p>
+    </li>
+    <li class="ev">
+      <p class="mo num">05<small>月</small></p>
+      <span class="dot" aria-hidden="true"></span>
+      <h2>线上商城上线</h2>
+      <p class="desc">首月 2,300 单，<br>三成来自老会员</p>
+    </li>
+    <li class="ev hl">
+      <p class="mo num">08<small>月</small></p>
+      <span class="dot" aria-hidden="true"></span>
+      <h2>育苗温室投用</h2>
+      <p class="desc">1,200 平米温室，<br>自育绿植占到 40%</p>
+    </li>
+    <li class="ev">
+      <p class="mo num">11<small>月</small></p>
+      <span class="dot" aria-hidden="true"></span>
+      <h2>第 7 家店开业</h2>
+      <p class="desc">城东社区店，<br>全年第 4 家新店</p>
+    </li>
+  </ol>
+
+  <p class="foot">门店开业时间按首个营业日计</p>
+</main>
+</body>
+</html>

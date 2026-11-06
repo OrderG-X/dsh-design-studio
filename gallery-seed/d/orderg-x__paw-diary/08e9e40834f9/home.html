@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="app">
+<title>首页 · 毛孩日记</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-top: var(--space-1); }
+  .pets { display: flex; align-items: center; gap: var(--space-2); }
+  .pet { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 4px 6px 4px 4px; border-radius: var(--radius-pill); font-weight: 700; color: var(--muted); }
+  .pet .avatar { width: 36px; height: 36px; box-shadow: none; }
+  .pet.on { padding-right: 16px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+  .pet.add { width: 44px; justify-content: center; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--line); color: var(--link); }
+  .pet.add .ico { width: 20px; height: 20px; stroke-width: 2.6; }
+  .round-btn { position: relative; flex: 0 0 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); box-shadow: var(--shadow-sm); }
+  .round-btn .dot { position: absolute; top: 10px; right: 11px; width: 9px; height: 9px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 2px var(--surface); }
+
+  .hero { position: relative; margin-top: var(--space-4); padding: var(--space-5) 140px var(--space-5) var(--space-5); border-radius: 28px; background: var(--primary); color: var(--on); box-shadow: var(--shadow-primary); overflow: hidden; }
+  .hero .kind { font-size: var(--fs-meta); font-weight: 700; }
+  .hero h1 { font-size: var(--fs-num); line-height: 1.15; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .hero h1 .ico { width: 20px; height: 20px; color: var(--surface); }
+  .hero p { margin-top: var(--space-1); font-size: var(--fs-meta); font-weight: 600; }
+  .hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-4); }
+  .hero .chip { background: var(--surface); }
+  .hero-pet { position: absolute; right: -4px; bottom: -8px; width: 150px; height: 150px; }
+
+  .todo-card { margin-top: var(--space-5); padding: var(--space-4) var(--space-3) var(--space-2); }
+  .todo-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-1) var(--space-2) var(--space-2); }
+  .todo-head h2 { font-size: var(--fs-h3); }
+  .todos { list-style: none; margin: 0; padding: 0; }
+  .todo { display: flex; align-items: center; gap: var(--space-3); padding: 6px var(--space-1) 6px var(--space-2); }
+  .todo + .todo { border-top: 2px dashed var(--line); }
+  .todo .tile { width: 40px; height: 40px; border-radius: 13px; }
+  .todo .tile .ico { width: 22px; height: 22px; }
+  .todo-txt { flex: 1; min-width: 0; line-height: 1.4; }
+  .todo-txt b { display: block; font-weight: 700; }
+  .todo.done .todo-txt b { color: var(--muted); }
+  .check { flex: 0 0 44px; height: 44px; display: grid; place-items: center; }
+  .check span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 2.5px var(--line); color: var(--surface); }
+  .check .ico { width: 16px; height: 16px; stroke-width: 3.2; }
+  .done .check span { background: var(--primary); box-shadow: none; color: var(--text); }
+  .todo.warn { margin: 6px 0 4px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2); border: 0; border-radius: var(--radius-md); background: var(--yellow-soft); }
+  .todo.warn .tile { background: var(--accent); color: var(--text); }
+  .todo.warn .chip { margin-right: 2px; }
+
+  .weight { margin-top: var(--space-4); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); }
+  .weight-txt { flex: 0 0 auto; line-height: 1.3; }
+  .weight-txt .val { display: flex; align-items: baseline; gap: 3px; margin-top: 2px; }
+  .num { font-size: var(--fs-h2); font-weight: var(--w-head); letter-spacing: -.02em; }
+  .spark { flex: 1; min-width: 0; height: 44px; }
+  .weight .chip { align-self: center; }
+  .weight > .ico { flex: 0 0 auto; width: 20px; height: 20px; color: var(--muted); stroke-width: 2.6; }
+
+  .book { position: relative; margin-top: var(--space-4); display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5); border-radius: var(--radius); background: var(--accent); box-shadow: var(--shadow-accent); overflow: hidden; }
+  .book-txt { flex: 1; min-width: 0; }
+  .book-txt b { display: block; font-size: var(--fs-h3); font-weight: var(--w-head); }
+  .book-txt .meta { color: var(--text); }
+  .book .go { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-pill); background: var(--surface); font-weight: 700; box-shadow: 0 4px 0 var(--yellow-deep); }
+  .book-art { flex: 0 0 64px; height: 56px; }
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="pet-corgi" viewBox="0 0 64 64">
+    <path d="M11 34 13.4 9.6c.3-2.4 3-3.4 4.8-1.8L31 19.5z" fill="#FFC93C"/>
+    <path d="M15.6 27 17 13.8 25.6 20.4z" fill="#FF9EC0"/>
+    <path d="M53 34 50.6 9.6c-.3-2.4-3-3.4-4.8-1.8L33 19.5z" fill="#FFC93C"/>
+    <path d="M48.4 27 47 13.8 38.4 20.4z" fill="#FF9EC0"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="19.5" fill="#FFC93C"/>
+    <path d="M32 21.5c-2.2 6-7.5 10-7.5 18 0 7.4 3.4 12.6 7.5 12.6s7.5-5.2 7.5-12.6c0-8-5.3-12-7.5-18z" fill="#FFFFFF"/>
+    <ellipse cx="32" cy="48" rx="11" ry="7.5" fill="#FFFFFF"/>
+    <circle cx="21.5" cy="36.5" r="3.3" fill="#3A2540"/><circle cx="22.7" cy="35.3" r="1.1" fill="#FFFFFF"/>
+    <circle cx="42.5" cy="36.5" r="3.3" fill="#3A2540"/><circle cx="43.7" cy="35.3" r="1.1" fill="#FFFFFF"/>
+    <ellipse cx="32" cy="43.2" rx="3.6" ry="2.6" fill="#3A2540"/>
+    <path d="M28.4 47.4q3.6 3.2 7.2 0" fill="none" stroke="#3A2540" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M30.2 48.6h3.6v2.2a1.8 1.8 0 0 1-3.6 0z" fill="#FF7AA8"/>
+    <ellipse cx="16.5" cy="44" rx="3.6" ry="2.3" fill="#FF7AA8" opacity=".6"/>
+    <ellipse cx="47.5" cy="44" rx="3.6" ry="2.3" fill="#FF7AA8" opacity=".6"/>
+  </symbol>
+  <symbol id="pet-cat" viewBox="0 0 64 64">
+    <path d="M12 33 13 10.5c.1-2.2 2.6-3.3 4.3-1.9L29 18.5z" fill="#FFB3CC"/>
+    <path d="M16.2 26 16.9 14.6 24 20z" fill="#FF7AA8"/>
+    <path d="M52 33 51 10.5c-.1-2.2-2.6-3.3-4.3-1.9L35 18.5z" fill="#FFB3CC"/>
+    <path d="M47.8 26 47.1 14.6 40 20z" fill="#FF7AA8"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="19" fill="#FFB3CC"/>
+    <path d="M32 21v6M25.5 22l1.6 5M38.5 22l-1.6 5" stroke="#FF7AA8" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M19.5 37.5q3.5-4 7 0M37.5 37.5q3.5-4 7 0" fill="none" stroke="#3A2540" stroke-width="2.3" stroke-linecap="round"/>
+    <ellipse cx="32" cy="46" rx="7.5" ry="5.4" fill="#FFFFFF"/>
+    <path d="M30 42.8h4l-2 2.2z" fill="#FF7AA8" stroke="#FF7AA8" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M29 47.4q1.5 1.7 3 0q1.5 1.7 3 0" fill="none" stroke="#3A2540" stroke-width="1.5" stroke-linecap="round"/>
+    <ellipse cx="16.5" cy="44.5" rx="3.6" ry="2.3" fill="#FFC93C"/>
+    <ellipse cx="47.5" cy="44.5" rx="3.6" ry="2.3" fill="#FFC93C"/>
+    <path d="M9 41.5l5.5 1M9 46.5l5.5-1.2M55 41.5l-5.5 1M55 46.5l-5.5-1.2" stroke="#3A2540" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4.5l8 6.7v7.8a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 19z"/><path d="M10 20.8v-4.6a2 2 0 0 1 4 0v4.6"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.3a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M6 4.5h10.5A1.5 1.5 0 0 1 18 6v13.5H7.5A2.5 2.5 0 0 1 5 17V5.5a1 1 0 0 1 1-1z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18"/><path d="M9.5 8.5h4"/></symbol>
+  <symbol id="i-me" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c1.3-3.6 4-5.4 7-5.4s5.7 1.8 7 5.4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 4.2a5.3 5.3 0 0 0-5.3 5.3v3.2L5 16.3h14l-1.7-3.6V9.5A5.3 5.3 0 0 0 12 4.2z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9"/></symbol>
+  <symbol id="i-bowl" viewBox="0 0 24 24"><path d="M3.5 12.5h17a8.5 7 0 0 1-17 0z"/><circle cx="9" cy="9" r="1.6"/><circle cx="14" cy="8" r="1.6"/><circle cx="12" cy="11" r=".6"/></symbol>
+  <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="7" cy="17" r="2.6"/><path d="M9 15 17.5 6.5"/><path d="M14 5.5h4.5V10"/></symbol>
+  <symbol id="i-pill" viewBox="0 0 24 24"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8.25" width="17" height="7.5" rx="3.75"/><path d="M12 8.25H7.25a3.75 3.75 0 0 0 0 7.5H12z" fill="currentColor"/></g></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M8.5 10a5 5 0 0 1 7 0"/><path d="M12 10.5l1.2-1.8"/></symbol>
+  <symbol id="i-bath" viewBox="0 0 24 24"><path d="M3.5 12h17v1.5a5.5 5.5 0 0 1-5.5 5.5H9a5.5 5.5 0 0 1-5.5-5.5z"/><path d="M6 12V6.5a2 2 0 0 1 3.6-1.2"/><path d="M8 19.5 7 21M16 19.5l1 1.5"/></symbol>
+  <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.6" cy="10.6" rx="2" ry="2.5"/><ellipse cx="9.4" cy="6.6" rx="2" ry="2.6"/><ellipse cx="14.6" cy="6.6" rx="2" ry="2.6"/><ellipse cx="18.4" cy="10.6" rx="2" ry="2.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+  <symbol id="i-syringe" viewBox="0 0 24 24"><g transform="rotate(45 12 12)"><rect x="8.5" y="7" width="7" height="10" rx="1.6"/><path d="M12 17v4.5M9 3.5h6M12 3.5V7M8.5 10.5h3M8.5 13.5h3"/></g></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.8 18.5 6v5.4c0 4.2-2.8 7.4-6.5 8.8-3.7-1.4-6.5-4.6-6.5-8.8V6z"/><path d="M9.2 12l2 2 3.8-3.8"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="7" r="2.6"/><circle cx="6.5" cy="17" r="2.6"/><path d="M8.8 8.4 19 16.5M8.8 15.6 19 7.5"/></symbol>
+  <symbol id="i-steth" viewBox="0 0 24 24"><path d="M6 4.5v5a4 4 0 0 0 8 0v-5"/><path d="M10 13.5v1.5a4.5 4.5 0 0 0 9 0v-2"/><circle cx="19" cy="11" r="2"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13.5 14-14 .5 9-5 14-12 14z"/><path d="M5 19c3-4 6-6.5 9.5-8.5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 20.5s-6-5.6-6-10.5a6 6 0 0 1 12 0c0 4.9-6 10.5-6 10.5z"/><circle cx="12" cy="10" r="2.2"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.5l2.3 4.7 5.2.7-3.8 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1-3.8-3.6 5.2-.7z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M5 19l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L9 17.5z"/></symbol>
+</svg>
+
+<header class="status" aria-hidden="true">
+  <span class="status-time">9:41</span>
+  <span class="status-icons">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="5" y="5.5" width="3" height="6.5" rx=".8"/><rect x="10" y="3" width="3" height="9" rx=".8"/><rect x="15" y="0" width="3" height="12" rx=".8"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4.3a9.5 9.5 0 0 1 13 0"/><path d="M4 7.1a6 6 0 0 1 8 0"/><circle cx="8" cy="10" r="1.3" fill="currentColor" stroke="none"/></svg>
+    <svg width="27" height="12" viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="currentColor" stroke-opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="1.8" fill="currentColor"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z" fill="currentColor" fill-opacity=".4"/></svg>
+  </span>
+</header>
+
+<main class="page">
+  <div class="topbar">
+    <div class="pets">
+      <a class="pet on" href="home.html"><span class="avatar pink"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#pet-corgi"/></svg></span>团子</a>
+      <span class="pet"><span class="avatar"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#pet-cat"/></svg></span>芝麻</span>
+      <span class="pet add" role="button" aria-label="添加毛孩"><svg class="ico"><use href="#i-plus"/></svg></span>
+    </div>
+    <span class="round-btn" role="button" aria-label="提醒"><svg class="ico"><use href="#i-bell"/></svg><i class="dot"></i></span>
+  </div>
+
+  <section class="hero">
+    <p class="kind">柯基 · 男孩</p>
+    <h1 class="head">团子 <svg class="ico fill"><use href="#i-heart"/></svg></h1>
+    <p>3 岁 2 个月 · 来家第 1,128 天</p>
+    <div class="hero-chips"><span class="chip">11.6 kg</span><span class="chip">已绝育</span><span class="chip">疫苗齐全</span></div>
+    <svg class="hero-pet" viewBox="0 0 150 150" role="img" aria-label="团子的头像">
+      <path d="M124 26l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#FFC93C"/>
+      <path d="M20 46c0-3 3.6-4.4 5.5-2.2 1.9-2.2 5.5-.8 5.5 2.2 0 3.6-5.5 6.4-5.5 6.4S20 49.6 20 46z" fill="#FFFFFF" opacity=".9"/>
+      <circle cx="112" cy="52" r="3" fill="#FFFFFF" opacity=".85"/>
+      <use href="#pet-corgi" x="12" y="24" width="130" height="130"/>
+      <ellipse cx="52" cy="144" rx="15" ry="9" fill="#FFFFFF"/>
+      <ellipse cx="102" cy="144" rx="15" ry="9" fill="#FFFFFF"/>
+      <path d="M46 140v5M52 139v6M58 140v5M96 140v5M102 139v6M108 140v5" stroke="#F3C4D3" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </section>
+
+  <section class="card todo-card" aria-label="今日待办">
+    <div class="todo-head">
+      <h2 class="head">今日待办</h2>
+      <span class="chip">2 / 4 完成</span>
+    </div>
+    <ul class="todos">
+      <li class="todo done">
+        <span class="tile"><svg class="ico fill"><use href="#i-paw"/></svg></span>
+        <div class="todo-txt"><b>晨遛 · 小区两圈</b><span class="meta">07:30 · 走了 2.4 km</span></div>
+        <span class="check"><span><svg class="ico"><use href="#i-check"/></svg></span></span>
+      </li>
+      <li class="todo done">
+        <span class="tile"><svg class="ico"><use href="#i-bowl"/></svg></span>
+        <div class="todo-txt"><b>早饭 · 鸡肉冻干粮 80g</b><span class="meta">08:05 · 林夏喂的</span></div>
+        <span class="check"><span><svg class="ico"><use href="#i-check"/></svg></span></span>
+      </li>
+      <li class="todo">
+        <span class="tile"><svg class="ico"><use href="#i-bowl"/></svg></span>
+        <div class="todo-txt"><b>晚饭 · 80g + 半根胡萝卜</b><span class="meta">18:30 · 胡萝卜记得蒸软</span></div>
+        <span class="check"><span><svg class="ico"><use href="#i-check"/></svg></span></span>
+      </li>
+      <li class="todo warn">
+        <span class="tile"><svg class="ico"><use href="#i-pill"/></svg></span>
+        <div class="todo-txt"><b>驱虫提醒 · 体内驱虫</b><span class="meta">11 月 9 日 · 拌在晚饭里</span></div>
+        <span class="chip yellow">2 天后</span>
+      </li>
+    </ul>
+  </section>
+
+  <a class="card weight" href="health.html">
+    <div class="weight-txt">
+      <span class="meta">体重趋势</span>
+      <p class="val"><span class="num">11.6</span><span class="meta">kg</span></p>
+    </div>
+    <svg class="spark" viewBox="0 0 140 44" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M4 10 L30 14 L56 22 L82 25 L108 25 L134 32 L134 44 L4 44Z" fill="#FFE4EC"/>
+      <path d="M4 10 L30 14 L56 22 L82 25 L108 25 L134 32" fill="none" stroke="#FF7AA8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <span class="chip">-0.2 kg</span>
+    <svg class="ico"><use href="#i-right"/></svg>
+  </a>
+
+  <a class="book" href="booking.html">
+    <svg class="book-art" viewBox="0 0 64 56" aria-hidden="true">
+      <circle cx="18" cy="12" r="6" fill="#FFFFFF" opacity=".9"/>
+      <circle cx="30" cy="7" r="4" fill="#FFFFFF" opacity=".75"/>
+      <circle cx="40" cy="14" r="5" fill="#FFFFFF" opacity=".85"/>
+      <path d="M4 26h56v6a16 16 0 0 1-16 16H20A16 16 0 0 1 4 32z" fill="#FF7AA8"/>
+      <rect x="2" y="22" width="60" height="8" rx="4" fill="#FFFFFF"/>
+      <path d="M16 48l-3 6M48 48l3 6" stroke="#3A2540" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <div class="book-txt">
+      <b>该洗香香啦</b>
+      <span class="meta">上次洗澡是 18 天前</span>
+    </div>
+    <span class="go">去预约</span>
+  </a>
+</main>
+
+<nav class="tabbar" aria-label="主导航">
+  <a class="tab is-on" href="home.html" aria-current="page"><span class="tab-ico"><svg class="ico"><use href="#i-home"/></svg></span>首页</a>
+  <a class="tab" href="health.html"><span class="tab-ico"><svg class="ico"><use href="#i-heart"/></svg></span>健康</a>
+  <span class="tab"><span class="tab-ico"><svg class="ico"><use href="#i-book"/></svg></span>日记</span>
+  <span class="tab"><span class="tab-ico"><svg class="ico"><use href="#i-me"/></svg></span>我的</span>
+</nav>
+</body>
+</html>

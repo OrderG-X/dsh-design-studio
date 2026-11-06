@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="slides">
+<title>月度营收 · 青禾年度回顾</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="deck.css">
+<style>
+  .note {
+    position: absolute;
+    top: 268px;
+    left: var(--margin);
+    width: 466px;
+  }
+  .note .u { font-size: var(--text-note); color: var(--color-muted); line-height: 20px; }
+  .note p:last-child { margin-top: 12px; font-size: var(--text-body); line-height: 1.45; }
+  .chart {
+    position: absolute;
+    top: 244px;
+    left: var(--margin);
+    width: 1152px;
+    height: 400px;
+    overflow: visible;
+  }
+  .chart .bars rect { fill: var(--color-bar); }
+  .chart .bars rect.hl { fill: var(--color-primary); }
+  .chart .base { fill: var(--color-line); }
+  .chart text { font-family: var(--font-sans); fill: var(--color-text); }
+  .chart .m { font-size: 18px; fill: var(--color-muted); }
+  .chart .m.hl { fill: var(--color-primary); font-weight: 700; }
+  .chart .v { font-size: var(--text-small); font-weight: 700; }
+  .chart .v.big { font-size: var(--text-sub); fill: var(--color-primary); letter-spacing: -0.02em; }
+</style>
+</head>
+<body>
+<main class="slide">
+  <header class="top grid">
+    <span class="brand">青禾植物</span>
+    <span class="deck">2026 年度回顾</span>
+    <span class="sec">02 — 月度营收</span>
+    <a class="pg" href="04-milestones.html">03 / 06</a>
+  </header>
+
+  <h1 class="title">12 月年宵花季，一个月卖了 392 万</h1>
+
+  <div class="note">
+    <p class="u">2026 年各月营收 · 单位：万元</p>
+    <p>年宵花礼盒卖出 1.1 万套，<br>12 月营收是 11 月的 2 倍，<br>一个月占了全年的 21%。</p>
+  </div>
+
+  <svg class="chart" viewBox="0 0 1152 400" role="img" aria-label="2026 年 1 到 12 月营收柱状图，12 月最高为 392 万元">
+    <g class="bars">
+      <rect x="0" y="281" width="74" height="75"/>
+      <rect x="98" y="290" width="74" height="66"/>
+      <rect x="196" y="247" width="74" height="109"/>
+      <rect x="294" y="227" width="74" height="129"/>
+      <rect x="392" y="241" width="74" height="115"/>
+      <rect x="490" y="266" width="74" height="90"/>
+      <rect x="588" y="276" width="74" height="80"/>
+      <rect x="686" y="270" width="74" height="86"/>
+      <rect x="784" y="252" width="74" height="104"/>
+      <rect x="882" y="235" width="74" height="121"/>
+      <rect x="980" y="206" width="74" height="150"/>
+      <rect class="hl" x="1078" y="56" width="74" height="300"/>
+    </g>
+    <rect class="base" x="0" y="356" width="1152" height="4"/>
+    <text class="v" x="294" y="215">168</text>
+    <text class="v" x="980" y="194">196</text>
+    <text class="v big" x="1078" y="42">392</text>
+    <g>
+      <text class="m" x="0" y="390">1 月</text>
+      <text class="m" x="98" y="390">2 月</text>
+      <text class="m" x="196" y="390">3 月</text>
+      <text class="m" x="294" y="390">4 月</text>
+      <text class="m" x="392" y="390">5 月</text>
+      <text class="m" x="490" y="390">6 月</text>
+      <text class="m" x="588" y="390">7 月</text>
+      <text class="m" x="686" y="390">8 月</text>
+      <text class="m" x="784" y="390">9 月</text>
+      <text class="m" x="882" y="390">10 月</text>
+      <text class="m" x="980" y="390">11 月</text>
+      <text class="m hl" x="1078" y="390">12 月</text>
+    </g>
+  </svg>
+</main>
+</body>
+</html>

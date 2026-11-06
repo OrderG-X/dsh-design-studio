@@ -1,0 +1,43 @@
+/* 巷口面馆 · 设计变量（温暖手作） */
+:root {
+  --color-bg: #F6EFE6;
+  --color-surface: #FFF9F2;
+  --color-paper: #EFE4D6;
+  --color-text: #2B1D14;
+  --color-muted: #6E5A4B;
+  --color-line: #E7D9C8;
+  --color-primary: #A9542A;
+  --color-primary-deep: #8C4321;
+  --color-primary-soft: #F4DFD0;
+  --color-on-primary: #FFFFFF;
+  --color-accent: #5E7A4A;
+  --color-accent-soft: #E4EAD8;
+  --color-link: #52703F;
+
+  --font-serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  --text-xs: 10px;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-body: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-hero: 64px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+  --radius-hand: 18px 14px 19px 15px / 15px 19px 14px 18px;
+
+  --shadow: 0 8px 24px rgba(120, 72, 30, .12);
+  --shadow-sm: 0 2px 8px rgba(120, 72, 30, .10);
+}

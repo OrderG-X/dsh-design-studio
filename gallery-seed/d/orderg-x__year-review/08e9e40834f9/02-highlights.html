@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="slides">
+<title>三个数字 · 青禾年度回顾</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="deck.css">
+<style>
+  .stats {
+    position: absolute;
+    top: 344px;
+    left: var(--margin);
+    width: 1152px;
+    height: 376px;
+  }
+  .stat { position: relative; padding-top: 32px; border-top: var(--rule) solid var(--color-line); }
+  .stat:nth-child(1) { grid-column: 1 / 5; }
+  .stat:nth-child(2) { grid-column: 5 / 9; }
+  .stat:nth-child(3) { grid-column: 9 / 13; }
+  .stat.hl {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border-top-color: var(--color-primary);
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .stat .k { font-size: var(--text-small); font-weight: 700; line-height: 24px; }
+  .stat .k b { display: inline-block; width: 40px; }
+  .stat .num { display: block; margin-top: 24px; font-size: var(--text-num); }
+  .stat .d { margin-top: 20px; font-size: var(--text-body); line-height: 1.4; }
+  .stat:not(.hl) .d { color: var(--color-muted); }
+</style>
+</head>
+<body>
+<main class="slide">
+  <header class="top grid">
+    <span class="brand">青禾植物</span>
+    <span class="deck">2026 年度回顾</span>
+    <span class="sec">01 — 全年亮点</span>
+    <a class="pg" href="03-growth.html">02 / 06</a>
+  </header>
+
+  <h1 class="title">营收涨了 62%，门店翻了一倍多</h1>
+  <p class="lede">营收、会员、门店三项都是开店以来最好的一年</p>
+
+  <div class="stats grid">
+    <div class="stat hl">
+      <p class="k"><b>01</b>全年营收 · 万元</p>
+      <p class="num">1,860</p>
+      <p class="d">同比增长 62%</p>
+    </div>
+    <div class="stat">
+      <p class="k"><b>02</b>会员人数 · 万人</p>
+      <p class="num">4.2</p>
+      <p class="d">复购率 48%，去年 35%</p>
+    </div>
+    <div class="stat">
+      <p class="k"><b>03</b>门店数量 · 家</p>
+      <p class="num">7</p>
+      <p class="d">今年新开 4 家，全部盈利</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>

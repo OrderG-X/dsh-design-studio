@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": { "zh": "月满市集", "en": "Moon Fair" },
+  "description": {
+    "zh": "中秋夜市的国潮竖版海报：中国红大色块、满月与桂花枝、竖排粗宋体标题、金色细线和印章",
+    "en": "A Guochao-style Mid-Autumn night market poster: big Chinese-red block, full moon with osmanthus, vertical bold Song title, fine gold lines and a seal"
+  },
+  "kind": "poster",
+  "size": "1080x1350",
+  "screens": [
+    { "file": "poster.html", "title": { "zh": "海报", "en": "Poster" } }
+  ],
+  "style": "guochao",
+  "categories": ["event"],
+  "tags": ["cover"],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": { "login": "orderg-x", "id": 271418316 },
+  "ai": { "generated": true, "tool": "dsh-design-studio@0.11.0" }
+}

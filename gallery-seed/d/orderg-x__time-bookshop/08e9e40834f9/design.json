@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": { "zh": "拾光书店", "en": "Shiguang Books" },
+  "description": {
+    "zh": "巷子里的独立书店官网：杂志感首页（本月主推、新书上架、店员推荐、读书会、到店）和一本书的详情页（书摘、作者、店员书评）",
+    "en": "Site for an independent bookshop: a magazine-style home page and a book detail page with excerpt, author notes and a staff review"
+  },
+  "kind": "web",
+  "screens": [
+    { "file": "home.html", "title": { "zh": "首页", "en": "Home" } },
+    { "file": "book.html", "title": { "zh": "书籍详情", "en": "Book detail" } }
+  ],
+  "style": "editorial",
+  "categories": ["retail", "media"],
+  "tags": ["landing", "article", "detail", "list", "illustration"],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": { "login": "orderg-x", "id": 271418316 },
+  "ai": { "generated": true, "tool": "dsh-design-studio@0.11.0" }
+}

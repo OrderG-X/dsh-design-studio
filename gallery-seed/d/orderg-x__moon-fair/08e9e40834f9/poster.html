@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1080">
+<meta name="dsh-design" content="poster 1080x1350">
+<title>海报 · 月满市集</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  html, body { margin: 0; width: 1080px; height: 1350px; overflow: hidden; }
+  body { background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  .poster { position: relative; width: 1080px; height: 1350px; overflow: hidden; }
+  .grain { position: absolute; inset: 0; pointer-events: none; }
+  .frame { position: absolute; inset: 28px; border: 1.5px solid var(--color-accent); border-radius: 2px; pointer-events: none; }
+  .frame::after { content: ""; position: absolute; inset: 7px; border: 1px solid var(--color-accent); opacity: .55; }
+
+  .hero { position: absolute; left: var(--safe); top: var(--safe); width: 936px; height: 764px; background: var(--color-primary); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .hero-art { position: absolute; inset: 0; }
+  .title { position: absolute; left: 64px; top: 70px; margin: 0; writing-mode: vertical-rl; text-orientation: upright; font-family: var(--font-head); font-weight: 900; font-size: var(--text-title); line-height: 1; letter-spacing: .04em; color: var(--color-on); text-shadow: 0 4px 0 var(--color-primary-deep); }
+  .sub { position: absolute; right: 40px; top: 104px; margin: 0; writing-mode: vertical-rl; font-family: var(--font-head); font-weight: 700; font-size: 32px; letter-spacing: .3em; color: var(--color-accent-light); }
+  .seal { position: absolute; left: 600px; top: 428px; width: 120px; height: 120px; box-sizing: border-box; padding: 10px; background: var(--color-primary); border-radius: 4px; box-shadow: inset 0 0 0 5px var(--color-primary), inset 0 0 0 7px var(--color-on); transform: rotate(-4deg); display: grid; grid-template-columns: repeat(2, 48px); grid-auto-rows: 48px; place-content: center; }
+  .seal i { font-style: normal; font-family: var(--font-head); font-weight: 900; font-size: 44px; line-height: 48px; text-align: center; color: var(--color-on); }
+
+  .info { position: absolute; left: var(--safe); right: var(--safe); top: 872px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 72px; }
+  .info::before { content: ""; position: absolute; left: 50%; top: 8px; bottom: 6px; width: 1px; background: var(--color-accent); opacity: .7; }
+  .label { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3); font-size: var(--text-label); font-weight: 600; letter-spacing: .4em; color: var(--color-accent-ink); }
+  .label::before { content: ""; width: 32px; height: 2px; background: var(--color-accent); }
+  .big { margin: 0 0 var(--space-3); font-family: var(--font-head); font-weight: 900; font-size: var(--text-sub); line-height: 1.2; letter-spacing: .04em; color: var(--color-primary); }
+  .big.ink { color: var(--color-text); }
+  .line { margin: 0; font-size: var(--text-info); line-height: 1.5; color: var(--color-text); }
+  .line.muted { color: var(--color-muted); }
+  .free { display: inline-block; margin-left: var(--space-3); padding: 0 14px; border-radius: 4px; background: var(--color-primary); color: var(--color-on); font-size: var(--text-label); font-weight: 600; line-height: 38px; vertical-align: 3px; letter-spacing: .08em; }
+
+  .acts { position: absolute; left: var(--safe); right: var(--safe); top: 1092px; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1.5px solid var(--color-accent); padding-top: 24px; }
+  .act { display: grid; grid-template-columns: 56px 1fr; column-gap: var(--space-4); row-gap: var(--space-2); align-items: center; padding-right: var(--space-4); }
+  .act + .act { padding-left: var(--space-6); border-left: 1px solid var(--color-line); }
+  .act svg { width: 56px; height: 56px; }
+  .act b { font-family: var(--font-head); font-weight: 900; font-size: 32px; line-height: 1.3; color: var(--color-text); letter-spacing: .04em; }
+  .act span { grid-column: 1 / -1; font-size: var(--text-label); line-height: 1.5; color: var(--color-muted); white-space: nowrap; }
+
+  .foot { position: absolute; left: var(--safe); right: var(--safe); bottom: 62px; display: flex; justify-content: space-between; align-items: center; font-size: var(--text-label); color: var(--color-muted); letter-spacing: .12em; }
+  .foot i { font-style: normal; color: var(--color-accent-ink); }
+</style>
+</head>
+<body>
+<main class="poster">
+  <svg class="grain" width="1080" height="1350" aria-hidden="true">
+    <filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .45  0 0 0 0 .28  0 0 0 0 .12  0 0 0 .09 0"/></filter>
+    <rect width="1080" height="1350" filter="url(#paper)"/>
+  </svg>
+  <div class="frame"></div>
+
+  <section class="hero">
+    <svg class="hero-art" viewBox="0 0 936 764" width="936" height="764" role="img" aria-label="一轮满月，桂花枝与祥云">
+      <defs>
+        <radialGradient id="moon" cx="44%" cy="40%" r="62%">
+          <stop offset="0" stop-color="#FFF8E6"/>
+          <stop offset=".65" stop-color="#FBE6B8"/>
+          <stop offset="1" stop-color="#F1CF86"/>
+        </radialGradient>
+        <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+          <stop offset=".55" stop-color="#FFD98A" stop-opacity=".28"/>
+          <stop offset="1" stop-color="#FFD98A" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="redgrain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .3  0 0 0 0 0  0 0 0 0 0  0 0 0 .12 0"/></filter>
+        <symbol id="cloud" viewBox="0 0 380 120">
+          <path d="M40 104C14 104 6 78 26 66C18 40 46 24 70 36C78 12 116 4 136 26C150 6 192 6 204 32C222 18 256 24 262 50C290 46 312 66 300 88C316 94 312 106 296 106Z" fill="#B8202A" stroke="#E0AC4A" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M46 72C40 56 56 46 66 54C74 60 68 72 58 68M104 58C98 36 124 28 134 42C140 52 130 60 122 54M166 56C162 34 190 28 196 44C200 56 186 62 180 54M236 76C232 58 256 52 262 66C266 76 254 82 248 74M296 106C330 106 352 98 366 82M40 104C16 104 2 94 4 80" fill="none" stroke="#E0AC4A" stroke-width="3" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="fret" viewBox="0 0 60 60">
+          <path d="M4 56V4H56V44H16V16H44V32H28" fill="none" stroke="#E0AC4A" stroke-width="3" stroke-linecap="square"/>
+        </symbol>
+        <symbol id="leaf" viewBox="0 -14 60 28" overflow="visible">
+          <path d="M0 0C14-13 40-13 58 0C40 13 14 13 0 0Z" fill="#8F161F"/>
+          <path d="M4 0H50" stroke="#C8952E" stroke-width="1.4" opacity=".8"/>
+        </symbol>
+        <symbol id="bloom" viewBox="-12 -12 24 24" overflow="visible">
+          <circle cx="0" cy="-5" r="4.6" fill="#F6CD6E"/><circle cx="5" cy="0" r="4.6" fill="#F6CD6E"/><circle cx="0" cy="5" r="4.6" fill="#F6CD6E"/><circle cx="-5" cy="0" r="4.6" fill="#F6CD6E"/><circle r="2.4" fill="#C77A1C"/>
+        </symbol>
+      </defs>
+
+      <rect width="936" height="764" filter="url(#redgrain)"/>
+      <rect x="18" y="18" width="900" height="728" rx="2" fill="none" stroke="#E0AC4A" stroke-width="1.5"/>
+      <use href="#fret" x="30" y="30" width="48" height="48"/>
+      <use href="#fret" x="30" y="30" width="48" height="48" transform="matrix(-1 0 0 1 936 0)"/>
+      <use href="#fret" x="30" y="30" width="48" height="48" transform="matrix(1 0 0 -1 0 764)"/>
+      <use href="#fret" x="30" y="30" width="48" height="48" transform="matrix(-1 0 0 -1 936 764)"/>
+
+      <circle cx="548" cy="360" r="360" fill="url(#glow)"/>
+      <circle cx="548" cy="360" r="304" fill="none" stroke="#F2C66B" stroke-width="3" stroke-dasharray="0 14" stroke-linecap="round" opacity=".9"/>
+      <circle cx="548" cy="360" r="288" fill="none" stroke="#E0AC4A" stroke-width="1.5"/>
+      <circle cx="548" cy="360" r="270" fill="url(#moon)"/>
+      <g fill="#EDC679" opacity=".26">
+        <ellipse cx="462" cy="300" rx="44" ry="36"/><ellipse cx="640" cy="330" rx="30" ry="24"/><ellipse cx="420" cy="430" rx="22" ry="18"/><ellipse cx="520" cy="392" rx="12" ry="10"/>
+      </g>
+
+      <g>
+        <path d="M842 -6C826 40 800 84 760 120C724 152 680 168 618 176" fill="none" stroke="#7A1018" stroke-width="7" stroke-linecap="round"/>
+        <path d="M818 52C786 66 760 90 744 116M724 146C700 120 676 108 644 108M770 108C780 144 778 176 762 200" fill="none" stroke="#7A1018" stroke-width="4" stroke-linecap="round"/>
+        <use href="#leaf" width="60" height="28" transform="translate(818 52) rotate(170)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(830 24) rotate(-150)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(744 116) rotate(130)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(736 136) rotate(-128)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(644 108) rotate(-168)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(672 166) rotate(150)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(762 200) rotate(104)"/>
+        <use href="#leaf" width="60" height="28" transform="translate(618 176) rotate(174)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(790 80)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(806 66) scale(.8)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(752 140)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(736 158) scale(.85)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(770 156) scale(.7)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(676 140)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(692 152) scale(.75)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(660 126) scale(.8)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(776 218) scale(.8)"/>
+        <use href="#bloom" width="24" height="24" transform="translate(596 186) scale(.85)"/>
+      </g>
+
+      <use href="#cloud" x="168" y="520" width="380" height="120"/>
+      <use href="#cloud" x="250" y="606" width="200" height="64" opacity=".95"/>
+    </svg>
+
+    <h1 class="title">月满市集</h1>
+    <p class="sub">中秋夜市 · 第三届</p>
+    <div class="seal" role="img" aria-label="印章：花好月圆"><i>月</i><i>花</i><i>圆</i><i>好</i></div>
+  </section>
+
+  <section class="info">
+    <div>
+      <p class="label">时间</p>
+      <p class="big">农历八月十五</p>
+      <p class="line">2026 年 9 月 25 日 · 周五</p>
+      <p class="line">18:00 – 23:30<span class="free">免费入场</span></p>
+    </div>
+    <div>
+      <p class="label">地点</p>
+      <p class="big ink">桂香里老街</p>
+      <p class="line muted">东牌坊进 · 沿青溪河至月湖桥</p>
+      <p class="line muted">八百米长街 · 一百二十个摊位</p>
+    </div>
+  </section>
+
+  <section class="acts">
+    <div class="act">
+      <svg viewBox="0 0 64 64" fill="none" stroke="#B8202A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M32 4V10M22 10H42M22 54H42M32 54V62M28 62H36"/><path d="M20 12C8 20 8 44 20 52H44C56 44 56 20 44 12Z" fill="#FBE1D2"/><path d="M32 12C26 22 26 42 32 52M32 12C38 22 38 42 32 52"/></svg>
+      <b>灯谜</b>
+      <span>百盏花灯 · 猜谜换桂花糕</span>
+    </div>
+    <div class="act">
+      <svg viewBox="0 0 64 64" fill="none" stroke="#B8202A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M32 6C36 6 37 9 40 9.5S46 8 48.5 10.5 49 16.5 51.5 18.5 57 21 57 26 54 29.5 54 32 57 35 57 38 52 43 51.5 45.5 51 51 48.5 53.5 43 54 40 54.5 36 58 32 58 28 55 24 54.5 18 56 15.5 53.5 15 48 12.5 45.5 7 42 7 38 10 34.5 10 32 7 29 7 26 12 21 12.5 18.5 13 13 15.5 10.5 21 10 24 9.5 28 6 32 6Z" fill="#FBE1D2"/><circle cx="32" cy="32" r="13"/><path d="M32 23V41M23 32H41M26 26L38 38M38 26L26 38" stroke-width="2"/></svg>
+      <b>手作月饼</b>
+      <span>现场压模 · 带走六只</span>
+    </div>
+    <div class="act">
+      <svg viewBox="0 0 64 64" fill="none" stroke="#B8202A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M30 4H40L38 20"/><path d="M38 20C52 24 56 40 50 50C44 60 22 60 16 50C10 40 18 24 32 20Z" fill="#FBE1D2"/><path d="M33 20L30 52M37 21L36 52M26 46H44" stroke-width="2"/><circle cx="33" cy="36" r="4"/><path d="M28 8H24M29 13H25" stroke-width="2.5"/></svg>
+      <b>民乐</b>
+      <span>20:00 · 月下古筝琵琶</span>
+    </div>
+  </section>
+
+  <footer class="foot"><span>桂香里街区 · 青溪河商户联合出品</span><i>月圆人团圆</i></footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="app">
+<title>预约洗护 · 毛孩日记</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+  .nav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: var(--space-2); padding-top: var(--space-1); }
+  .nav h1 { text-align: center; font-size: var(--fs-h3); }
+  .round-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); box-shadow: var(--shadow-sm); }
+  .round-btn .ico { stroke-width: 2.6; }
+
+  .store { margin-top: var(--space-4); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3); }
+  .store-art { flex: 0 0 56px; height: 56px; border-radius: var(--radius-sm); background: var(--pink-soft); }
+  .store-txt { flex: 1; min-width: 0; line-height: 1.4; }
+  .store-txt b { display: block; font-weight: 700; }
+  .rate { display: inline-flex; align-items: center; gap: 2px; font-weight: var(--w-head); }
+  .rate .ico { width: 18px; height: 18px; color: var(--accent); }
+
+  .label { display: flex; align-items: baseline; justify-content: space-between; margin: var(--space-5) 0 var(--space-3); }
+  .label h2 { font-size: var(--fs-h3); }
+
+  .who-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); }
+  .who-row h2 { font-size: var(--fs-h3); }
+  .who { display: flex; gap: var(--space-2); }
+  .who > span { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 48px; padding: 4px 18px 4px 6px; border-radius: var(--radius-pill); background: var(--surface); box-shadow: inset 0 0 0 2px var(--line); font-weight: 700; color: var(--muted); }
+  .who .avatar { width: 36px; height: 36px; box-shadow: none; }
+  .who > .on { background: var(--pink-soft); box-shadow: inset 0 0 0 2.5px var(--primary); color: var(--text); }
+
+  .svcs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .svc { position: relative; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); line-height: 1.35; }
+  .svc-top { display: flex; align-items: center; gap: var(--space-2); }
+  .svc .tile { width: 32px; height: 32px; border-radius: 11px; }
+  .svc .tile .ico { width: 18px; height: 18px; }
+  .svc b { font-weight: 700; }
+  .svc-foot { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .svc .price { font-weight: var(--w-head); }
+  .svc.on { background: var(--pink-soft); box-shadow: inset 0 0 0 2.5px var(--primary), 0 4px 0 var(--pink-deep); }
+  .svc.on .tile { background: var(--primary); color: var(--text); }
+  .badge { position: absolute; top: -6px; right: -4px; width: 24px; height: 24px; box-shadow: 0 0 0 2.5px var(--bg); border-radius: 50%; display: grid; place-items: center; background: var(--primary); color: var(--text); }
+  .badge .ico { width: 14px; height: 14px; stroke-width: 3.4; }
+
+  .days { display: flex; gap: var(--space-2); overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter) 8px; scrollbar-width: none; }
+  .days::-webkit-scrollbar { display: none; }
+  .day { flex: 0 0 52px; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 68px; border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); line-height: 1.2; }
+  .day span { font-size: var(--fs-micro); font-weight: 700; color: var(--muted); }
+  .day b { font-size: var(--fs-h3); font-weight: var(--w-head); }
+  .day.full { background: transparent; box-shadow: inset 0 0 0 2px var(--line); }
+  .day.full b { color: var(--muted); }
+  .day.on { background: var(--primary); box-shadow: var(--shadow-primary); }
+  .day.on span { color: var(--text); }
+
+  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
+  .slot { display: grid; place-items: center; min-height: 44px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: inset 0 0 0 2px var(--line); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .slot.full { background: transparent; color: var(--muted); font-weight: 600; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .slot.on { background: var(--accent); box-shadow: 0 4px 0 var(--yellow-deep); }
+
+  .note { display: flex; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 2px var(--line); }
+  .note .ico { flex: 0 0 auto; width: 20px; height: 20px; color: var(--link); margin-top: 2px; }
+  .note p { flex: 1; }
+  .note .meta { align-self: flex-end; }
+
+  .page { padding-bottom: calc(104px + var(--home-bar) + var(--space-6)); }
+  .checkout { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--gutter) calc(var(--home-bar) + var(--space-1)); background: var(--surface); border-radius: 28px 28px 0 0; box-shadow: 0 -2px 0 var(--line); }
+  .sumup { flex: 1; min-width: 0; line-height: 1.3; }
+  .total { display: flex; align-items: baseline; gap: var(--space-2); }
+  .total b { font-size: var(--fs-h2); font-weight: var(--w-head); }
+  .checkout .btn { flex: 0 0 auto; min-width: 156px; }
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="pet-corgi" viewBox="0 0 64 64">
+    <path d="M11 34 13.4 9.6c.3-2.4 3-3.4 4.8-1.8L31 19.5z" fill="#FFC93C"/>
+    <path d="M15.6 27 17 13.8 25.6 20.4z" fill="#FF9EC0"/>
+    <path d="M53 34 50.6 9.6c-.3-2.4-3-3.4-4.8-1.8L33 19.5z" fill="#FFC93C"/>
+    <path d="M48.4 27 47 13.8 38.4 20.4z" fill="#FF9EC0"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="19.5" fill="#FFC93C"/>
+    <path d="M32 21.5c-2.2 6-7.5 10-7.5 18 0 7.4 3.4 12.6 7.5 12.6s7.5-5.2 7.5-12.6c0-8-5.3-12-7.5-18z" fill="#FFFFFF"/>
+    <ellipse cx="32" cy="48" rx="11" ry="7.5" fill="#FFFFFF"/>
+    <circle cx="21.5" cy="36.5" r="3.3" fill="#3A2540"/><circle cx="22.7" cy="35.3" r="1.1" fill="#FFFFFF"/>
+    <circle cx="42.5" cy="36.5" r="3.3" fill="#3A2540"/><circle cx="43.7" cy="35.3" r="1.1" fill="#FFFFFF"/>
+    <ellipse cx="32" cy="43.2" rx="3.6" ry="2.6" fill="#3A2540"/>
+    <path d="M28.4 47.4q3.6 3.2 7.2 0" fill="none" stroke="#3A2540" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M30.2 48.6h3.6v2.2a1.8 1.8 0 0 1-3.6 0z" fill="#FF7AA8"/>
+    <ellipse cx="16.5" cy="44" rx="3.6" ry="2.3" fill="#FF7AA8" opacity=".6"/>
+    <ellipse cx="47.5" cy="44" rx="3.6" ry="2.3" fill="#FF7AA8" opacity=".6"/>
+  </symbol>
+  <symbol id="pet-cat" viewBox="0 0 64 64">
+    <path d="M12 33 13 10.5c.1-2.2 2.6-3.3 4.3-1.9L29 18.5z" fill="#FFB3CC"/>
+    <path d="M16.2 26 16.9 14.6 24 20z" fill="#FF7AA8"/>
+    <path d="M52 33 51 10.5c-.1-2.2-2.6-3.3-4.3-1.9L35 18.5z" fill="#FFB3CC"/>
+    <path d="M47.8 26 47.1 14.6 40 20z" fill="#FF7AA8"/>
+    <ellipse cx="32" cy="38.5" rx="23" ry="19" fill="#FFB3CC"/>
+    <path d="M32 21v6M25.5 22l1.6 5M38.5 22l-1.6 5" stroke="#FF7AA8" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M19.5 37.5q3.5-4 7 0M37.5 37.5q3.5-4 7 0" fill="none" stroke="#3A2540" stroke-width="2.3" stroke-linecap="round"/>
+    <ellipse cx="32" cy="46" rx="7.5" ry="5.4" fill="#FFFFFF"/>
+    <path d="M30 42.8h4l-2 2.2z" fill="#FF7AA8" stroke="#FF7AA8" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M29 47.4q1.5 1.7 3 0q1.5 1.7 3 0" fill="none" stroke="#3A2540" stroke-width="1.5" stroke-linecap="round"/>
+    <ellipse cx="16.5" cy="44.5" rx="3.6" ry="2.3" fill="#FFC93C"/>
+    <ellipse cx="47.5" cy="44.5" rx="3.6" ry="2.3" fill="#FFC93C"/>
+    <path d="M9 41.5l5.5 1M9 46.5l5.5-1.2M55 41.5l-5.5 1M55 46.5l-5.5-1.2" stroke="#3A2540" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4.5l8 6.7v7.8a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 19z"/><path d="M10 20.8v-4.6a2 2 0 0 1 4 0v4.6"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.3a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M6 4.5h10.5A1.5 1.5 0 0 1 18 6v13.5H7.5A2.5 2.5 0 0 1 5 17V5.5a1 1 0 0 1 1-1z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18"/><path d="M9.5 8.5h4"/></symbol>
+  <symbol id="i-me" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c1.3-3.6 4-5.4 7-5.4s5.7 1.8 7 5.4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 4.2a5.3 5.3 0 0 0-5.3 5.3v3.2L5 16.3h14l-1.7-3.6V9.5A5.3 5.3 0 0 0 12 4.2z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9"/></symbol>
+  <symbol id="i-bowl" viewBox="0 0 24 24"><path d="M3.5 12.5h17a8.5 7 0 0 1-17 0z"/><circle cx="9" cy="9" r="1.6"/><circle cx="14" cy="8" r="1.6"/><circle cx="12" cy="11" r=".6"/></symbol>
+  <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="7" cy="17" r="2.6"/><path d="M9 15 17.5 6.5"/><path d="M14 5.5h4.5V10"/></symbol>
+  <symbol id="i-pill" viewBox="0 0 24 24"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8.25" width="17" height="7.5" rx="3.75"/><path d="M12 8.25H7.25a3.75 3.75 0 0 0 0 7.5H12z" fill="currentColor"/></g></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M8.5 10a5 5 0 0 1 7 0"/><path d="M12 10.5l1.2-1.8"/></symbol>
+  <symbol id="i-bath" viewBox="0 0 24 24"><path d="M3.5 12h17v1.5a5.5 5.5 0 0 1-5.5 5.5H9a5.5 5.5 0 0 1-5.5-5.5z"/><path d="M6 12V6.5a2 2 0 0 1 3.6-1.2"/><path d="M8 19.5 7 21M16 19.5l1 1.5"/></symbol>
+  <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><ellipse cx="5.6" cy="10.6" rx="2" ry="2.5"/><ellipse cx="9.4" cy="6.6" rx="2" ry="2.6"/><ellipse cx="14.6" cy="6.6" rx="2" ry="2.6"/><ellipse cx="18.4" cy="10.6" rx="2" ry="2.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+  <symbol id="i-syringe" viewBox="0 0 24 24"><g transform="rotate(45 12 12)"><rect x="8.5" y="7" width="7" height="10" rx="1.6"/><path d="M12 17v4.5M9 3.5h6M12 3.5V7M8.5 10.5h3M8.5 13.5h3"/></g></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.8 18.5 6v5.4c0 4.2-2.8 7.4-6.5 8.8-3.7-1.4-6.5-4.6-6.5-8.8V6z"/><path d="M9.2 12l2 2 3.8-3.8"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6.5" cy="7" r="2.6"/><circle cx="6.5" cy="17" r="2.6"/><path d="M8.8 8.4 19 16.5M8.8 15.6 19 7.5"/></symbol>
+  <symbol id="i-steth" viewBox="0 0 24 24"><path d="M6 4.5v5a4 4 0 0 0 8 0v-5"/><path d="M10 13.5v1.5a4.5 4.5 0 0 0 9 0v-2"/><circle cx="19" cy="11" r="2"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13.5 14-14 .5 9-5 14-12 14z"/><path d="M5 19c3-4 6-6.5 9.5-8.5"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 20.5s-6-5.6-6-10.5a6 6 0 0 1 12 0c0 4.9-6 10.5-6 10.5z"/><circle cx="12" cy="10" r="2.2"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.5l2.3 4.7 5.2.7-3.8 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1-3.8-3.6 5.2-.7z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M5 19l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L9 17.5z"/></symbol>
+</svg>
+
+<header class="status" aria-hidden="true">
+  <span class="status-time">9:41</span>
+  <span class="status-icons">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="5" y="5.5" width="3" height="6.5" rx=".8"/><rect x="10" y="3" width="3" height="9" rx=".8"/><rect x="15" y="0" width="3" height="12" rx=".8"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4.3a9.5 9.5 0 0 1 13 0"/><path d="M4 7.1a6 6 0 0 1 8 0"/><circle cx="8" cy="10" r="1.3" fill="currentColor" stroke="none"/></svg>
+    <svg width="27" height="12" viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="currentColor" stroke-opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="1.8" fill="currentColor"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z" fill="currentColor" fill-opacity=".4"/></svg>
+  </span>
+</header>
+
+<main class="page">
+  <nav class="nav">
+    <a class="round-btn" href="home.html" aria-label="返回首页"><svg class="ico"><use href="#i-left"/></svg></a>
+    <h1 class="head">预约洗护</h1>
+    <span class="round-btn" role="button" aria-label="我的预约"><svg class="ico"><use href="#i-book"/></svg></span>
+  </nav>
+
+  <section class="card store">
+    <svg class="store-art" viewBox="0 0 56 56" aria-hidden="true">
+      <rect x="10" y="22" width="36" height="24" rx="4" fill="#FFFFFF"/>
+      <path d="M8 14h40l2 9H6z" fill="#FF7AA8"/>
+      <path d="M14 14l-2 9M22 14l-1 9M30 14v9M38 14l1 9" stroke="#FFFFFF" stroke-width="2.6"/>
+      <path d="M6 23a4.4 4.4 0 0 0 8.8 0 4.4 4.4 0 0 0 8.8 0 4.4 4.4 0 0 0 8.8 0 4.4 4.4 0 0 0 8.8 0 4.4 4.4 0 0 0 8.8 0z" fill="#FF7AA8"/>
+      <rect x="22" y="32" width="12" height="14" rx="3" fill="#FFC93C"/>
+      <circle cx="40" cy="34" r="3" fill="#FFC93C"/>
+    </svg>
+    <div class="store-txt">
+      <b>豆丁宠物生活馆 · 滨江店</b>
+      <span class="meta">营业中 09:30–20:00 · 1.2 km</span>
+    </div>
+    <span class="rate"><svg class="ico fill"><use href="#i-star"/></svg>4.9</span>
+  </section>
+
+  <div class="who-row">
+    <h2 class="head">给谁预约</h2>
+    <div class="who">
+    <span class="on"><span class="avatar pink"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#pet-corgi"/></svg></span>团子</span>
+    <span><span class="avatar"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#pet-cat"/></svg></span>芝麻</span>
+    </div>
+  </div>
+
+  <div class="label"><h2 class="head">选服务</h2><span class="meta">按 10–15 kg 体型计价</span></div>
+  <div class="svcs">
+    <div class="svc on">
+      <span class="badge"><svg class="ico"><use href="#i-check"/></svg></span>
+      <div class="svc-top"><span class="tile"><svg class="ico"><use href="#i-bath"/></svg></span><b>基础洗护</b></div>
+      <p class="svc-foot"><span class="price">¥128</span><span class="meta">约 60 分钟</span></p>
+    </div>
+    <div class="svc">
+      <div class="svc-top"><span class="tile"><svg class="ico"><use href="#i-scissors"/></svg></span><b>精致美容</b></div>
+      <p class="svc-foot"><span class="price">¥228</span><span class="meta">约 2 小时</span></p>
+    </div>
+    <div class="svc">
+      <div class="svc-top"><span class="tile yellow"><svg class="ico"><use href="#i-steth"/></svg></span><b>年度体检</b></div>
+      <p class="svc-foot"><span class="price">¥299</span><span class="meta">约 45 分钟</span></p>
+    </div>
+    <div class="svc">
+      <div class="svc-top"><span class="tile yellow"><svg class="ico"><use href="#i-leaf"/></svg></span><b>草本药浴</b></div>
+      <p class="svc-foot"><span class="price">¥168</span><span class="meta">约 75 分钟</span></p>
+    </div>
+  </div>
+
+  <div class="label"><h2 class="head">选日期</h2><span class="meta">2026 年 11 月</span></div>
+  <div class="days">
+    <span class="day full"><span>今天</span><b>7</b></span>
+    <span class="day on"><span>周日</span><b>8</b></span>
+    <span class="day"><span>周一</span><b>9</b></span>
+    <span class="day"><span>周二</span><b>10</b></span>
+    <span class="day"><span>周三</span><b>11</b></span>
+    <span class="day"><span>周四</span><b>12</b></span>
+    <span class="day"><span>周五</span><b>13</b></span>
+  </div>
+
+  <div class="label"><h2 class="head">选时间</h2><span class="meta">划线的已约满</span></div>
+  <div class="slots">
+    <span class="slot">10:00</span>
+    <span class="slot">11:00</span>
+    <span class="slot full">13:30</span>
+    <span class="slot on">14:30</span>
+    <span class="slot">15:30</span>
+    <span class="slot">16:30</span>
+    <span class="slot full">17:30</span>
+    <span class="slot">18:30</span>
+  </div>
+
+  <div class="label"><h2 class="head">给美容师的话</h2></div>
+  <div class="note">
+    <svg class="ico"><use href="#i-pen"/></svg>
+    <p>团子有点怕吹风机，吹干的时候麻烦轻一点、慢一点，谢谢～</p>
+  </div>
+</main>
+
+<div class="checkout">
+  <div class="sumup">
+    <span class="meta">11 月 8 日 14:30</span>
+    <p class="total"><b>¥128</b><span class="meta">到店付</span></p>
+  </div>
+  <a class="btn" href="home.html">确认预约</a>
+</div>
+</body>
+</html>

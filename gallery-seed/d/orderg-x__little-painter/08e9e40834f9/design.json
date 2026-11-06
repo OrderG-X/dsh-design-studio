@@ -1,0 +1,49 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": {
+    "zh": "小画家",
+    "en": "Little Painter"
+  },
+  "description": {
+    "zh": "儿童美术网课的平板 App：课程表和跟着画的上课页",
+    "en": "A tablet app for kids’ art classes: a course list and a paint-along lesson screen"
+  },
+  "kind": "tablet",
+  "screens": [
+    {
+      "file": "courses.html",
+      "title": {
+        "zh": "课程",
+        "en": "Courses"
+      }
+    },
+    {
+      "file": "lesson.html",
+      "title": {
+        "zh": "上课",
+        "en": "Lesson"
+      }
+    }
+  ],
+  "style": "fresh",
+  "categories": [
+    "kids",
+    "education"
+  ],
+  "tags": [
+    "list",
+    "detail",
+    "illustration"
+  ],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": {
+    "login": "orderg-x",
+    "id": 271418316
+  },
+  "ai": {
+    "generated": true,
+    "tool": "dsh-design-studio@0.11.0"
+  }
+}

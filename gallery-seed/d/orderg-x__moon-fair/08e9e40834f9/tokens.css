@@ -1,0 +1,35 @@
+:root {
+  --color-bg: #FBF3E4;
+  --color-surface: #FFFAF0;
+  --color-text: #2A1410;
+  --color-muted: #6F4A3A;
+  --color-line: #E8D3B5;
+  --color-primary: #B8202A;
+  --color-primary-deep: #8F161F;
+  --color-accent: #C8952E;
+  --color-accent-light: #F2C66B;
+  --color-accent-ink: #8C6420;
+  --color-on: #FFF7E6;
+  --color-link: #A31D26;
+  --color-moon: #FFF4DA;
+
+  --font-head: "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --weight-head: 800;
+
+  --text-label: 24px;
+  --text-info: 28px;
+  --text-sub: 44px;
+  --text-title: 156px;
+
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --safe: 72px;
+
+  --radius: 6px;
+  --shadow: 0 6px 18px rgba(140, 30, 20, .12);
+}

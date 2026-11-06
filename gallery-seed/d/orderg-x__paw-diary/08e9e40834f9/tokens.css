@@ -1,0 +1,54 @@
+:root {
+  /* 颜色：粉黄糖果色 */
+  --bg: #FFF4F6;
+  --surface: #FFFFFF;
+  --text: #3A2540;
+  --muted: #7A5E80;
+  --line: #F3D3DD;
+  --primary: #FF7AA8;
+  --accent: #FFC93C;
+  --on: #3A2540;
+  --link: #C2366F;
+  --pink-soft: #FFE4EC;
+  --pink-mid: #FFD1DF;
+  --pink-deep: #E8638F;
+  --yellow-soft: #FFF3CC;
+  --yellow-deep: #E9AE1E;
+
+  /* 字体：圆体 */
+  --font-round: "SF Pro Rounded", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --w-head: 800;
+
+  /* 字号阶梯 */
+  --fs-micro: 11px;
+  --fs-meta: 13px;
+  --fs-body: 15px;
+  --fs-h3: 17px;
+  --fs-h2: 22px;
+  --fs-num: 30px;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --gutter: 20px;
+
+  /* 形状：圆角很大，底下一道厚阴影 */
+  --radius: 24px;
+  --radius-md: 18px;
+  --radius-sm: 14px;
+  --radius-pill: 999px;
+  --shadow: 0 6px 0 #F3C4D3;
+  --shadow-sm: 0 4px 0 #F3C4D3;
+  --shadow-primary: 0 5px 0 var(--pink-deep);
+  --shadow-accent: 0 5px 0 var(--yellow-deep);
+
+  /* 手机安全区 */
+  --status-h: 54px;
+  --tab-h: 49px;
+  --home-bar: 34px;
+}

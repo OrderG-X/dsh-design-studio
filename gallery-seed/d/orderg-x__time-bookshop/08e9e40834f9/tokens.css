@@ -1,0 +1,49 @@
+:root {
+  --color-bg: #F4F1EA;
+  --color-surface: #FFFFFF;
+  --color-paper-2: #EAE5DA;
+  --color-text: #111111;
+  --color-muted: #555555;
+  --color-line: #111111;
+  --color-line-soft: rgba(17, 17, 17, .18);
+  --color-primary: #C8231B;
+  --color-primary-hover: #A81C15;
+  --color-accent: #111111;
+  --color-on: #FFFFFF;
+  --color-link: #C8231B;
+  --color-night: #111111;
+  --color-night-text: #F4F1EA;
+  --color-night-muted: #ABA59A;
+
+  --font-serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-sans: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: clamp(32px, 3.4vw, 48px);
+  --text-2xl: clamp(44px, 5.6vw, 80px);
+  --text-3xl: clamp(56px, 8vw, 112px);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  --rule-thick: 4px;
+  --rule: 1px;
+  --radius: 2px;
+
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0ms; }
+}

@@ -1,0 +1,56 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": {
+    "zh": "巷口面馆",
+    "en": "Alley Noodles"
+  },
+  "description": {
+    "zh": "街边面馆的点单小程序：分类点单、口味备注、取餐叫号，手绘碗面配纸感底色",
+    "en": "An ordering mini program for a street-corner noodle shop: menu by category, taste notes, pickup number, with hand-drawn bowls on paper tones"
+  },
+  "kind": "miniprogram",
+  "screens": [
+    {
+      "file": "menu.html",
+      "title": {
+        "zh": "点单",
+        "en": "Menu"
+      }
+    },
+    {
+      "file": "cart.html",
+      "title": {
+        "zh": "购物车",
+        "en": "Cart"
+      }
+    },
+    {
+      "file": "order.html",
+      "title": {
+        "zh": "订单",
+        "en": "Order"
+      }
+    }
+  ],
+  "style": "warm",
+  "categories": [
+    "food"
+  ],
+  "tags": [
+    "menu",
+    "cart",
+    "checkout",
+    "illustration"
+  ],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": {
+    "login": "orderg-x",
+    "id": 271418316
+  },
+  "ai": {
+    "generated": true,
+    "tool": "dsh-design-studio@0.11.0"
+  }
+}

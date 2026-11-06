@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="miniprogram">
+<title>点单 · 巷口面馆</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="mp-top paper">
+  <div class="mp-status"><span>9:41</span><span class="mp-sys"><svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 2.2c2.5 0 4.8 1 6.5 2.6l1.2-1.3A11 11 0 0 0 8 .4 11 11 0 0 0 .3 3.5l1.2 1.3A9.3 9.3 0 0 1 8 2.2z"/><path d="M8 5.8c1.5 0 2.9.6 3.9 1.5l1.2-1.3A7.4 7.4 0 0 0 8 4a7.4 7.4 0 0 0-5.1 2l1.2 1.3c1-.9 2.4-1.5 3.9-1.5z"/><path d="M8 9.3c.6 0 1.2.2 1.6.6L8 11.6 6.4 9.9c.4-.4 1-.6 1.6-.6z"/></svg><svg width="27" height="13" viewBox="0 0 27 13" aria-hidden="true"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="18" height="9" rx="2"/><path d="M25 4.5v4c.8-.3 1.5-1.1 1.5-2s-.7-1.7-1.5-2z" opacity=".5"/></svg></span></div>
+  <div class="mp-nav custom">
+    <span class="seal serif" aria-hidden="true">巷</span>
+    <span class="brand serif">巷口面馆</span>
+    <button class="branch">老街店<svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>
+  </div>
+</header>
+<main class="menu">
+  <section class="shop">
+    <div class="shop-main">
+      <p class="shop-status"><i class="dot" aria-hidden="true"></i>营业中 · 10:00–21:30 · 距你 280 米</p>
+      <p class="shop-note serif">牛骨汤每天现熬 8 小时</p>
+      <div class="coupons"><span class="coupon">满 60 减 5</span><span class="coupon">满 99 减 12</span></div>
+    </div>
+    <svg class="shopfront" viewBox="0 0 96 84" aria-hidden="true">
+<path d="M14 31v45h68V31" fill="#F3E3D0" stroke="#2B1D14" stroke-width="2" stroke-linejoin="round"/>
+<path d="M8 28l7-15h66l7 15z" fill="#A9542A" stroke="#2B1D14" stroke-width="2" stroke-linejoin="round"/>
+<path d="M26.5 13.5L24 28M40 13.5L39 28M54 13.5l.6 14.5M68 13.5l2 14.5" stroke="#FFF9F2" stroke-width="3.2" stroke-linecap="round"/>
+<path d="M8 28q5 7 10 0t10 0 10 0 10 0 10 0 10 0 10 0 10 0" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linejoin="round"/>
+<rect x="34" y="3" width="28" height="11" rx="2" fill="#FFF9F2" stroke="#2B1D14" stroke-width="1.8"/>
+<path d="M39 8.5h3M45 7v3.5M49 8.5h3M55.5 7.5v2.5" stroke="#A9542A" stroke-width="1.8" stroke-linecap="round"/>
+<rect x="21" y="44" width="24" height="18" rx="2" fill="#FFF9F2" stroke="#2B1D14" stroke-width="1.8"/>
+<path d="M25 52h16c-.6 4.6-3.6 7-8 7s-7.4-2.4-8-7z" fill="#F4DFD0" stroke="#2B1D14" stroke-width="1.4"/><path d="M31 49.5c-1-1.4 1-2.2 0-3.6M35.5 49.5c-1-1.4 1-2.2 0-3.6" fill="none" stroke="#C2A48B" stroke-width="1.4" stroke-linecap="round"/>
+<path d="M55 76V52a7 7 0 0 1 14 0v24" fill="#6E5A4B" stroke="#2B1D14" stroke-width="1.8"/><circle cx="65" cy="65" r="1.2" fill="#F3E3D0"/>
+<path d="M88 30v4" stroke="#2B1D14" stroke-width="1.6"/><ellipse cx="88" cy="41" rx="5.5" ry="7" fill="#D9652F" stroke="#2B1D14" stroke-width="1.6"/><path d="M85 41h6" stroke="#2B1D14" stroke-width="1" opacity=".5"/><path d="M88 48v4" stroke="#2B1D14" stroke-width="1.6"/>
+<path d="M3 76.5h90" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/>
+<path d="M76 76c0-6 5-6 5-11M80 76c0-4 3-4 3-7" fill="none" stroke="#5E7A4A" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+  </section>
+
+  <div class="board">
+    <aside class="cats" aria-label="分类">
+      <button class="cat"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21c3.9 0 6.5-2.6 6.5-6.2 0-3.3-2.3-5.6-3.9-7.8-.4 2-1.4 3.2-2.6 3.8.2-3-1.2-5.6-3.8-7.3.2 3.1-1.6 5-3 7A7.3 7.3 0 0 0 5.5 15c0 3.5 2.6 6 6.5 6z"/></svg>热卖</button>
+      <button class="cat on" aria-current="true">招牌面<b class="cat-n">1</b></button>
+      <button class="cat">汤面</button>
+      <button class="cat">拌面<b class="cat-n">2</b></button>
+      <button class="cat">浇头加料</button>
+      <button class="cat">小菜<b class="cat-n">1</b></button>
+      <button class="cat">饮品</button>
+    </aside>
+    <div class="list">
+      <header class="sec-head"><h2 class="serif">招牌面</h2><span>老汤慢熬，面现切</span></header>
+
+      <article class="dish">
+        <div class="pic "><svg class="bowl" viewBox="0 0 80 80" aria-hidden="true"><path d="M31 21c-3.5-4 3-6.5-.5-11M40.5 18.5c-3.5-4 3-6.5-.5-11M50 21c-3.5-4 3-6.5-.5-11" fill="none" stroke="#C2A48B" stroke-width="2" stroke-linecap="round"/><path d="M9.5 39.5c1 16.5 13.5 27 30.5 27s29.5-10.5 30.5-27" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><path d="M16.5 52.5q2.9-2.7 5.8 0t5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0" fill="none" stroke="#A9542A" stroke-width="1.7" stroke-linecap="round"/><path d="M30 66.6c1.5 3 18.5 3 20 0" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><ellipse cx="40" cy="39.5" rx="31" ry="10" fill="#9C4A26" stroke="#2B1D14" stroke-width="2"/><path d="M17 41.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F2D795" stroke-width="2.2" stroke-linecap="round"/><path d="M20 37.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F2D795" stroke-width="2.2" stroke-linecap="round"/><path transform="translate(27 36) rotate(-8)" d="M-6 0c3.5-2.6 9-2.3 11.6.3C4 3.2-2.4 3.8-6 0z" fill="#6E3218" stroke="#2B1D14" stroke-width="1.2" stroke-linejoin="round"/><path transform="translate(38 33.5) rotate(6)" d="M-6 0c3.5-2.6 9-2.3 11.6.3C4 3.2-2.4 3.8-6 0z" fill="#6E3218" stroke="#2B1D14" stroke-width="1.2" stroke-linejoin="round"/><path transform="translate(33 42) rotate(2)" d="M-6 0c3.5-2.6 9-2.3 11.6.3C4 3.2-2.4 3.8-6 0z" fill="#6E3218" stroke="#2B1D14" stroke-width="1.2" stroke-linejoin="round"/><path d="M48 34c4-3.2 9.5-2.4 12 .8-3 2.6-8.6 2.8-12-.8z" fill="#7C9A5E" stroke="#2B1D14" stroke-width="1.2"/><path d="M49.5 34.2l9 .3" stroke="#E4EAD8" stroke-width="1.2" stroke-linecap="round"/><circle cx="46" cy="42" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="52" cy="40.5" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="24" cy="41.5" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="56" cy="43.5" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="42" cy="45" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="20" cy="38" r="1.1" fill="#E0763A"/><circle cx="58" cy="39" r="1.1" fill="#E0763A"/></svg></div>
+        <div class="dish-body">
+          <h3 class="dish-name">红烧牛肉面</h3>
+          <p class="dish-desc">牛腱慢炖四小时，汤浓肉烂</p>
+          <p class="dish-meta"><span class="hot">招牌</span>月售 1200+</p>
+          <div class="dish-foot">
+            <span class="price"><small>¥</small>26</span>
+            <button class="spec"><span>选规格<b class="spec-n">1</b></span></button>
+          </div>
+        </div>
+      </article>
+
+      <article class="dish">
+        <div class="pic "><svg class="bowl" viewBox="0 0 80 80" aria-hidden="true"><path d="M31 21c-3.5-4 3-6.5-.5-11M40.5 18.5c-3.5-4 3-6.5-.5-11M50 21c-3.5-4 3-6.5-.5-11" fill="none" stroke="#C2A48B" stroke-width="2" stroke-linecap="round"/><path d="M9.5 39.5c1 16.5 13.5 27 30.5 27s29.5-10.5 30.5-27" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><path d="M16.5 52.5q2.9-2.7 5.8 0t5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0" fill="none" stroke="#A9542A" stroke-width="1.7" stroke-linecap="round"/><path d="M30 66.6c1.5 3 18.5 3 20 0" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><ellipse cx="40" cy="39.5" rx="31" ry="10" fill="#C85A32" stroke="#2B1D14" stroke-width="2"/><path d="M17 41.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F4DDA4" stroke-width="2.2" stroke-linecap="round"/><path d="M20 37.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F4DDA4" stroke-width="2.2" stroke-linecap="round"/><path d="M24 34.5a5.4 5.4 0 0 1 10 2.2z" fill="#D9452B" stroke="#2B1D14" stroke-width="1.2" stroke-linejoin="round"/><path d="M44 33a5.4 5.4 0 0 1 9.6 3.4z" fill="#D9452B" stroke="#2B1D14" stroke-width="1.2" stroke-linejoin="round"/><rect x="33" y="38" width="7" height="6" rx="1.6" fill="#7A3A1C" stroke="#2B1D14" stroke-width="1.2" transform="rotate(-8 36 41)"/><rect x="47" y="39" width="7" height="6" rx="1.6" fill="#7A3A1C" stroke="#2B1D14" stroke-width="1.2" transform="rotate(10 50 42)"/><circle cx="28" cy="42" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="57" cy="37" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="42" cy="35" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="22" cy="39" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/></svg></div>
+        <div class="dish-body">
+          <h3 class="dish-name">番茄牛腩面</h3>
+          <p class="dish-desc">整颗番茄熬汤，酸甜开胃</p>
+          <p class="dish-meta">月售 860</p>
+          <div class="dish-foot">
+            <span class="price"><small>¥</small>28</span>
+            <button class="spec"><span>选规格</span></button>
+          </div>
+        </div>
+      </article>
+
+      <article class="dish">
+        <div class="pic green"><svg class="bowl" viewBox="0 0 80 80" aria-hidden="true"><path d="M31 21c-3.5-4 3-6.5-.5-11M40.5 18.5c-3.5-4 3-6.5-.5-11M50 21c-3.5-4 3-6.5-.5-11" fill="none" stroke="#C2A48B" stroke-width="2" stroke-linecap="round"/><path d="M9.5 39.5c1 16.5 13.5 27 30.5 27s29.5-10.5 30.5-27" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><path d="M16.5 52.5q2.9-2.7 5.8 0t5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0" fill="none" stroke="#A9542A" stroke-width="1.7" stroke-linecap="round"/><path d="M30 66.6c1.5 3 18.5 3 20 0" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><ellipse cx="40" cy="39.5" rx="31" ry="10" fill="#EAD8B4" stroke="#2B1D14" stroke-width="2"/><path d="M17 41.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F7E6B8" stroke-width="2.2" stroke-linecap="round"/><path d="M20 37.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F7E6B8" stroke-width="2.2" stroke-linecap="round"/><path d="M24 35.5c2-1.5 4 .8 6-.4M27 40.5c2.4-1.2 4 1 6.4-.2M45 35c2-1.4 4 1 6-.2M50 41c2.2-1.3 4 .8 6.2-.3" fill="none" stroke="#5E7A4A" stroke-width="2" stroke-linecap="round"/><path d="M35 37l6 1.5M37 41.5l6.4.8M41 34.5l5 1.8" stroke="#C98D63" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+        <div class="dish-body">
+          <h3 class="dish-name">雪菜肉丝面</h3>
+          <p class="dish-desc">清汤打底，雪菜脆口</p>
+          <p class="dish-meta">月售 540</p>
+          <div class="dish-foot">
+            <span class="price"><small>¥</small>18</span>
+            <button class="spec"><span>选规格</span></button>
+          </div>
+        </div>
+      </article>
+      <article class="dish soldout">
+        <div class="pic paper"><div class="fade"><svg class="bowl" viewBox="0 0 80 80" aria-hidden="true"><path d="M9.5 39.5c1 16.5 13.5 27 30.5 27s29.5-10.5 30.5-27" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><path d="M16.5 52.5q2.9-2.7 5.8 0t5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0" fill="none" stroke="#A9542A" stroke-width="1.7" stroke-linecap="round"/><path d="M30 66.6c1.5 3 18.5 3 20 0" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><ellipse cx="40" cy="39.5" rx="31" ry="10" fill="#B9774A" stroke="#2B1D14" stroke-width="2"/><path d="M17 41.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F2D795" stroke-width="2.2" stroke-linecap="round"/><path d="M20 37.5c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#F2D795" stroke-width="2.2" stroke-linecap="round"/><path d="M23 37c2-3.2 8-3.6 11-.6-1.4 3.4-8.6 4-11 .6z" fill="#5A2A14" stroke="#2B1D14" stroke-width="1.2"/><path d="M38 35c2-3.4 8.4-3.6 11.4-.4-1.6 3.4-9 4-11.4.4z" fill="#5A2A14" stroke="#2B1D14" stroke-width="1.2"/><path d="M26 36.2l3.6-.8M41.4 34l4-.8" stroke="#C98D63" stroke-width="1.1" stroke-linecap="round"/><circle cx="52" cy="41" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="30" cy="42.5" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/><circle cx="57" cy="37.5" r="1.7" fill="#9DB97A" stroke="#4E6B3A" stroke-width=".8"/></svg></div><span class="stamp serif">售罄</span></div>
+        <div class="dish-body">
+          <h3 class="dish-name">苏式爆鱼面</h3>
+          <p class="dish-desc">青鱼现炸，甜口酱汁</p>
+          <p class="dish-meta">每天限 30 碗</p>
+          <div class="dish-foot"><span class="price off"><small>¥</small>24</span><span class="later">明早 10 点再来</span></div>
+        </div>
+      </article>
+      <header class="sec-head"><h2 class="serif">拌面</h2><span>拌匀了再吃</span></header>
+
+      <article class="dish">
+        <div class="pic green"><svg class="bowl" viewBox="0 0 80 80" aria-hidden="true"><path d="M9.5 39.5c1 16.5 13.5 27 30.5 27s29.5-10.5 30.5-27" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><path d="M16.5 52.5q2.9-2.7 5.8 0t5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0" fill="none" stroke="#A9542A" stroke-width="1.7" stroke-linecap="round"/><path d="M30 66.6c1.5 3 18.5 3 20 0" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><ellipse cx="40" cy="39.5" rx="31" ry="10" fill="#E6BE72" stroke="#2B1D14" stroke-width="2"/><path d="M17 40c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0 6 2 9 0M19 36c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0M22 44c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#C99A4E" stroke-width="1.6" stroke-linecap="round"/><path d="M27 34.5l9 3.2M40 33.5l8.4 4.4M31 41l8 1.6M45 40.5l8-2.2" stroke="#3F5A2A" stroke-width="2.4" stroke-linecap="round"/><path d="M28 38.5c4 1 9 .6 13-1.2" fill="none" stroke="#8A4A22" stroke-width="1.6" stroke-linecap="round" opacity=".8"/></svg></div>
+        <div class="dish-body">
+          <h3 class="dish-name">葱油拌面</h3>
+          <p class="dish-desc">小葱慢熬出油，酱香浓</p>
+          <p class="dish-meta"><span class="hot">人气</span>月售 980</p>
+          <div class="dish-foot">
+            <span class="price"><small>¥</small>14</span>
+            <div class="stepper"><button class="step minus" aria-label="葱油拌面减一份"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 12h11"/></svg></i></button><span class="qty">2</span><button class="step plus" aria-label="葱油拌面加一份"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5v11M6.5 12h11"/></svg></i></button></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="dish">
+        <div class="pic "><svg class="bowl" viewBox="0 0 80 80" aria-hidden="true"><path d="M9.5 39.5c1 16.5 13.5 27 30.5 27s29.5-10.5 30.5-27" fill="#FFF9F2" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><path d="M16.5 52.5q2.9-2.7 5.8 0t5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0 5.8 0" fill="none" stroke="#A9542A" stroke-width="1.7" stroke-linecap="round"/><path d="M30 66.6c1.5 3 18.5 3 20 0" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round"/><ellipse cx="40" cy="39.5" rx="31" ry="10" fill="#EDD39A" stroke="#2B1D14" stroke-width="2"/><path d="M17 40c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0 6 2 9 0M20 36c3-2.4 6 2 9 0s6 2 9 0 6 2 9 0 6 2 9 0" fill="none" stroke="#C99A4E" stroke-width="1.6" stroke-linecap="round"/><path d="M29 38.5c0-4.6 5-6.8 11-6.8s11 2.2 11 6.8c-3 2.4-19 2.4-22 0z" fill="#5A3420" stroke="#2B1D14" stroke-width="1.2"/><path d="M53 37.5l8 2.6M54 41.5l7.4 1M20 38l7 2.6M22 42.5l6-.4" stroke="#8FAE6E" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+        <div class="dish-body">
+          <h3 class="dish-name">老式炸酱面</h3>
+          <p class="dish-desc">黄酱干炸，配黄瓜丝</p>
+          <p class="dish-meta">月售 410</p>
+          <div class="dish-foot">
+            <span class="price"><small>¥</small>19</span>
+            <div class="stepper solo"><button class="step plus" aria-label="老式炸酱面加一份"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5v11M6.5 12h11"/></svg></i></button></div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</main>
+
+<div class="fade-tail" aria-hidden="true"></div>
+<a class="cartbar" href="cart.html" aria-label="购物车，4 件，去结算">
+  <span class="cart-ico"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 8.5h13l-1 12h-11z"/><path d="M9 10.5V7a3 3 0 0 1 6 0v3.5"/></svg><b class="cart-n">4</b></span>
+  <span class="cart-sum"><b class="num">¥60</b><small>已减 ¥5 · 堂食</small></span>
+  <span class="cart-go">选好了</span>
+</a>
+<nav class="mp-tabbar" aria-label="主导航">
+  <a class="on" href="menu.html" aria-current="page"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.5h17a8.5 8.5 0 0 1-17 0z"/><path d="M9 20.5h6"/><path d="M12.5 3.5l-2.5 8M18.5 4l-4.5 7.5"/></svg><span>点单</span></a>
+  <a href="order.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2.4-1.5-2.4 1.5-2.4-1.5-2.4 1.5L6 20.5z"/><path d="M9 8.5h6M9 12.5h6M9 16h3"/></svg><span>订单</span></a>
+  <span class="tab"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1.3-3.8 4.1-5.6 7.5-5.6s6.2 1.8 7.5 5.6"/></svg><span>我的</span></span>
+</nav>
+
+<style>
+.seal { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px 11px 8px 12px; background: var(--color-primary); color: var(--color-on-primary); font-size: var(--text-lg); font-weight: 700; transform: rotate(-4deg); box-shadow: 0 2px 0 var(--color-primary-deep); }
+.brand { font-size: var(--text-xl); font-weight: 700; letter-spacing: .04em; }
+.branch { display: inline-flex; align-items: center; gap: 2px; height: 44px; padding: 0 4px 0 6px; font-size: var(--text-sm); color: var(--color-muted); }
+
+.shop { position: relative; display: flex; align-items: flex-end; gap: 8px; margin: 8px 16px 0; padding: 14px 12px 12px 16px; border-radius: var(--radius-hand); background: var(--color-surface); box-shadow: var(--shadow); }
+.shop-main { flex: 1; min-width: 0; }
+.shop-status { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-muted); white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-soft); }
+.shop-note { margin-top: 6px; font-size: var(--text-lg); font-weight: 600; }
+.coupons { display: flex; gap: 8px; margin-top: 10px; }
+.coupon { padding: 2px 8px; border: 1px dashed var(--color-primary); border-radius: 6px; font-size: var(--text-sm); color: var(--color-primary-deep); background: var(--color-primary-soft); white-space: nowrap; }
+.shopfront { width: 88px; height: 77px; flex-shrink: 0; margin-bottom: -4px; }
+
+.board { display: grid; grid-template-columns: 84px 1fr; margin-top: 16px; padding-bottom: 196px; background: var(--color-surface); border-radius: 20px 20px 0 0; box-shadow: 0 -1px 0 var(--color-line); min-height: 640px; }
+.cats { background: var(--color-paper); border-radius: 20px 0 0 0; padding: 8px 0; }
+.cat { position: relative; width: 100%; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 8px; font-size: var(--text-md); color: var(--color-muted); text-align: center; line-height: 1.3; }
+.cat .ico { color: var(--color-primary); }
+.cat.on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
+.cat.on::before { content: ""; position: absolute; left: 5px; top: 50%; width: 4px; height: 20px; margin-top: -10px; border-radius: 2px; background: var(--color-primary); }
+.cat-n { position: absolute; top: 6px; right: 8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--color-primary); color: var(--color-on-primary); font-size: var(--text-xs); line-height: 16px; font-weight: 600; }
+
+.list { padding: 4px 12px 0; min-width: 0; }
+.sec-head { display: flex; align-items: baseline; gap: 8px; padding: 12px 0 4px; }
+.sec-head h2 { font-size: var(--text-lg); font-weight: 700; }
+.sec-head span { font-size: var(--text-sm); color: var(--color-muted); }
+.dish { display: flex; gap: 12px; padding: 12px 0; }
+.dish + .dish { border-top: 1.5px dashed var(--color-line); }
+.dish-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dish-name { font-family: var(--font-serif); font-size: var(--text-body); font-weight: 700; line-height: 1.35; }
+.dish-desc { margin-top: 2px; font-size: var(--text-sm); color: var(--color-muted); line-height: 1.4; }
+.dish-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: var(--text-xs); color: var(--color-muted); }
+.hot { padding: 0 5px; border-radius: 4px; background: var(--color-primary); color: var(--color-on-primary); font-weight: 600; line-height: 16px; }
+.dish-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; height: 44px; margin-bottom: -8px; }
+.dish-foot .price { font-size: var(--text-lg); }
+.spec { position: relative; height: 44px; display: grid; place-items: center; margin-right: -2px; }
+.spec > span { position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: var(--radius-full); background: var(--color-primary); color: var(--color-on-primary); font-size: var(--text-sm); font-weight: 600; }
+.spec-n { position: absolute; top: -7px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--color-text); color: var(--color-surface); border: 2px solid var(--color-surface); font-size: var(--text-xs); line-height: 14px; text-align: center; }
+.soldout .dish-name, .soldout .dish-desc { color: var(--color-muted); }
+.fade { opacity: .42; filter: grayscale(.6); }
+.stamp { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-14deg); padding: 1px 8px; border: 2px solid var(--color-primary); border-radius: 6px; color: var(--color-primary-deep); background: rgba(255, 249, 242, .92); font-size: var(--text-md); font-weight: 700; letter-spacing: .2em; text-indent: .2em; white-space: nowrap; }
+.price.off { color: var(--color-muted); }
+.later { font-size: var(--text-sm); color: var(--color-muted); }
+
+.fade-tail { position: fixed; left: 0; right: 0; bottom: 84px; height: 88px; z-index: 9; pointer-events: none; background: linear-gradient(rgba(255, 249, 242, 0), var(--color-surface) 62%); }
+.cartbar { position: fixed; left: 12px; right: 12px; bottom: 96px; z-index: 11; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 6px 0 16px; border-radius: var(--radius-full); background: var(--color-text); color: var(--color-surface); box-shadow: 0 10px 24px rgba(43, 29, 20, .28); }
+.cart-ico { position: relative; width: 40px; height: 40px; margin-top: -18px; display: grid; place-items: center; border-radius: 50%; background: var(--color-primary); color: var(--color-on-primary); border: 3px solid var(--color-text); }
+.cart-n { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--color-surface); color: var(--color-primary-deep); font-size: var(--text-xs); line-height: 18px; text-align: center; }
+.cart-sum { flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+.cart-sum b { font-size: var(--text-xl); }
+.cart-sum small { font-size: var(--text-xs); color: var(--color-line); }
+.cart-go { height: 44px; display: grid; place-items: center; padding: 0 22px; border-radius: var(--radius-full); background: var(--color-primary); color: var(--color-on-primary); font-weight: 600; font-size: var(--text-body); }
+</style>
+</body>
+</html>

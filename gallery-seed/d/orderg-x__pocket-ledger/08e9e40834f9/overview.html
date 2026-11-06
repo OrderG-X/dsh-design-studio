@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="desktop">
+<title>总览 · 小账本</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+.content { flex: 1; overflow: auto; padding: var(--space-5); display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: min-content; gap: var(--space-4); align-content: start; }
+.kpi { grid-column: span 3; padding: var(--space-4); display: flex; flex-direction: column; gap: 6px; }
+.kpi .lb { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.kpi .v { font-size: var(--fs-xl); font-weight: 600; line-height: 1.15; letter-spacing: -.01em; white-space: nowrap; }
+.kpi .v small { font-size: var(--fs-lg); font-weight: 500; margin-left: 1px; }
+.kpi .d { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+.kpi .d .tag { height: 18px; padding: 0 4px; gap: 1px; }
+.kpi .d .tag svg { width: 12px; height: 12px; stroke-width: 2.25; }
+.mix { grid-column: span 5; }
+.daily { grid-column: span 7; display: flex; flex-direction: column; }
+.budget { grid-column: span 5; }
+.recent { grid-column: span 7; }
+
+.mix-body { display: flex; align-items: center; gap: var(--space-5); padding: 4px var(--space-4) var(--space-4); }
+.donut { position: relative; width: 160px; height: 160px; flex: none; }
+.donut svg { width: 160px; height: 160px; transform: rotate(-90deg); }
+.donut circle { fill: none; stroke-width: 18; }
+.donut .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.donut .c b { font-size: var(--fs-lg); font-weight: 600; }
+.donut .c span { font-size: var(--fs-sm); color: var(--muted); }
+.legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.legend li { display: flex; align-items: center; gap: var(--space-2); height: 28px; border-bottom: 1px solid var(--line); }
+.legend li:last-child { border-bottom: 0; }
+.legend .nm { flex: 1; white-space: nowrap; }
+.legend .amt { width: 84px; text-align: right; }
+.legend .pc { width: 48px; text-align: right; color: var(--muted); }
+
+.seg { display: inline-flex; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); margin-left: auto; }
+.seg span { height: 22px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: var(--radius-xs); color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+.seg .on { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: var(--shadow); }
+.chart { position: relative; flex: 1; min-height: 168px; margin: 0 var(--space-4) 0 56px; }
+.grid-l { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
+.grid-l span { position: absolute; right: calc(100% + 8px); top: -9px; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+.grid-l.ref { border-top: 1px dashed var(--muted); }
+.grid-l.ref em { position: absolute; right: 0; top: -20px; font-style: normal; font-size: var(--fs-sm); color: var(--muted); background: var(--surface); padding: 0 0 0 6px; white-space: nowrap; }
+.bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 4px; }
+.b { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.b i { display: block; width: 100%; max-width: 12px; background: var(--primary); opacity: .78; border-radius: 4px 4px 0 0; transition: opacity .15s var(--ease); }
+.b:hover i { opacity: 1; }
+.b.top i { opacity: 1; }
+.b.future i { background: transparent; border: 1px dashed #B8C2D1; border-bottom: 0; opacity: 1; }
+.b em { position: absolute; bottom: calc(92.8% + 4px); font-style: normal; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; }
+.xaxis { position: relative; height: 18px; margin: 6px var(--space-4) var(--space-3) 56px; font-size: var(--fs-sm); color: var(--muted); }
+.xaxis span { position: absolute; top: 0; width: 0; display: flex; justify-content: center; white-space: nowrap; }
+
+.btotal { padding: 0 var(--space-4) var(--space-3); }
+.btotal .row { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: 6px; white-space: nowrap; }
+.btotal .row b { font-size: var(--fs-lg); font-weight: 600; }
+.btotal .row .r { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.btotal .bar { height: 8px; }
+.bar { flex: 1; height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; min-width: 40px; }
+.bar i { display: block; height: 100%; border-radius: 999px; }
+.blist { list-style: none; margin: 0; padding: 0 var(--space-4) var(--space-3); border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.blist li { display: flex; align-items: center; gap: var(--space-3); height: 30px; }
+.blist .nm { width: 52px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.blist .val { width: 132px; text-align: right; }
+.blist .pc { width: 72px; text-align: right; color: var(--muted); }
+.blist .tag { width: 72px; justify-content: center; }
+
+.rlist { border-top: 1px solid var(--line); }
+.r { display: grid; grid-template-columns: 108px 72px minmax(0, 1fr) 48px 96px; align-items: center; gap: var(--space-3); height: 40px; padding: 0 var(--space-4); border-bottom: 1px solid var(--line); transition: background .15s var(--ease); }
+.r:last-child { border-bottom: 0; }
+.r:hover { background: var(--hover); }
+.r .when { display: flex; gap: 6px; white-space: nowrap; }
+.r .cat { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.r .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r .amt { text-align: right; font-weight: 600; }
+.kpi .d { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1200px) {
+  .kpi { grid-column: span 6; }
+  .mix, .daily, .budget, .recent { grid-column: span 12; }
+}
+</style>
+</head>
+<body>
+<div class="win">
+  <aside class="side" aria-label="侧栏">
+    <div class="brand"><span class="logo"><svg class="i" aria-hidden="true"><use href="icons.svg#book"></use></svg></span><b>小账本</b><span class="book">日常<svg class="i" style="width:12px;height:12px" aria-hidden="true"><use href="icons.svg#down"></use></svg></span></div>
+    <nav class="nav" aria-label="主导航">
+      <a href="overview.html" class="on"><svg class="i" aria-hidden="true"><use href="icons.svg#overview"></use></svg>总览</a>
+      <a href="entries.html" class=""><svg class="i" aria-hidden="true"><use href="icons.svg#list"></use></svg>流水<span class="count num">86</span></a>
+      <span class="item"><svg class="i" aria-hidden="true"><use href="icons.svg#budget"></use></svg>预算<span class="flag"><i class="dot" style="background:var(--danger);width:6px;height:6px"></i>1 项超支</span></span>
+      <span class="item"><svg class="i" aria-hidden="true"><use href="icons.svg#report"></use></svg>报表</span>
+    </nav>
+    <h3>账户</h3>
+    <div class="acct"><svg class="i" aria-hidden="true"><use href="icons.svg#cash"></use></svg>现金<span class="num">¥1,286.40</span></div>
+    <div class="acct"><svg class="i" aria-hidden="true"><use href="icons.svg#save"></use></svg>储蓄<span class="num">¥48,200.00</span></div>
+    <div class="acct"><svg class="i" aria-hidden="true"><use href="icons.svg#credit"></use></svg>信用<span class="num">−¥3,412.80</span></div>
+    <div class="net"><span>净资产</span><b class="num">¥46,073.60</b></div>
+    <h3>常用分类</h3>
+    <div class="nav">
+      <span class="item"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span>
+      <span class="item"><i class="dot" style="background:var(--cat-shopping)"></i>购物</span>
+      <span class="item"><i class="dot" style="background:var(--cat-transit)"></i>交通</span>
+      <span class="item"><i class="dot" style="background:var(--cat-fun)"></i>娱乐</span>
+    </div>
+    <div class="side-foot"><i class="ok"></i>本地已保存 · 刚刚<span class="gear" title="设置"><svg class="i" aria-hidden="true"><use href="icons.svg#gear"></use></svg></span></div>
+  </aside>
+  <div class="main">
+    <header class="toolbar">
+      <h1>总览</h1>
+      <div class="month">
+        <button class="ib" aria-label="上个月"><svg class="i" aria-hidden="true"><use href="icons.svg#left"></use></svg></button>
+        <b>2026 年 10 月</b>
+        <button class="ib" aria-label="下个月"><svg class="i" aria-hidden="true"><use href="icons.svg#right"></use></svg></button>
+      </div>
+      <span class="tag">还剩 3 天</span>
+      <div class="spacer"></div>
+      <div class="search"><svg class="i" aria-hidden="true"><use href="icons.svg#search"></use></svg><span>搜索流水</span><kbd>⌘F</kbd></div>
+      <button class="btn primary"><svg class="i" aria-hidden="true"><use href="icons.svg#plus"></use></svg>记一笔<kbd>⌘N</kbd></button>
+    </header>
+    <main class="content">
+      <section class="card kpi">
+        <span class="lb">本月支出</span>
+        <span class="v num">¥9,327<small>.50</small></span>
+        <span class="d"><span class="tag good"><svg class="i" aria-hidden="true"><use href="icons.svg#dn"></use></svg>8.4%</span>比 9 月少花 ¥855.40</span>
+      </section>
+      <section class="card kpi">
+        <span class="lb">本月收入</span>
+        <span class="v num">¥18,640<small>.00</small></span>
+        <span class="d"><span class="tag good"><svg class="i" aria-hidden="true"><use href="icons.svg#up"></use></svg>3.2%</span>工资、稿费、理财收益</span>
+      </section>
+      <section class="card kpi">
+        <span class="lb">结余</span>
+        <span class="v num">¥9,312<small>.50</small></span>
+        <span class="d"><span class="tag">存下 50.0%</span>比 9 月多 ¥1,433.40</span>
+      </section>
+      <section class="card kpi">
+        <span class="lb">日均还能花</span>
+        <span class="v num">¥390<small>.83</small></span>
+        <span class="d">预算剩 ¥1,172.50 · 3 天</span>
+      </section>
+
+      <section class="card mix">
+        <div class="card-h"><h2>支出构成</h2><span class="muted">按分类</span></div>
+        <div class="mix-body">
+          <div class="donut"><svg viewBox="0 0 160 160" role="img" aria-label="10 月支出按分类：住房 40.7%，餐饮 23.0%，购物 18.1%，交通 6.9%，娱乐 6.3%，其他 5.0%"><circle cx="80" cy="80" r="60" stroke="var(--cat-housing)" stroke-dasharray="151.59 225.41" stroke-dashoffset="0.00"/><circle cx="80" cy="80" r="60" stroke="var(--cat-food)" stroke-dasharray="84.84 292.15" stroke-dashoffset="-153.59"/><circle cx="80" cy="80" r="60" stroke="var(--cat-shopping)" stroke-dasharray="66.07 310.92" stroke-dashoffset="-240.43"/><circle cx="80" cy="80" r="60" stroke="var(--cat-transit)" stroke-dasharray="23.98 353.01" stroke-dashoffset="-308.50"/><circle cx="80" cy="80" r="60" stroke="var(--cat-fun)" stroke-dasharray="21.68 355.31" stroke-dashoffset="-334.48"/><circle cx="80" cy="80" r="60" stroke="var(--cat-other)" stroke-dasharray="16.83 360.16" stroke-dashoffset="-358.16"/></svg><div class="c"><b class="num">¥9,327.50</b><span>6 个分类</span></div></div>
+          <ul class="legend"><li><i class="dot" style="background:var(--cat-housing)"></i><span class="nm">住房</span><span class="num amt">¥3,800.00</span><span class="num pc">40.7%</span></li><li><i class="dot" style="background:var(--cat-food)"></i><span class="nm">餐饮</span><span class="num amt">¥2,148.60</span><span class="num pc">23.0%</span></li><li><i class="dot" style="background:var(--cat-shopping)"></i><span class="nm">购物</span><span class="num amt">¥1,684.30</span><span class="num pc">18.1%</span></li><li><i class="dot" style="background:var(--cat-transit)"></i><span class="nm">交通</span><span class="num amt">¥642.80</span><span class="num pc">6.9%</span></li><li><i class="dot" style="background:var(--cat-fun)"></i><span class="nm">娱乐</span><span class="num amt">¥586.00</span><span class="num pc">6.3%</span></li><li><i class="dot" style="background:var(--cat-other)"></i><span class="nm">其他</span><span class="num amt">¥465.80</span><span class="num pc">5.0%</span></li></ul>
+        </div>
+      </section>
+
+      <section class="card daily">
+        <div class="card-h"><h2>每日支出</h2><span class="muted">不含房租</span><span class="seg"><span class="on">日</span><span>周</span><span>月</span></span></div>
+        <div class="chart" role="img" aria-label="10 月每日支出柱状图，最高 10 月 27 日 ¥649.50">
+          <div class="grid-l" style="bottom:85.7%"><span>600</span></div>
+          <div class="grid-l" style="bottom:57.1%"><span>400</span></div>
+          <div class="grid-l ref" style="bottom:30.9%"><span>216</span><em>日均预算</em></div>
+          <div class="grid-l" style="bottom:0"><span>0</span></div>
+          <div class="bars"><div class="b" title="10月1日 ¥342.00"><i style="height:48.9%"></i></div><div class="b" title="10月2日 ¥438.00"><i style="height:62.6%"></i></div><div class="b" title="10月3日 ¥356.00"><i style="height:50.9%"></i></div><div class="b" title="10月4日 ¥262.00"><i style="height:37.4%"></i></div><div class="b" title="10月5日 ¥298.00"><i style="height:42.6%"></i></div><div class="b" title="10月6日 ¥188.00"><i style="height:26.9%"></i></div><div class="b" title="10月7日 ¥142.00"><i style="height:20.3%"></i></div><div class="b" title="10月8日 ¥96.00"><i style="height:13.7%"></i></div><div class="b" title="10月9日 ¥132.00"><i style="height:18.9%"></i></div><div class="b" title="10月10日 ¥188.10"><i style="height:26.9%"></i></div><div class="b" title="10月11日 ¥226.00"><i style="height:32.3%"></i></div><div class="b" title="10月12日 ¥84.00"><i style="height:12.0%"></i></div><div class="b" title="10月13日 ¥118.00"><i style="height:16.9%"></i></div><div class="b" title="10月14日 ¥76.00"><i style="height:10.9%"></i></div><div class="b" title="10月15日 ¥162.00"><i style="height:23.1%"></i></div><div class="b" title="10月16日 ¥128.00"><i style="height:18.3%"></i></div><div class="b" title="10月17日 ¥198.00"><i style="height:28.3%"></i></div><div class="b" title="10月18日 ¥184.00"><i style="height:26.3%"></i></div><div class="b" title="10月19日 ¥72.00"><i style="height:10.3%"></i></div><div class="b" title="10月20日 ¥98.00"><i style="height:14.0%"></i></div><div class="b" title="10月21日 ¥136.00"><i style="height:19.4%"></i></div><div class="b" title="10月22日 ¥88.00"><i style="height:12.6%"></i></div><div class="b" title="10月23日 ¥154.00"><i style="height:22.0%"></i></div><div class="b" title="10月24日 ¥212.00"><i style="height:30.3%"></i></div><div class="b" title="10月25日 ¥268.90"><i style="height:38.4%"></i></div><div class="b" title="10月26日 ¥167.00"><i style="height:23.9%"></i></div><div class="b top" title="10月27日 ¥649.50"><i style="height:92.8%"></i><em class="num">¥649.50</em></div><div class="b" title="10月28日 ¥64.00"><i style="height:9.1%"></i></div><div class="b future" title="10月29日"><i style="height:10%"></i></div><div class="b future" title="10月30日"><i style="height:10%"></i></div><div class="b future" title="10月31日"><i style="height:10%"></i></div></div>
+        </div>
+        <div class="xaxis"><span style="left:1.61%">1日</span><span style="left:24.19%">8日</span><span style="left:46.77%">15日</span><span style="left:69.35%">22日</span><span style="left:91.94%">29日</span></div>
+      </section>
+
+      <section class="card budget">
+        <div class="card-h"><h2>预算</h2><span class="tag warn">购物超支</span><span class="muted" style="margin-left:auto">月预算 ¥10,500</span></div>
+        <div class="btotal">
+          <div class="row"><b class="num">88.8%</b><span class="muted">已用 ¥9,327.50</span><span class="r num">剩 ¥1,172.50</span></div>
+          <div class="bar"><i style="width:88.8%;background:var(--primary)"></i></div>
+        </div>
+        <ul class="blist"><li><span class="nm"><i class="dot" style="background:var(--cat-housing)"></i>住房</span><span class="bar"><i style="width:100.0%;background:var(--cat-housing)"></i></span><span class="num val">3,800.00<span class="muted"> / 3,800</span></span><span class="num pc">100%</span></li><li><span class="nm"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="bar"><i style="width:85.9%;background:var(--cat-food)"></i></span><span class="num val">2,148.60<span class="muted"> / 2,500</span></span><span class="num pc">86%</span></li><li class="over"><span class="nm"><i class="dot" style="background:var(--cat-shopping)"></i>购物</span><span class="bar"><i style="width:100.0%;background:var(--danger)"></i></span><span class="num val">1,684.30<span class="muted"> / 1,500</span></span><span class="tag warn">超 ¥184.30</span></li><li><span class="nm"><i class="dot" style="background:var(--cat-transit)"></i>交通</span><span class="bar"><i style="width:71.4%;background:var(--cat-transit)"></i></span><span class="num val">642.80<span class="muted"> / 900</span></span><span class="num pc">71%</span></li><li><span class="nm"><i class="dot" style="background:var(--cat-fun)"></i>娱乐</span><span class="bar"><i style="width:73.3%;background:var(--cat-fun)"></i></span><span class="num val">586.00<span class="muted"> / 800</span></span><span class="num pc">73%</span></li><li><span class="nm"><i class="dot" style="background:var(--cat-other)"></i>其他</span><span class="bar"><i style="width:46.6%;background:var(--cat-other)"></i></span><span class="num val">465.80<span class="muted"> / 1,000</span></span><span class="num pc">47%</span></li></ul>
+      </section>
+
+      <section class="card recent">
+        <div class="card-h"><h2>最近几笔</h2><a class="more" href="entries.html">全部流水<svg class="i" style="width:14px;height:14px" aria-hidden="true"><use href="icons.svg#right"></use></svg></a></div>
+        <div class="rlist"><a class="r" href="entries.html"><span class="when"><span>10月28日</span><span class="muted num">18:52</span></span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note">晚饭 · 楼下沙县</span><span class="acc muted">信用</span><span class="num amt">−¥28.00</span></a><a class="r" href="entries.html"><span class="when"><span>10月28日</span><span class="muted num">12:36</span></span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note">午饭 · 牛肉粉</span><span class="acc muted">信用</span><span class="num amt">−¥32.00</span></a><a class="r" href="entries.html"><span class="when"><span>10月28日</span><span class="muted num">08:15</span></span><span class="cat"><i class="dot" style="background:var(--cat-transit)"></i>交通</span><span class="note">地铁</span><span class="acc muted">储蓄</span><span class="num amt">−¥4.00</span></a><a class="r" href="entries.html"><span class="when"><span>10月27日</span><span class="muted num">21:04</span></span><span class="cat"><i class="dot" style="background:var(--cat-shopping)"></i>购物</span><span class="note">冬季被子</span><span class="acc muted">信用</span><span class="num amt">−¥459.00</span></a><a class="r" href="entries.html"><span class="when"><span>10月27日</span><span class="muted num">19:30</span></span><span class="cat"><i class="dot" style="background:var(--cat-food)"></i>餐饮</span><span class="note">和小林吃火锅</span><span class="acc muted">信用</span><span class="num amt">−¥186.50</span></a><a class="r" href="entries.html"><span class="when"><span>10月27日</span><span class="muted num">15:10</span></span><span class="cat"><i class="dot" style="background:var(--accent)"></i>收入</span><span class="note">稿费 · 十月专栏</span><span class="acc muted">储蓄</span><span class="num amt in">+¥1,200.00</span></a></div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

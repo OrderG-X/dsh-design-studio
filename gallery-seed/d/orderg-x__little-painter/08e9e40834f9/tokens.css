@@ -1,0 +1,55 @@
+:root {
+  --bg: #F3F7F2;
+  --surface: #FFFFFF;
+  --surface-2: #EDF4EB;
+  --tint: #E2EFDF;
+  --sky: #E3F1EE;
+  --text: #1F2A22;
+  --muted: #56665A;
+  --line: #DCE6DA;
+  --primary: #2F7D4F;
+  --primary-press: #276B43;
+  --primary-soft: #DCEEDF;
+  --on: #FFFFFF;
+  --accent: #C9962A;
+  --accent-soft: #F8EDCF;
+  --accent-ink: #7A5710;
+  --leaf: #6FAE7E;
+  --leaf-deep: #4E9A5F;
+  --leaf-light: #B9DDB4;
+  --sun: #F2C94C;
+  --wood: #9A6B44;
+
+  --font: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --w-head: 600;
+
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+  --fs-2xl: 32px;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-full: 999px;
+
+  --shadow: 0 6px 18px rgba(47, 125, 79, .10);
+  --shadow-sm: 0 1px 3px rgba(47, 125, 79, .08);
+
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0ms; }
+}

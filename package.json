@@ -52,7 +52,8 @@
     "README.md",
     "README.en.md",
     "assets/hero-sm.jpg",
-    "assets/demo.gif"
+    "assets/demo.gif",
+    "gallery-seed"
   ],
   "icon": "./icon.svg",
   "dsh": {

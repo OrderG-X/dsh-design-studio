@@ -1,0 +1,50 @@
+:root {
+  --bg: #F5F7FB;
+  --surface: #FFFFFF;
+  --text: #0F172A;
+  --muted: #55657D;
+  --line: #E2E8F0;
+  --primary: #2457F5;
+  --primary-hover: #1C49DB;
+  --primary-soft: #E9EFFE;
+  --accent: #0F8F8E;
+  --accent-soft: #E2F3F2;
+  --accent-ink: #0A7372;
+  --on: #FFFFFF;
+  --link: #2457F5;
+  --danger: #C0392B;
+  --danger-soft: #FCEDEB;
+  --side: #EDF1F7;
+  --side-line: #DCE3ED;
+  --hover: #F1F4F9;
+  --track: #E8EDF4;
+
+  --cat-housing: #2457F5;
+  --cat-food: #EB6834;
+  --cat-transit: #0BA394;
+  --cat-shopping: #EDA100;
+  --cat-fun: #7A5CE0;
+  --cat-other: #94A3B8;
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 28px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
+  --shadow: 0 1px 3px rgba(15, 23, 42, .08);
+  --shadow-pop: 0 8px 24px rgba(15, 23, 42, .12);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}

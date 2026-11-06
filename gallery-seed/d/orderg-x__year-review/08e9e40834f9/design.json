@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "type": "template",
+  "title": { "zh": "青禾年度回顾", "en": "Qinghe Year in Review" },
+  "description": {
+    "zh": "植物零售小公司的六页年终汇报：大数字、月度柱状图、时间线和明年计划，瑞士网格风格",
+    "en": "A six-slide year-end review for a small plant retailer: big numbers, a monthly bar chart, a timeline and next year's plan, in a Swiss grid style"
+  },
+  "kind": "slides",
+  "screens": [
+    { "file": "01-cover.html", "title": { "zh": "封面", "en": "Cover" } },
+    { "file": "02-highlights.html", "title": { "zh": "三个数字", "en": "Highlights" } },
+    { "file": "03-growth.html", "title": { "zh": "月度营收", "en": "Monthly revenue" } },
+    { "file": "04-milestones.html", "title": { "zh": "四个节点", "en": "Milestones" } },
+    { "file": "05-next.html", "title": { "zh": "明年三件事", "en": "Next year" } },
+    { "file": "06-thanks.html", "title": { "zh": "谢谢", "en": "Thanks" } }
+  ],
+  "style": "swiss",
+  "categories": ["business"],
+  "tags": ["report", "chart"],
+  "lang": "zh",
+  "license": "CC0-1.0",
+  "author": { "login": "orderg-x", "id": 271418316 },
+  "ai": { "generated": true, "tool": "dsh-design-studio@0.11.0" }
+}

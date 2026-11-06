@@ -1,0 +1,30 @@
+:root {
+  --color-bg: #FFFFFF;
+  --color-surface: #F1F1F1;
+  --color-text: #0A0A0A;
+  --color-muted: #545454;
+  --color-line: #0A0A0A;
+  --color-primary: #D9001B;
+  --color-on-primary: #FFFFFF;
+  --color-link: #C2001A;
+  --color-bar: #BDBDBD;
+
+  --font-sans: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --weight-head: 800;
+
+  --text-note: 16px;
+  --text-small: 20px;
+  --text-body: 24px;
+  --text-sub: 32px;
+  --text-title: 52px;
+  --text-num: 120px;
+  --text-hero: 136px;
+
+  --margin: 64px;
+  --col: 74px;
+  --gutter: 24px;
+  --rule: 8px;
+  --rule-mid: 4px;
+  --rule-thin: 2px;
+  --radius: 0;
+}

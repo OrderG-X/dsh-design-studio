@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="slides">
+<title>明年三件事 · 青禾年度回顾</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="deck.css">
+<style>
+  .block {
+    position: absolute;
+    top: 128px;
+    left: 0;
+    width: 432px;
+    bottom: 0;
+    padding: 16px 24px 0 var(--margin);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+  .block h1 {
+    font-size: var(--text-title);
+    font-weight: var(--weight-head);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .block .goal {
+    position: absolute;
+    left: var(--margin);
+    bottom: var(--margin);
+  }
+  .block .goal .k { font-size: var(--text-small); font-weight: 700; line-height: 24px; }
+  .block .goal .num { margin-top: 12px; font-size: var(--text-title); }
+  .block .goal .d { margin-top: 12px; font-size: var(--text-small); line-height: 24px; }
+
+  .todo {
+    position: absolute;
+    top: 144px;
+    left: 456px;
+    width: 760px;
+  }
+  .todo li {
+    display: grid;
+    grid-template-columns: 172px 564px;
+    column-gap: var(--gutter);
+    height: 168px;
+    padding-top: 20px;
+    border-top: var(--rule-mid) solid var(--color-line);
+  }
+  .todo li:first-child { border-top-width: var(--rule); padding-top: 16px; }
+  .todo .n { font-size: 72px; }
+  .todo h2 { font-size: var(--text-sub); font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; padding-top: 6px; }
+  .todo .desc { margin-top: 8px; font-size: var(--text-body); line-height: 1.45; color: var(--color-muted); }
+</style>
+</head>
+<body>
+<main class="slide">
+  <header class="top grid">
+    <span class="brand">青禾植物</span>
+    <span class="deck">2026 年度回顾</span>
+    <span class="sec">04 — 2027 计划</span>
+    <a class="pg" href="06-thanks.html">05 / 06</a>
+  </header>
+
+  <aside class="block">
+    <h1>2027 年，<br>只做三件事</h1>
+    <div class="goal">
+      <p class="k">全年营收目标 · 万元</p>
+      <p class="num">2,800</p>
+      <p class="d">比今年多 51%</p>
+    </div>
+  </aside>
+
+  <ol class="todo">
+    <li>
+      <p class="n num">01</p>
+      <div>
+        <h2>门店开到 12 家</h2>
+        <p class="desc">新开 5 家社区店，每家 3 公里内要有 2 万户住户</p>
+      </div>
+    </li>
+    <li>
+      <p class="n num">02</p>
+      <div>
+        <h2>会员复购率做到 55%</h2>
+        <p class="desc">上线养护提醒和上门换盆，让会员每个季度回店一次</p>
+      </div>
+    </li>
+    <li>
+      <p class="n num">03</p>
+      <div>
+        <h2>自育绿植占到 60%</h2>
+        <p class="desc">温室扩到 3,000 平米，毛利率再提高 6 个点</p>
+      </div>
+    </li>
+  </ol>
+</main>
+</body>
+</html>
