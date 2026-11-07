@@ -15,6 +15,7 @@ const react = {
   useEffect: () => {},
   useRef: (v = null) => ({ current: v }),
   useCallback: (fn) => fn,
+  useLayoutEffect: () => {},
 }
 let mod
 globalThis.window = { __ModuleLoader__: { load: ({ factory }) => { mod = factory((name) => (name === 'react' ? react : null)) } } }
@@ -87,7 +88,7 @@ check('还没拿到状态（DSH 刚启动）：先空着，不闪空状态', !lo
 mod._test.poller('sEmpty').state = { url: '' }
 const emptyView = body.comp({ ...body.opts.inject('sEmpty') })
 const emptyText = text(emptyView)
-check('空状态：一句标题 + 示例 + 收起的「其他开始方式」（地址框在里面）', emptyText.includes('想做点什么') && emptyText.includes('试试这样说') && emptyText.includes('其他开始方式') && emptyText.includes('打开'), emptyText)
+check('首页：一句问话 + 大输入框（参考图、风格）+ 类型 + 收起的「打开已有的 HTML」', emptyText.includes('想做点什么') && emptyText.includes('参考图') && emptyText.includes('风格：自动') && emptyText.includes('小程序') && emptyText.includes('打开已有的 HTML'), emptyText)
 check('空状态：网页版（没有桌面版的桥）不显示「浏览…」，提示照旧', !emptyText.includes('浏览…') && emptyText.includes('输入文件路径，或本地端口'), emptyText)
 globalThis.__DSH_HOST_PATHS__ = { pathFor: (f) => '/Users/me/site/' + f.name }
 const deskText = text(body.comp({ ...body.opts.inject('sEmpty') }))
@@ -103,16 +104,37 @@ function findEl(el, ok) {
 const isBrowse = (el) => el.type === 'button' && el.props && el.props.className === 'ddp-browse'
 const deskBtn = findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse)
 check('空状态：桌面版真有「浏览…」按钮、点得动', !!deskBtn && typeof deskBtn.props.onClick === 'function' && deskBtn.props.type === 'button')
-// 排在哪：标题 → 示例 → 模板 → 风格 → 收起的「其他开始方式」（地址框、参考图、品牌、设计库都在里面）
-const startBox = findEl(body.comp({ ...body.opts.inject('sEmpty') }), (el) => el.props && el.props.className === 'ddp-start')
+// 排在哪：顶条（开始 / 市场 / 我的作品 / 灵感）→ 问话 → 大输入框 → 接着做 → 模板 → 收起的「打开已有的 HTML」（地址框在里面）
+const homeView = body.comp({ ...body.opts.inject('sEmpty') })
+const bar = findEl(homeView, (el) => el.props && el.props.className === 'ddp-homebar')
+const barTabs = []
+findEl(bar, (el) => { if (el.type === 'button' && el.props && el.props.role === 'tab') barTabs.push(el); return false })
+check('首页：顶上四个页签，「开始」选中', barTabs.length === 4 && barTabs[0].props['aria-selected'] === true && text(barTabs[0]) === '开始', barTabs.map(text).join(','))
+const startBox = findEl(homeView, (el) => el.props && el.props.className === 'ddp-start')
 const kids = startBox ? [].concat(startBox.children || startBox.props.children || []).flat() : []
 const at = (cls) => kids.findIndex((k) => k && typeof k === 'object' && ((k.props && k.props.className === cls) || (typeof k.type === 'function' && k.type.name === cls)))
-const order = ['ddp-hello', 'ddp-tries', 'TplStart', 'ddp-stylepick', 'ddp-ways'].map(at)
+const order = ['ddp-hero', 'HomeAsk', 'HomeWorks', 'TplStart', 'ddp-ways'].map(at)
 const ways = kids.find((k) => k && k.props && k.props.className === 'ddp-ways')
-const inWays = (ok) => !!(ways && findEl(ways, ok))
-const lks = []
-findEl(ways, (el) => { if (el.type === 'button' && el.props && el.props.className === 'lk') lks.push(el); return false })
-check('空状态：标题 → 示例 → 模板 → 风格 → 收起的其他开始方式；地址框和三行入口（参考图、品牌、设计库）都在里面', order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])) && ways.type === 'details' && inWays((el) => el.props && el.props.className === 'ddp-form') && lks.length === 3, JSON.stringify({ order, lks: lks.length }))
+check('首页：问话 → 大输入框 → 接着做 → 模板 → 收起的地址框', order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])) && ways.type === 'details' && !!findEl(ways, (el) => el.props && el.props.className === 'ddp-form'), JSON.stringify(order))
+// 大输入框发出去：放进 DSH 输入框（带类型）再直接发；旧版 DSH 没有 submit 就只放进去
+function findComp(el, name) {
+  if (el == null || el === false || typeof el !== 'object') return null
+  if (Array.isArray(el)) { for (const x of el) { const r = findComp(x, name); if (r) return r } return null }
+  if (typeof el.type === 'function') return el.type.name === name ? el : findComp(el.type(el.props), name)
+  return findComp(el.props && el.props.children, name) || findComp(el.children || [], name)
+}
+const sent = []
+const iaNew = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { sent.push(x); return true }, submit: () => sent.push('<submit>') }
+const homeAsk = findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: iaNew }), 'HomeAsk')
+check('首页：有大输入框，「+」里三项（打开 HTML、品牌、设计库）', !!homeAsk && homeAsk.props.plus.length === 3)
+homeAsk.props.onSend({ text: '做个面馆点单', kind: 'miniprogram', style: null })
+await new Promise((r) => setTimeout(r, 150))
+check('首页：发出去 = 放进输入框（带类型）+ 直接发', sent.length === 2 && sent[0].includes('做个面馆点单') && sent[0].includes('类型：小程序') && sent[1] === '<submit>', JSON.stringify(sent))
+const sentOld = []
+const iaOld = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { sentOld.push(x); return true } }
+findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: iaOld }), 'HomeAsk').props.onSend({ text: '做个海报', kind: '', style: null })
+await new Promise((r) => setTimeout(r, 150))
+check('首页：旧版 DSH（没有 submit）只放进输入框，不带类型行', sentOld.length === 1 && !sentOld[0].includes('类型'), JSON.stringify(sentOld))
 delete globalThis.__DSH_HOST_PATHS__
 check('空状态：网页版树里没有「浏览…」按钮', !findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse))
 
