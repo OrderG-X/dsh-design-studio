@@ -4,14 +4,14 @@
  *   ② 假模型调 preview_page 打开一个三屏的 App 设计 → 右侧栏出画布；再调 check_design → 无头浏览器按真实尺寸量完把清单交回给模型；
  *     严重的问题附上局部截图；调 look_design → 工具结果里带一张真实渲染的截图；
  *     模型用提问卡问用户时，右侧栏提示「在等你回答」，答完就没了
- *   ③ 设计体检：首屏埋了四类问题（点击区、对比度、截断、小字），另两屏干净；点一条会定位；「交给模型修」把清单放进输入框，发出去模型收得到
+ *   ③ 设计体检：首屏埋了四类问题（点击区、对比度、截断、小字），另两屏干净；点一条会定位；「发到对话」把清单放进输入框，发出去模型收得到
  *   ④ 改好首屏后「再查一次」→ 没问题
  *   ⑤ 导出 PDF / PPT → 设计目录 exports/ 里各一份，三页
- *   ⑥ 首页再出一版 home-b → 紧挨着首页；点它的「就要这个」→ 输入框里是〔选定方向〕
- *   ⑦ 调样式：单看菜单屏，点「加入购物车」→ 面板认出它用的设计变量；拖圆角页面上先变，写回文件 → 源码里那个元素带上 style；
- *     再拖字号「交给模型」→ 输入框里是〔调样式〕；退出 → 没写回的改动撤掉
- *   ⑧ 换风格：设计规范面板里「换个风格…」→ 一排风格卡，点「温暖手作」→ 输入框里是〔风格〕和整套配色
- *   ⑧b 画笔标注：工具栏「画笔标注」→ 在页面上画圈、箭头、写字，撤销 / 重做 →「交给模型」→ refs/ 里一张标注图（页面截图叠着画的），
+ *   ⑥ 首页再出一版 home-b → 紧挨着首页；点它的「用这版」→ 输入框里是〔选定方向〕
+ *   ⑦ 调样式：单看菜单屏，点「加入购物车」→ 面板认出它用的设计变量；拖圆角页面上先变，直接保存 → 源码里那个元素带上 style；
+ *     再拖字号「发到对话」→ 输入框里是〔调样式〕；退出 → 没写回的改动撤掉
+ *   ⑧ 换风格：外观面板「换风格」→ 一排风格卡，点「温暖手作」→ 输入框里是〔风格〕和整套配色
+ *   ⑧b 画笔标注：工具栏「画笔标注」→ 在页面上画圈、箭头、写字，撤销 / 重做 →「发到对话」→ refs/ 里一张标注图（页面截图叠着画的），
  *     输入框里是〔标注〕和图的路径，叫模型先用 read_image 看；画布上画到两屏点「复制」→ 同一张图进剪贴板、不存文件（测试里换掉剪贴板，不碰真的）
  *   ⑨ 远程看：换个地址（remote.test，像手机走外网）打开同一个会话 → 连不上本机预览，右侧栏把这一屏打包放进沙盒 iframe：
  *     样式、写回的 style 都在，<base> 指着原地址（不漏 DSH 的地址），设计变量照样报上来；点页面里的链接换到那一屏；文件改了跟着变；体检照样量、导出照样能导
@@ -130,7 +130,7 @@ function sse(res, blocks, stop) {
   res.end()
 }
 const textOf = (m) => (typeof m.content === 'string' ? m.content : (m.content || []).map((c) => c.text || (c.type === 'tool_result' ? '[tool_result]' : '')).join(' '))
-let fixAsk = '' // 「交给模型修」发出去后模型收到的那段
+let fixAsk = '' // 「发到对话」发出去后模型收到的那段
 const selfChecks = [] // 模型调 check_design 拿回来的结果
 const selfCheckImgs = [] // 每次 check_design 结果里带了几张图（严重问题的局部截图）
 const looks = [] // 模型调 look_design 拿回来的（原样的 tool_result 内容：一段字 + 几张图）
@@ -266,6 +266,10 @@ try {
   chrome = launchChrome(bin)
   const { targetId } = await chrome.cdp('Target.createTarget', { url })
   const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+  // 视图（画布 / 单页 / 多尺寸 / 演示）收在工具栏「视图」下拉里：打开菜单点那一项
+  const VIEW = (re) => `(async () => { const b = [...document.querySelectorAll('.ddp-bar .ddp-kind > .ddp-btn')].find((x) => /^(视图|View)$/.test(x.title)); if (!b) return false; b.click(); await new Promise((r) => setTimeout(r, 150)); const it = [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => ${re}.test(x.textContent.trim())); if (it) it.click(); return !!it })()`
+  const SINGLE = VIEW('/^(单页|Single)/')
+  const CANVAS = VIEW('/^(画布|Canvas)/')
   const page = async (expression) => {
     const r = await chrome.cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId)
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text)
@@ -402,10 +406,10 @@ try {
   await sleep(700)
   await shot('3-focus')
 
-  // 交给模型修 → 输入框里是体检清单，发出去模型收得到
+  // 发到对话 → 输入框里是体检清单，发出去模型收得到
   await page(`document.querySelector('.ddp-check footer .go').click()`)
   const asked = await until(`(() => { const t = ${composerText}; return /〔设计体检〕|\\[Design check\\]/.test(t) && t })()`, 5000)
-  check('「交给模型修」把清单放进输入框', asked, await page(composerText))
+  check('「发到对话」把清单放进输入框', asked, await page(composerText))
   if (asked) console.log(`  （输入框：${asked.replace(/\n/g, ' ⏎ ').slice(0, 260)}…）`)
   check('清单写明哪一屏、什么问题', /首页|home/.test(asked || '') && /对比度|contrast/i.test(asked || ''), asked)
   const ckChip = await asChip('check', `体检 · ${((asked || '').match(/发现 (\d+) 个问题/) || [])[1]} 个问题`, /〔设计体检〕/)
@@ -453,7 +457,7 @@ try {
   // ⑤ 导出 PDF / PPT
   const EXPORTS = path.join(DESIGN, 'exports')
   const exportAs = async (re, ext) => {
-    await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /导出|Export/.test(b.title)).click()`)
+    await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(交付|Deliver)/.test(b.title)).click()`)
     await sleep(300)
     const item = await page(`(() => { const b = [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => ${re}.test(x.textContent)); if (b) b.click(); return !!b })()`)
     if (!check(`导出菜单有 ${ext.toUpperCase()}`, item)) return null
@@ -488,12 +492,12 @@ try {
   check('导出的 PDF / PPT 不算设计改动（不报「已更新」）', !stray, stray)
   await shot('5-exported')
 
-  // ⑥ 首页再出一版 → home-b 紧挨着首页；点它的「就要这个」→ 输入框里是〔选定方向〕
+  // ⑥ 首页再出一版 → home-b 紧挨着首页；点它的「用这版」→ 输入框里是〔选定方向〕
   await say('MAKE-TAKE 首页再出一版')
-  const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab > span:first-child')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
+  const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab > span:first-of-type')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
   // 标签是页面标题，标题没载出来时先显示文件名：两种都认
   check('再出的一版紧挨着原版', /(首页|home),(首页 B|home-b)(,|$)/.test(order || ''), order)
-  check('几个版本并排：每屏标题旁都有「就要这个」，不用先选中', /(首页|home)(就要这个|Use this),(首页 B|home-b)(就要这个|Use this)/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent).join(',')`) || ''))
+  check('几个版本并排：每屏标题旁都有「用这版」，不用先选中', /A(首页|home)(用这版|Use this),B(首页 B|home-b)(用这版|Use this)/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent).join(',')`) || ''))
   // 先点一下那一屏选中它（按钮在选中的那屏标签旁）
   // （那一屏可能在画面外，鼠标点不到，直接发 pointer 事件：按在那屏上、在窗口上松开）
   await page(`(() => {
@@ -507,14 +511,14 @@ try {
   await sleep(400)
   const picked = await page(`(() => {
     const cell = [...document.querySelectorAll('.ddp-cell')].find((c) => /首页 B|home-b/.test(c.querySelector('.ddp-lab')?.textContent || ''))
-    const b = cell && cell.querySelector('[title^="就要这个"], [title^="Use this one"]')
+    const b = cell && cell.querySelector('[title^="用这版"], [title^="Use this take"]')
     if (!b) return 'no button'
     b.click()
     return 'ok'
   })()`)
   await sleep(600)
   const pickText = await page(composerText)
-  check('点「就要这个」→ 输入框里是〔选定方向〕，原版挪进 drafts/', picked === 'ok' && /〔选定方向〕就用/.test(pickText) && /home\.html/.test(pickText) && /drafts\//.test(pickText), `${picked}：${pickText.slice(0, 160)}`)
+  check('点「用这版」→ 输入框里是〔选定方向〕，原版挪进 drafts/', picked === 'ok' && /〔选定方向〕就用/.test(pickText) && /home\.html/.test(pickText) && /drafts\//.test(pickText), `${picked}：${pickText.slice(0, 160)}`)
   const dirChip = await asChip('layers', '选定方向', /〔选定方向〕/)
   check('选定方向在输入框里是一个标签', dirChip.ok, dirChip.why)
   await shot('6-pick')
@@ -529,7 +533,7 @@ try {
     window.dispatchEvent(new PointerEvent('pointerup', o))
   })()`)
   await sleep(300)
-  await page(`document.querySelector('button[title^="单页"]').click()`)
+  await page(SINGLE)
   await until(`!!document.querySelector('iframe.ddp-frame.cur[src*="menu.html"]')`, 15000)
   await sleep(1500)
   await page(`document.querySelector('button[title^="调样式"]').click()`)
@@ -579,24 +583,25 @@ try {
     return true
   })()`)
   await clickIn('menu.html', 'a.go')
-  const who = await until(`document.querySelector('.ddp-style .who code')?.textContent || ''`, 5000)
-  const bgVar = await page(`[...document.querySelectorAll('.ddp-style .row')].find((x) => x.querySelector('label span')?.textContent === '背景')?.querySelector('em.v')?.textContent || ''`)
-  check('调样式：点页面里的按钮 → 面板认出它、背景用的是设计变量 --brand', who === 'a.go' && bgVar === '--brand', `${who} / ${bgVar}`)
+  // 头部给人看的是「按钮「加入购物车」」，选择器在 title 里；变量显示中文名，原名在 title 里
+  const who = await until(`(document.querySelector('.ddp-style .who')?.title || '').split(' · ')[0]`, 5000)
+  const bgVar = await page(`[...document.querySelectorAll('.ddp-style .row')].find((x) => x.querySelector('label span')?.textContent === '背景')?.querySelector('em.v')?.title || ''`)
+  check('调样式：点页面里的按钮 → 面板认出它、背景用的是设计变量 --brand', who === 'a.go' && /--brand\b/.test(bgVar), `${who} / ${bgVar}`)
   await slide('圆角', 24)
   await sleep(400)
   const live = await styleAttr('menu.html', 'a.go')
   check('调样式：拖圆角，页面上先变（还没写进文件）', /border-radius:\s*24px/.test(live || '') && !fs.readFileSync(path.join(DESIGN, 'menu.html'), 'utf8').includes('border-radius: 24px'), live)
   await page(`document.querySelector('.ddp-style footer .go').click()`)
   const savedOk = await waitFor(() => fs.readFileSync(path.join(DESIGN, 'menu.html'), 'utf8').includes('<a class="go" href="cart.html" style="border-radius: 24px">'), 8000)
-  const savedMsg = await until(`/样式已写回 menu\.html/.test(document.body.innerText)`, 5000)
-  check('调样式：写回文件 → 源码里那个元素带上 style，提示写回了', savedOk && savedMsg, fs.readFileSync(path.join(DESIGN, 'menu.html'), 'utf8').slice(-260))
+  const savedMsg = await until(`/样式已保存到 menu\.html/.test(document.body.innerText)`, 5000)
+  check('调样式：直接保存 → 源码里那个元素带上 style，提示写回了', savedOk && savedMsg, fs.readFileSync(path.join(DESIGN, 'menu.html'), 'utf8').slice(-260))
   await sleep(2500) // 文件变了，预览在后台换一帧
   await slide('字号', 18)
   await sleep(400)
-  await page(`[...document.querySelectorAll('.ddp-style footer button')].find((x) => x.textContent === '交给模型').click()`)
+  await page(`[...document.querySelectorAll('.ddp-style footer button')].find((x) => x.textContent === '发到对话').click()`)
   await sleep(500)
   const askTxt = await page(composerText)
-  check('调样式：再拖字号「交给模型」→ 输入框里是〔调样式〕和改了什么', /〔调样式〕a\.go/.test(askTxt) && /字号 16px → 18px/.test(askTxt) && askTxt.includes(path.join(DESIGN, 'menu.html')), askTxt.slice(0, 200))
+  check('调样式：再拖字号「发到对话」→ 输入框里是〔调样式〕和改了什么', /〔调样式〕a\.go/.test(askTxt) && /字号 16px → 18px/.test(askTxt) && askTxt.includes(path.join(DESIGN, 'menu.html')), askTxt.slice(0, 200))
   const styChip = await asChip('style', '样式改动', /〔调样式〕/)
   check('调样式在输入框里是一个标签「样式改动」', styChip.ok, styChip.why)
   await shot('7-style')
@@ -631,10 +636,10 @@ try {
     check('点选标签：接着打的字在标签后面', typed.indexOf('1 个元素') >= 0 && typed.indexOf('改成红色') > typed.indexOf('1 个元素'), JSON.stringify({ chip: typed.indexOf('1 个元素'), typed: typed.indexOf('改成红色'), len: typed.length, head: typed.slice(0, 30), active: await page(`(() => { const a = document.activeElement; return a ? a.tagName + (a.getAttribute('data-lexical-editor') ? '[lexical]' : '') + (a.tagName === 'IFRAME' ? a.src : '') : null })()`) }))
   }
 
-  // ⑧ 换风格：设计规范面板 →「换个风格…」→ 点一张卡
-  await page(`document.querySelector('button[title="设计规范"]').click()`)
+  // ⑧ 换风格：外观面板 →「换风格」→ 点一张卡
+  await page(`document.querySelector('.ddp-bar button[title^="外观"]').click()`)
   await sleep(300)
-  await page(`[...document.querySelectorAll('.ddp-tokens footer button')].find((x) => /换个风格/.test(x.textContent)).click()`)
+  await page(`[...document.querySelectorAll('.ddp-look .ddp-lktabs button')].find((x) => /换风格/.test(x.textContent)).click()`)
   const cards = await until(`document.querySelectorAll('.ddp-styles .ddp-sc').length`, 5000)
   await sleep(400) // 面板淡入完再截图
   await shot('8-styles')
@@ -663,11 +668,11 @@ try {
   const markOn = await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
   check('画笔标注：盖上画布，工具栏有七种笔 + 撤销 / 重做 / 清掉，颜色和粗细', markOn && await page(`document.querySelectorAll('.ddp-mk-tools > .ddp-btn').length`) === 10 &&
     await page(`document.querySelectorAll('.ddp-mk-sz .ddp-btn').length`) === 3 && await page(`!!document.querySelector('.ddp-mk-color')`), await page(`document.querySelector('.ddp-mark')?.innerText || '没有标注层'`))
-  // 不知道怎么用的人：中间有三步说明，底栏写着现在这支笔怎么画；「交给模型」先是淡的
+  // 不知道怎么用的人：中间有三步说明，底栏写着现在这支笔怎么画；「发到对话」先是淡的
   const how0 = await page(`({ coach: document.querySelector('.ddp-mk-coach')?.innerText || '', bar: document.querySelector('.ddp-mk-bar span')?.innerText || '', idle: !!document.querySelector('.ddp-mk-bar .go.idle') })`)
   await sleep(250)
   await shot('8c0-markup-how')
-  check('画笔标注：打开就教怎么用（中间三步、底栏写现在这支笔怎么画、交给模型先是淡的）', /直接在页面上画/.test(how0.coach) && /交给模型/.test(how0.coach) && /画笔/.test(how0.bar) && /按住拖动/.test(how0.bar) && how0.idle, JSON.stringify(how0))
+  check('画笔标注：打开就教怎么用（中间三步、底栏写现在这支笔怎么画、发到对话先是淡的）', /直接在页面上画/.test(how0.coach) && /发到对话/.test(how0.coach) && /画笔/.test(how0.bar) && /按住拖动/.test(how0.bar) && how0.idle, JSON.stringify(how0))
   // 画在台面上看得到的那一屏中间
   const fr = await page(`(() => { const s = document.querySelector('.ddp-stage').getBoundingClientRect(); const r = [...document.querySelectorAll('.ddp-stage iframe')].map((x) => x.getBoundingClientRect()).find((r) => r.width > 80 && r.height > 80 && r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1); return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null })()`)
   if (fr) {
@@ -676,7 +681,7 @@ try {
     check('画笔标注：换成圆圈，底栏跟着说怎么圈', /圆圈/.test(ovalHow) && /圈出要改的地方/.test(ovalHow), ovalHow)
     await drag(fr.x - 40, fr.y - 30, fr.x + 40, fr.y + 30)
     const how1 = await page(`({ coach: !!document.querySelector('.ddp-mk-coach'), idle: !!document.querySelector('.ddp-mk-bar .go.idle') })`)
-    check('画笔标注：画了第一笔，说明收起、「交给模型」亮起来', !how1.coach && !how1.idle, JSON.stringify(how1))
+    check('画笔标注：画了第一笔，说明收起、「发到对话」亮起来', !how1.coach && !how1.idle, JSON.stringify(how1))
     await tool('箭头')
     await drag(fr.x - 90, fr.y + 90, fr.x - 45, fr.y + 35)
     await tool('文字')
@@ -729,7 +734,7 @@ try {
   check('画笔标注：字写一半点聊天输入框，字留下、焦点留在输入框', typing && await page(`!!document.activeElement && !document.activeElement.closest('.ddp-mark') && !!document.activeElement.closest('${composer}, [contenteditable], textarea')`) &&
     !(await page(`!!document.querySelector('.ddp-mark textarea')`)), await page(`document.activeElement ? document.activeElement.tagName + '.' + document.activeElement.className : 'none'`))
   const refsBefore = fs.existsSync(path.join(DESIGN, 'refs')) ? fs.readdirSync(path.join(DESIGN, 'refs')).length : 0
-  await page(`[...document.querySelectorAll('.ddp-mk-bar button')].find((x) => /交给模型/.test(x.textContent)).click()`)
+  await page(`[...document.querySelectorAll('.ddp-mk-bar button')].find((x) => /发到对话/.test(x.textContent)).click()`)
   const markGone = await until(`!document.querySelector('.ddp-mark') && /〔标注〕/.test(${composerText})`, 30000)
   const markTxt = await page(composerText)
   const markFile = (/〔标注〕(\S+?\.png)/.exec(markTxt) || [])[1] || ''
@@ -737,7 +742,7 @@ try {
   try { markPng = fs.readFileSync(markFile) } catch { markPng = null }
   const pw = markPng && markPng.length > 24 ? markPng.readUInt32BE(16) : 0
   const ph = markPng && markPng.length > 24 ? markPng.readUInt32BE(20) : 0
-  check('画笔标注：「交给模型」→ 标注图存进设计目录的 refs/，输入框里是〔标注〕、图的路径、用 read_image 看的要求和图上写的字', markGone && path.dirname(markFile) === path.join(DESIGN, 'refs') &&
+  check('画笔标注：「发到对话」→ 标注图存进设计目录的 refs/，输入框里是〔标注〕、图的路径、用 read_image 看的要求和图上写的字', markGone && path.dirname(markFile) === path.join(DESIGN, 'refs') &&
     /^markup-/.test(path.basename(markFile)) && /read_image/.test(markTxt) && /图上写的字：「这里改大」、「间距」/.test(markTxt) && markPng && markPng.readUInt32BE(0) === 0x89504e47 && pw >= 160 && ph >= 160 && markPng.length > 8000 &&
     fs.readdirSync(path.join(DESIGN, 'refs')).length === refsBefore + 1, `${markTxt.slice(-260)} / ${markFile} ${pw}×${ph} ${markPng ? markPng.length : 0}B`)
   const mkChip = await asChip('mark', '标注图', /〔标注〕/)
@@ -754,7 +759,7 @@ try {
   await sleep(1200)
   check('画笔标注：存图不算设计改动（不报「已更新」）', !(await page(`(document.body.innerText.match(/(已更新|Updated) coffee-app[^\\n]*/) || [''])[0]`)))
   // 画布上一笔自由线从一屏画到另一屏：窗口变窄画布换了行，两头各跟各的屏；取消后回单页
-  await page(`document.querySelector('.ddp-bar button[title^="画布"]').click()`)
+  await page(CANVAS)
   await sleep(900)
   await page(`document.querySelector('.ddp-bar button[title^="画笔标注"]').click()`)
   await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
@@ -821,7 +826,7 @@ try {
     copied.types.join() === 'image/png' && copied.w / copied.h > 0.75 && copied.blue > 150 && copied.size > 8000 && !!cpSaid && fs.readdirSync(path.join(DESIGN, 'refs')).length === refsCp, JSON.stringify({ cpBtn, copied, cpSaid }))
   check('画笔标注：画的时候画布的缩放按钮收起来（点不到，免得压在底栏下），关了标注再出来', zoomHid && zoomBack, JSON.stringify({ zoomHid, zoomBack }))
   await until(`!document.querySelector('.ddp-mark')`, 3000)
-  await page(`document.querySelector('.ddp-bar button[title^="单页"]').click()`)
+  await page(SINGLE)
   await sleep(900)
 
   // ⑨ 远程看：同一个会话换个地址打开（remote.test 指向本机，DSH 信任这个域名；页面里 127.0.0.1 指的是「那台设备自己」，预览连不上）
@@ -897,10 +902,10 @@ try {
   const m1 = JSON.parse((await frameUntil(PROBE, (v) => /menu\.html"/.test(v || ''))) || '{}')
   check('远程看：页面样式（设计变量的品牌色）、写回的圆角都在，picker 也在', m1.bg === 'rgb(107, 62, 38)' && /border-radius:\s*24px/.test(m1.style) && m1.picker, JSON.stringify(m1))
   check('远程看：<base> 指着这一屏原来的地址，页面里拿不到 DSH 的地址', /^http:\/\/127\.0\.0\.1:\d+\/menu\.html$/.test(m1.base || ''), m1.base)
-  await rpage(`document.querySelector('button[title="设计规范"]').click()`).catch(() => {})
-  const toks = await runtil(`(document.querySelector('.ddp-tokens')?.innerText || '').includes('brand') && document.querySelector('.ddp-tokens').innerText`, 8000)
-  check('远程看：页面和右侧栏说得上话（设计变量报上来了）', !!toks, await rpage(`document.querySelector('.ddp-tokens')?.innerText.slice(0, 200) || '没有设计规范面板'`).catch((e) => e.message))
-  await rpage(`document.querySelector('button[title="设计规范"]').click()`).catch(() => {})
+  await rpage(`document.querySelector('.ddp-bar button[title^="外观"]').click()`).catch(() => {})
+  const toks = await runtil(`!!document.querySelector('.ddp-look [title^="--brand"]') && document.querySelector('.ddp-look').innerText`, 8000)
+  check('远程看：页面和右侧栏说得上话（设计变量报上来了）', !!toks, await rpage(`document.querySelector('.ddp-look')?.innerText.slice(0, 200) || '没有外观面板'`).catch((e) => e.message))
+  await rpage(`document.querySelector('.ddp-bar button[title^="外观"]').click()`).catch(() => {})
   await sleep(400)
   {
     const { data } = await chrome.cdp('Page.captureScreenshot', { format: 'png' }, rs)
@@ -918,9 +923,9 @@ try {
   await rpage(`document.querySelector('.ddp-check header .ddp-btn')?.click()`).catch(() => {})
   const pngs = () => (fs.existsSync(path.join(DESIGN, 'exports')) ? fs.readdirSync(path.join(DESIGN, 'exports')).filter((f) => f.endsWith('.png')) : [])
   const pngBefore = pngs().length
-  await rpage(`[...document.querySelectorAll('.ddp-btn')].find((b) => b.title === '导出').click()`).catch(() => {})
+  await rpage(`[...document.querySelectorAll('.ddp-btn')].find((b) => /^交付/.test(b.title)).click()`).catch(() => {})
   await sleep(400)
-  await rpage(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '这一屏 · 纯画面').click()`).catch(() => {})
+  await rpage(`[...document.querySelectorAll('.ddp-menu button')].find((b) => b.textContent.trim().endsWith(' · 纯画面')).click()`).catch(() => {})
   const exMsg = await runtil(`(document.body.innerText.match(/(已导出|导出失败)[^\\n]*/) || [''])[0]`, 30000)
   check('远程看：导出这一屏照样能导（沙盒里也画得出图）', /已导出/.test(exMsg || '') && pngs().length > pngBefore, `${exMsg} / ${pngs().join(',')}`)
   await chrome.cdp('Target.closeTarget', { targetId: rt }).catch(() => {})
@@ -932,8 +937,12 @@ try {
   fs.utimesSync(path.join(OTHER, 'landing.html'), Date.now() / 1000 - 30, Date.now() / 1000 - 30)
   fs.writeFileSync(path.join(OTHER, 'about.html'), `${HEAD('关于')}</head><body><main><h1>关于我们</h1></main></body></html>`)
   const BROWSE = `document.querySelector('.ddp-bar button[title="选一个本地 HTML 文件打开"]')`
-  const addrText = `(document.querySelector('.ddp-addr span') || {}).textContent || ''`
-  const openAddr = async () => { await page(`document.querySelector('.ddp-addr')?.click()`).catch(() => {}); return until(`!!document.querySelector('.ddp-bar .ddp-input')`, 3000) }
+  // 工具栏左边是屏名菜单（11-07 起）：开的是哪个文件看它的 title；要输地址点菜单里的「打开别的页面…」
+  const addrText = `(document.querySelector('.ddp-addr') || {}).title || ''`
+  const openAddr = async () => {
+    await page(`(async () => { const b = document.querySelector('.ddp-addr'); if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') b.click(); await new Promise((r) => setTimeout(r, 150)); const it = document.querySelector('.ddp-where .ddp-menu [role=menuitem]'); if (it) it.click(); return !!it })()`).catch(() => {})
+    return until(`!!document.querySelector('.ddp-bar .ddp-input')`, 3000)
+  }
   const NOTES = path.join(tmp, 'work', 'notes.txt')
   fs.writeFileSync(NOTES, 'x')
   const DROPDIR = path.join(tmp, 'work', 'drop-dir')
@@ -1003,7 +1012,7 @@ try {
   const dirDropped = await until(`/first\.html/.test(${addrText}) && ${addrText}`, 15000)
   check('打开已有的 HTML：把文件夹拖进来 → 蒙层写「打开这个文件夹或 HTML」，开里面的页面', /松开，打开这个文件夹或 HTML/.test(dirDrop) && !!dirDropped, JSON.stringify({ dirDrop, addr: await page(addrText) }))
   // 单页铺满时拖到预览页面上（iframe 会把拖动吃掉）：页面转告右侧栏，照样盖上蒙层、松手打开
-  await page(`[...document.querySelectorAll('.ddp-bar .ddp-btn')].find((b) => b.title === '单页：只看一屏')?.click()`).catch(() => {})
+  await page(SINGLE).catch(() => {})
   await until(`!!document.querySelector('.ddp iframe')`, 8000)
   await sleep(800)
   const frameDrop = await realDrop([path.join(OTHER, 'about.html')], '.ddp iframe')
@@ -1046,7 +1055,7 @@ ${id}.addEventListener('drop', (e) => { e.preventDefault()${stop ? '; e.stopProp
     await page(`document.querySelector('.ddp-bar form').requestSubmit()`)
     await until(`/upload\\.html/.test(${addrText})`, 15000)
     // 同目录有几屏时会回到画布（卡片上盖着点选层）：切回单页铺满，拖动才落在页面里
-    await page(`[...document.querySelectorAll('.ddp-bar .ddp-btn')].find((b) => b.title === '单页：只看一屏')?.click()`).catch(() => {})
+    await page(SINGLE).catch(() => {})
     await sleep(1200)
     const FRAME = `[...document.querySelectorAll('.ddp iframe')].filter((f) => /upload\\.html/.test(f.src) && f.getBoundingClientRect().width > 0).pop()`
     // 在预览页面里求值（同站 iframe：拿到它的 frameId，开一个隔离环境，DOM 是同一份）
@@ -1094,7 +1103,7 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     await page(`(() => { const el = document.querySelector('.ddp-bar .ddp-input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, ${JSON.stringify(ALL)}); el.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
     await page(`document.querySelector('.ddp-bar form').requestSubmit()`)
     await until(`/upload-all\\.html/.test(${addrText})`, 15000)
-    await page(`[...document.querySelectorAll('.ddp-bar .ddp-btn')].find((b) => b.title === '单页：只看一屏')?.click()`).catch(() => {})
+    await page(SINGLE).catch(() => {})
     await sleep(1200)
     {
       const FR = `[...document.querySelectorAll('.ddp iframe')].filter((f) => /upload-all\\.html/.test(f.src) && f.getBoundingClientRect().width > 0).pop()`
@@ -1125,10 +1134,12 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   }
   check('打开已有的 HTML：拖进右侧栏时 DSH 自己的「拖到这里添加」不出来、松手后也不卡着', !dshMask.length, dshMask.join('；'))
   // 转成代码的「代码放在」：旁边的选文件夹按钮 → 填进去
-  await page(`document.querySelector('.ddp-bar button[title="转成代码"]')?.click()`).catch(() => {})
+  // 转成代码在「交付」下拉里；「代码放在」平时只显示文件夹名（完整路径在 title 第一行），点了才是输入框
+  const HO_DEST = "((el) => (el ? (el.tagName === 'INPUT' ? el.value : el.title.split('\\n')[0]) : ''))(document.querySelector('.ddp-ho .pathrow input, .ddp-ho .pathv'))"
+  await page(`(async () => { const b = [...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((x) => /^(交付|Deliver)/.test(x.title)); if (!b) return false; b.click(); await new Promise((r) => setTimeout(r, 150)); const it = [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /转成代码/.test(x.textContent)); if (it) it.click(); return !!it })()`).catch(() => {})
   const hoDir = await until(`!!document.querySelector('.ddp-ho .ddp-dirbtn')`, 8000)
   if (hoDir) await page(`document.querySelector('.ddp-ho .ddp-dirbtn').click()`)
-  const hoVal = await until(`(document.querySelector('.ddp-ho .pathrow input') || {}).value === ${JSON.stringify(path.join(tmp, 'work', 'app-code'))}`, 5000)
+  const hoVal = await until(`${HO_DEST} === ${JSON.stringify(path.join(tmp, 'work', 'app-code'))}`, 5000)
   check('转成代码：「代码放在」旁的选文件夹按钮 → 选的目录填进去', hoDir && hoVal, await page(`(document.querySelector('.ddp-ho') || {}).innerText || '没有面板'`))
   // 检查文件夹还没回来时「开始」点不了；这时自己点了框架，检查回来也不改掉
   const PROJ = path.join(tmp, 'work', 'vue-proj')
@@ -1146,7 +1157,7 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   fs.writeFileSync(path.join(STATIC, 'index.html'), '<h1>x</h1>')
   await page(`[...document.querySelectorAll('.ddp-ho .opt')].find((b) => /Vue 3/.test(b.textContent))?.click()`)
   await page(`(() => { window.__e2eDir = ${JSON.stringify(STATIC)}; document.querySelector('.ddp-ho .ddp-dirbtn').click(); return true })()`)
-  const keptVue = await until(`(() => { const ho = document.querySelector('.ddp-ho'); const on = ho && ho.querySelector('.opt.on'); return (ho.querySelector('.pathrow input') || {}).value === ${JSON.stringify(STATIC)} && !ho.querySelector('.go').disabled && !!on && on.textContent })()`, 5000)
+  const keptVue = await until(`(() => { const ho = document.querySelector('.ddp-ho'); const on = ho && ho.querySelector('.opt.on'); return ${HO_DEST} === ${JSON.stringify(STATIC)} && !ho.querySelector('.go').disabled && !!on && on.textContent })()`, 5000)
   check('转成代码：先点了 Vue 再选纯 HTML 站点 → 框架还是 Vue', /Vue 3/.test(keptVue || ''), JSON.stringify({ keptVue }))
   // 选了个有别的东西的文件夹（比如 ~/Projects）→ 在里面新建 <设计名>-app，下面说一声
   const PARENT = path.join(tmp, 'work', 'picked-parent')
@@ -1154,7 +1165,7 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   fs.writeFileSync(path.join(PARENT, 'notes.md'), 'x')
   await page(`(() => { window.__e2eDir = ${JSON.stringify(PARENT)}; document.querySelector('.ddp-ho .ddp-dirbtn').click(); return true })()`).catch(() => {})
   const nested = path.join(PARENT, 'other-site-app')
-  const hoNest = await until(`(document.querySelector('.ddp-ho .pathrow input') || {}).value === ${JSON.stringify(nested)} && (document.querySelector('.ddp-ho .moved') || {}).innerText`, 5000)
+  const hoNest = await until(`${HO_DEST} === ${JSON.stringify(nested)} && (document.querySelector('.ddp-ho .moved') || {}).innerText`, 5000)
   check('转成代码：选了有别的东西的文件夹 → 改放进里面新建的 <设计名>-app，下面说一声', /已经有别的东西/.test(hoNest || '') && /other-site-app/.test(hoNest || ''), await page(`(document.querySelector('.ddp-ho') || {}).innerText || '没有面板'`))
   await page(`document.querySelector('.ddp-ho .go')?.click()`).catch(() => {})
   const goTxt = await until(`(() => { const t = ${composerText}; return t.includes(${JSON.stringify(nested)}) && t })()`, 5000)

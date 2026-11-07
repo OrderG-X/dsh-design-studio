@@ -152,6 +152,18 @@ check('体检：都接上了就没话说', lintTweaks(dir).length === 0, JSON.st
   check('写回：两份样式顶层都有的变量，两处都改', r.ok && tok.includes('--radius-md: 4px;') && app.includes(':root { --radius-md: 4px; }'), tok + app)
   check('写回：只在 @media 里有的变量退到那一处', app.includes(':root { --color-primary: #336699; }') && !r.missed.length, JSON.stringify(r))
 }
+{
+  // 外观面板里直接改设计变量（没有 tweaks.json 也行）：只改样式里的默认值，名字 / 值不老实的不认
+  const d4 = path.join(tmp, 'look')
+  fs.mkdirSync(d4)
+  fs.writeFileSync(path.join(d4, 'tokens.css'), ':root { --bg: #fff; --primary: #c26a32; }\n')
+  fs.writeFileSync(path.join(d4, 'home.html'), '<!doctype html><html><head><style>:root { --line: #eee; }</style></head><body></body></html>')
+  const r = applyTweaks(d4, {}, { '--primary': '#336699', '--line': '#dddddd', '--nope': '#000', '--bad name': 'x', '--bg': 'red; } body { display:none' })
+  const tok = fs.readFileSync(path.join(d4, 'tokens.css'), 'utf8')
+  check('外观直接改：变量写进 tokens.css、页面 <style> 里的 :root', r.ok && tok.includes('--primary: #336699;') && fs.readFileSync(path.join(d4, 'home.html'), 'utf8').includes('--line: #dddddd;'), JSON.stringify(r))
+  check('外观直接改：找不到的记下来；名字、值不老实的不写', r.missed.length === 1 && r.missed[0].id === '--nope' && tok.includes('--bg: #fff;') && !fs.existsSync(path.join(d4, 'tweaks.json')), JSON.stringify(r))
+  check('外观直接改：什么都没给就是没东西可写', applyTweaks(d4, {}, {}).ok === false)
+}
 if (process.platform !== 'win32') {
   // 软链接：指到设计目录外的样式、tweaks.json 不写
   const d3 = path.join(tmp, 'links')

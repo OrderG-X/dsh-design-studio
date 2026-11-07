@@ -83,12 +83,12 @@ function text(el) {
   return text(el.props && el.props.children) + (el.children || []).map(text).join('')
 }
 const loading = text(body.comp({ ...body.opts.inject('sEmpty') }))
-check('还没拿到状态（DSH 刚启动）：先空着，不闪空状态', !loading.includes('还没有要预览的页面'), loading)
+check('还没拿到状态（DSH 刚启动）：先空着，不闪空状态', !loading.includes('想做点什么'), loading)
 mod._test.poller('sEmpty').state = { url: '' }
 const emptyView = body.comp({ ...body.opts.inject('sEmpty') })
 const emptyText = text(emptyView)
-check('空状态：三步说明 + 地址框', emptyText.includes('还没有要预览的页面') && emptyText.includes('点「选择」') && emptyText.includes('打开'), emptyText)
-check('空状态：网页版（没有桌面版的桥）不显示「浏览…」，提示照旧', !emptyText.includes('浏览…') && emptyText.includes('也可以直接输入 HTML 文件路径或端口'), emptyText)
+check('空状态：一句标题 + 示例 + 收起的「其他开始方式」（地址框在里面）', emptyText.includes('想做点什么') && emptyText.includes('试试这样说') && emptyText.includes('其他开始方式') && emptyText.includes('打开'), emptyText)
+check('空状态：网页版（没有桌面版的桥）不显示「浏览…」，提示照旧', !emptyText.includes('浏览…') && emptyText.includes('输入文件路径，或本地端口'), emptyText)
 globalThis.__DSH_HOST_PATHS__ = { pathFor: (f) => '/Users/me/site/' + f.name }
 const deskText = text(body.comp({ ...body.opts.inject('sEmpty') }))
 check('空状态：桌面版有「浏览…」，提示说能选、能拖', deskText.includes('浏览…') && deskText.includes('直接拖进来'), deskText)
@@ -103,14 +103,16 @@ function findEl(el, ok) {
 const isBrowse = (el) => el.type === 'button' && el.props && el.props.className === 'ddp-browse'
 const deskBtn = findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse)
 check('空状态：桌面版真有「浏览…」按钮、点得动', !!deskBtn && typeof deskBtn.props.onClick === 'function' && deskBtn.props.type === 'button')
-// 排在哪：看空状态那一层的孩子顺序（地址框 / 两行参考图、设计系统 都在风格卡前面）
-const emptyBox = findEl(body.comp({ ...body.opts.inject('sEmpty') }), (el) => el.props && el.props.className === 'ddp-empty')
-const kids = emptyBox ? [].concat(emptyBox.children || emptyBox.props.children || []).flat() : []
-const at = (ok) => kids.findIndex((k) => k && typeof k === 'object' && ok(k))
-const formAt = at((k) => k.props && k.props.className === 'ddp-form')
-const pickAt = at((k) => k.props && k.props.className === 'ddp-stylepick')
-const reflineAt = kids.map((k, i) => (k && k.props && k.props.className === 'ddp-refline' ? i : -1)).filter((i) => i >= 0)
-check('空状态：地址框（带「浏览…」）和三行入口（参考图、设计系统、设计库）排在风格卡前面（右侧栏矮也不被挤到下面）', formAt >= 0 && pickAt > formAt && reflineAt.length === 3 && reflineAt.every((i) => i < pickAt), JSON.stringify({ formAt, pickAt, reflineAt }))
+// 排在哪：标题 → 示例 → 模板 → 风格 → 收起的「其他开始方式」（地址框、参考图、品牌、设计库都在里面）
+const startBox = findEl(body.comp({ ...body.opts.inject('sEmpty') }), (el) => el.props && el.props.className === 'ddp-start')
+const kids = startBox ? [].concat(startBox.children || startBox.props.children || []).flat() : []
+const at = (cls) => kids.findIndex((k) => k && typeof k === 'object' && ((k.props && k.props.className === cls) || (typeof k.type === 'function' && k.type.name === cls)))
+const order = ['ddp-hello', 'ddp-tries', 'TplStart', 'ddp-stylepick', 'ddp-ways'].map(at)
+const ways = kids.find((k) => k && k.props && k.props.className === 'ddp-ways')
+const inWays = (ok) => !!(ways && findEl(ways, ok))
+const lks = []
+findEl(ways, (el) => { if (el.type === 'button' && el.props && el.props.className === 'lk') lks.push(el); return false })
+check('空状态：标题 → 示例 → 模板 → 风格 → 收起的其他开始方式；地址框和三行入口（参考图、品牌、设计库）都在里面', order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])) && ways.type === 'details' && inWays((el) => el.props && el.props.className === 'ddp-form') && lks.length === 3, JSON.stringify({ order, lks: lks.length }))
 delete globalThis.__DSH_HOST_PATHS__
 check('空状态：网页版树里没有「浏览…」按钮', !findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse))
 
