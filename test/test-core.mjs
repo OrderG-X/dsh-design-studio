@@ -351,6 +351,13 @@ check('回合结束 → turn=false', tracker.snapshot(SID).turn === false)
   const one = snap().draft
   const oneAbs = path.join(gen, 'one.html')
   check('正文先到、一块就全到了 → 名字也在这块里：直接挂真名字，写完了', one && one.key === 'one.html' && /\/one\.html\?__ddp_draft=/.test(one.url) && drafts.get(oneAbs) && drafts.get(oneAbs).done === true && drafts.get(oneAbs).text === '<!doctype html><meta name="dsh-design" content="app"><p>一口气</p>', JSON.stringify({ one, t: drafts.get(oneAbs) }))
+  check('一块就全到了 → 快照说草稿还 live（刚写完，右侧栏这时看到要放一遍）', one && one.live === true, JSON.stringify(one))
+  check('快照带上页面开头写的设计类型（真文件还没摆出来时套对外框）', one && one.meta === 'app', JSON.stringify(one))
+  check('一块就全到了、但很短 → 不算整段到的（lump 假，不用放完再换）', one && one.lump === false, JSON.stringify(one))
+  drafts.get(oneAbs).lump = true
+  check('整段一下子到的（draft.js 记着 lump）→ 快照 lump 真', snap().draft && snap().draft.lump === true, JSON.stringify(snap().draft))
+  drafts.get(oneAbs).endAt = Date.now() - 9000
+  check('写完好一阵了 → 不 live（右侧栏中途才打开不补放）', snap().draft && snap().draft.live === false, JSON.stringify(snap().draft))
   fr({ type: 'start' })
   delta(0, '{"content":"<!doctype html>\\n<p>一个普通网页，开头很长' + 'x'.repeat(3100), 'write')
   check('正文先到、开头三千字都没有设计标记（不在做设计的会话也会这样写）→ 有 skill 加载过时照样算设计', !!snap().draft)

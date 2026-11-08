@@ -434,6 +434,102 @@ fs.rmSync(tmp, { recursive: true, force: true })
   drafts.end(prov)
   const pv = await get(`${dor}/__ddp_draft_1__.html?__ddp_draft=2`)
   check('临时名字上的草稿 → 照样给（插上草稿脚本）', pv.status === 200 && pv.body.includes('正文先到') && pv.body.includes('draft.js'), pv.body.slice(0, 80))
+  // 整页一下子到：一截截放出来（几秒放完），<head> 里的样式一口气给
+  const lump = path.join(dsite, 'lump.html')
+  const head = '<!doctype html><html><head><style>' + 'b{color:red}'.repeat(400) + '</style></head><body>'
+  const bodyText = '<p>一段字</p>'.repeat(600)
+  drafts.begin(lump)
+  drafts.push(lump, head + bodyText + '</body></html>')
+  drafts.end(lump)
+  const lc = []
+  const lt0 = Date.now()
+  await new Promise((resolve, reject) => {
+    const u = new URL(`${dor}/lump.html?__ddp_draft=3`)
+    http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
+      res.setEncoding('utf8')
+      res.on('data', (d) => lc.push({ at: Date.now() - lt0, d }))
+      res.on('end', resolve)
+    }).on('error', reject).end()
+  })
+  const lbody = lc.map((x) => x.d).join('')
+  const span = lc[lc.length - 1].at - lc[0].at
+  check('整页一下子到 → 一截截放（好几截、拉开一两秒以上），拼起来一字不差', lc.length >= 10 && span >= 1500 && span < 9000 && lbody === head.replace('<!doctype html>', '<!doctype html>' + TAG) + bodyText + '</body></html>', JSON.stringify({ n: lc.length, span }))
+  check('整页一下子到 → <head> 里的样式和 <body> 开头头一截就全给了（看不见的不用等）', lc[0].d.includes('<body>') && lc[0].d.length < head.length + TAG.length + 400, String(lc[0].d.length))
+  // 开着看的时候整页才一块到、紧跟着写完 → 慢放；流到一半来了一大块（还没写完）→ 照样马上给
+  const live2 = path.join(dsite, 'live2.html')
+  drafts.begin(live2)
+  drafts.push(live2, '<!doctype html><html><head></head><body>')
+  const lc2 = []
+  let l2End = 0
+  const l2done = new Promise((resolve, reject) => {
+    const u = new URL(`${dor}/live2.html?__ddp_draft=5`)
+    http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
+      res.setEncoding('utf8')
+      res.on('data', (d) => lc2.push({ at: Date.now(), d }))
+      res.on('end', () => { l2End = Date.now(); resolve() })
+    }).on('error', reject).end()
+  })
+  await new Promise((r) => setTimeout(r, 80))
+  const bigMid = '<p>中途一大块</p>'.repeat(200)
+  const tMid = Date.now()
+  drafts.push(live2, bigMid)
+  await new Promise((r) => setTimeout(r, 120))
+  const gotMid = lc2.filter((x) => x.at >= tMid).map((x) => x.d).join('')
+  check('流到一半来了一大块（还没写完）→ 马上整块给，不慢放', gotMid.includes(bigMid), String(gotMid.length))
+  const tail = '<p>最后整段</p>'.repeat(400)
+  const tLump = Date.now()
+  drafts.push(live2, tail)
+  drafts.end(live2)
+  await l2done
+  check('开着看时最后一大块到了紧跟着就写完（整页憋到最后给）→ 慢放（拉开一两秒）', l2End - tLump >= 1500 && lc2.map((x) => x.d).join('').endsWith(tail), String(l2End - tLump))
+  // 一点点流得很快（每 20ms 来 300 字 ≈ 每秒 1.5 万字）：来多少吐多少，写完时不落在后头
+  const fast = path.join(dsite, 'fast.html')
+  drafts.begin(fast)
+  drafts.push(fast, '<!doctype html><html><head></head><body>' + '<p>早就写好的</p>'.repeat(300))
+  const fc = []
+  const ft0 = Date.now()
+  let fEnd = 0
+  const fdone = new Promise((resolve, reject) => {
+    const u = new URL(`${dor}/fast.html?__ddp_draft=4`)
+    http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
+      res.setEncoding('utf8')
+      res.on('data', (d) => fc.push(d))
+      res.on('end', () => { fEnd = Date.now(); resolve() })
+    }).on('error', reject).end()
+  })
+  await new Promise((r) => setTimeout(r, 60))
+  for (let i = 0; i < 40; i++) {
+    drafts.push(fast, `<p>${String(i).padStart(2, '0')}${'字'.repeat(290)}</p>`)
+    await new Promise((r) => setTimeout(r, 20))
+  }
+  const fPushed = Date.now()
+  drafts.end(fast)
+  await fdone
+  check('右侧栏中途才来看（前面已经写了一大段、还在写）→ 写到的一口气先给，不慢放', fc.slice(0, 2).join('').includes('<p>早就写好的</p>'.repeat(300)), JSON.stringify(fc.slice(0, 3).map((x) => x.length)))
+  check('一点点流得很快 → 不排队、写完马上收尾（不落后）', fEnd - fPushed < 200 && fc.join('').includes('39' + '字'.repeat(290)), JSON.stringify({ lag: fEnd - fPushed, took: fEnd - ft0 }))
+  // 一路流着写完的（拉开一两秒）→ 不算整段到的；右侧栏换了个框事后再看（第一屏落地时等待卡片换成单屏）→ 一口气给，不再放一遍
+  check('整段一下子到的草稿记着 lump', drafts.get(lump).lump === true)
+  const slow = path.join(dsite, 'slow.html')
+  drafts.begin(slow)
+  drafts.push(slow, '<!doctype html><html><head></head><body>')
+  for (let i = 0; i < 18; i++) {
+    drafts.push(slow, `<p>${'慢'.repeat(200)}</p>`)
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  drafts.end(slow)
+  check('一路流着写完的草稿不算 lump', drafts.get(slow).lump === false)
+  const sc = []
+  const st0 = Date.now()
+  let sEnd = 0
+  await new Promise((resolve, reject) => {
+    const u = new URL(`${dor}/slow.html?__ddp_draft=6`)
+    http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
+      res.setEncoding('utf8')
+      res.on('data', (d) => sc.push(d))
+      res.on('end', () => { sEnd = Date.now(); resolve() })
+    }).on('error', reject).end()
+  })
+  check('一路流着写完的、事后再来看 → 一口气给完，不慢放', sEnd - st0 < 300 && sc.join('').split('慢'.repeat(200)).length === 19, JSON.stringify({ took: sEnd - st0, n: sc.length }))
   hd.closeAll()
 }
 

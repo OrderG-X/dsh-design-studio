@@ -714,6 +714,31 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   check('边写边看：没有草稿 → 只有占位', !findComp(view({ url: '', turn: true, kind: 'app', tool: 'read_file' }), 'FitDraft'))
   check('边写边看：不在生成了（草稿是上一轮的）→ 不放', !findComp(view({ url: '', turn: false, kind: 'app', draft: { key: 'menu.html', url: DU } }), 'FitDraft'))
   check('占位拿到鼠标该不该动的拍子（pulse）', typeof findComp(vd, 'GhostDraw').props.pulse === 'number')
+  // 整页一下子到（模型服务把参数憋到最后）：真文件马上落地，草稿先放完再换——画布上真的那块先不摆，草稿在占位那格里放
+  const O = 'http://127.0.0.1:5'
+  const cv = (x) => findComp(view({ url: O + '/home.html', turn: true, kind: 'app', view: 'canvas', target: { kind: 'file', root: '/d', file: '/d/home.html' }, origin: O,
+    screens: [{ key: 'home.html', url: O + '/home.html' }, { key: 'menu.html', url: O + '/menu.html' }], ...x }), 'Canvas')
+  const c1 = cv({ draft: { key: 'menu.html', url: DU, live: true, lump: true } })
+  check('整页一下子到：草稿刚写完（live）、真文件已落地 → 画布上先不摆真的那块，草稿在占位格里放，放完要报回来', !!c1 && c1.props.ghost === true && c1.props.draft === DU && c1.props.screens.map((x) => x.key).join() === 'home.html' && typeof c1.props.onDraftEnd === 'function', c1 && JSON.stringify({ g: c1.props.ghost, d: c1.props.draft, s: c1.props.screens.map((x) => x.key) }))
+  const c2 = cv({ draft: { key: 'menu.html', url: DU, live: false } })
+  check('右侧栏中途才打开（草稿早写完了，不 live）→ 不补放，直接摆真文件', !!c2 && !c2.props.draft && c2.props.screens.map((x) => x.key).join() === 'home.html,menu.html', c2 && JSON.stringify({ d: c2.props.draft, s: c2.props.screens.map((x) => x.key) }))
+  const c3 = cv({ draft: { key: 'cart.html', url: O + '/cart.html?__ddp_draft=2', live: true } })
+  const c4 = cv({ draft: { key: 'menu.html', url: O + '/menu.html?__ddp_draft=3', live: true, lump: false } })
+  check('一路流着写的（不是整段到的）：落地就摆真文件，不再放一遍草稿', !!c4 && !c4.props.draft && c4.props.screens.map((x) => x.key).join() === 'home.html,menu.html', c4 && JSON.stringify({ d: c4.props.draft, s: c4.props.screens.map((x) => x.key) }))
+  // 第一屏整页一下子到：真文件落地了、右侧栏还没量到它的类型 → 单屏放草稿时按草稿开头写的类型套外框（小程序不铺成网页）
+  const sv = view({ url: O + '/menu.html', turn: false, view: 'single', target: { kind: 'file', root: '/d', file: '/d/menu.html' }, origin: O, focus: 'menu.html',
+    screens: [{ key: 'menu.html', url: O + '/menu.html' }], draft: { key: 'menu.html', url: DU, live: true, lump: true, meta: 'miniprogram' } })
+  // 外框（Device）的孩子在 children 里：不展开组件，直接在树上找
+  const raw = (el, ok) => {
+    if (el == null || typeof el !== 'object') return null
+    if (Array.isArray(el)) { for (const x of el) { const r = raw(x, ok); if (r) return r } return null }
+    if (ok(el)) return el
+    return raw(el.props && el.props.children, ok) || raw(el.children || [], ok)
+  }
+  const sdv = raw(sv, (el) => typeof el.type === 'function' && el.type.name === 'Device' && el.props.key === 'draft')
+  const sdf = sdv && raw(sdv.children, (el) => typeof el.type === 'function' && el.type.name === 'DraftFrame')
+  check('第一屏整段到、这轮已说完：单屏先放草稿，外框按草稿写的小程序（不铺满）', !!sdv && sdv.props.kind === 'miniprogram' && sdv.props.fill === false && !!sdf && sdf.props.url === DU, sdv && JSON.stringify({ kind: sdv.props.kind, fill: sdv.props.fill }))
+  check('边写边看照旧：在写的那屏还没落地 → 两块真的都在，草稿在占位格里', !!c3 && c3.props.draft === O + '/cart.html?__ddp_draft=2' && c3.props.screens.length === 2)
   const { pulseStep } = mod._test
   const pr = { key: '', lines: 0, n: 0 }
   const seq = [[true, 'read', 0], [true, 'read', 0], [true, 'write', 3], [true, 'write', 10], [true, 'write', 30], [true, 'write', 0], [false, '', 0], [true, 'think', 0]].map(([b, k, l]) => pulseStep(pr, b, k, l))
