@@ -290,6 +290,28 @@ check('回合结束 → turn=false', tracker.snapshot(SID).turn === false)
   tk.stream(S5, { type: 'start' })
   tk.stream(S5, { type: 'chunk', chunk: { type: 'tool-call-delta', index: 0, id: 'r', name: 'write', argumentsDelta: '{"file_path":"' + jp(path.join(site, 'parts', 'card.html')) + '","content":"<p>' } })
   check('草稿：已有设计、写的是它子文件夹里的（不算一屏）→ 不开', tk.snapshot(S5).draft === null && !drafts.get(path.join(site, 'parts', 'card.html')))
+
+  // 一条流里交错出现很多别的工具：在写的页面不被挤掉
+  const S7 = 'evict1'
+  skill(tk, S7)
+  tk.observe(S7, { type: 'turn/start', time: Date.now(), data: { turn: 1 } })
+  tk.stream(S7, { type: 'start' })
+  const ev = path.join(gen, 'evict.html')
+  const d7 = (index, argumentsDelta, name) => tk.stream(S7, { type: 'chunk', chunk: { type: 'tool-call-delta', index, id: 'e' + index, ...(name ? { name } : {}), argumentsDelta } })
+  d7(0, '{"file_path":"' + jp(ev) + '","content":"<p>a', 'write')
+  await wait()
+  for (let i = 1; i <= 17; i++) d7(i, '{"path":"x"}', 'read')
+  d7(0, 'b</p>"}')
+  check('草稿：中间插了 17 个别的工具 → 在写的页面不被挤掉，后面的照样接上、收尾', !!drafts.get(ev) && drafts.get(ev).text === '<p>ab</p>' && drafts.get(ev).done === true, JSON.stringify(drafts.get(ev)))
+  // 同一个文件写了两遍：挤掉写完的第一遍时，不能把正在写的第二遍也收了
+  tk.stream(S7, { type: 'start' })
+  const tw2 = path.join(gen, 'twice.html')
+  d7(0, '{"file_path":"' + jp(tw2) + '","content":"<p>old</p>"}', 'write')
+  d7(1, '{"file_path":"' + jp(tw2) + '","content":"<p>new', 'write')
+  await wait()
+  for (let i = 2; i <= 17; i++) d7(i, '{"path":"x"}', 'read')
+  d7(1, ' complete</p>"}')
+  check('草稿：同一个文件重写、旧的那份被挤掉 → 新的这份不被提前收尾，正文写全', !!drafts.get(tw2) && drafts.get(tw2).text === '<p>new complete</p>' && drafts.get(tw2).done === true, JSON.stringify(drafts.get(tw2)))
 }
 
 // ── 边写边看：有的模型（DeepSeek V4.1）把正文排在文件名前面，文件名最后才到 ──
@@ -339,7 +361,7 @@ check('回合结束 → turn=false', tracker.snapshot(SID).turn === false)
   await wait()
   check('正文先到的第二份：新开一份（临时名字不撞）', snap().draft && snap().draft.key === '' && /__ddp_draft_2__\.html/.test(snap().draft.url), JSON.stringify(snap().draft))
   delta(0, '</head></html>","file_path":"' + jp(path.join(gen, 'parts', 'card.html')) + '"}')
-  check('正文先到、最后发现写的是子文件夹里的（不是一屏）→ 草稿作废', snap().draft === null, JSON.stringify(snap().draft))
+  check('正文先到、最后发现写的是子文件夹里的（不是一屏）→ 草稿作废，临时地址也读不到了', snap().draft === null && drafts.get(path.join(gen, '__ddp_draft_2__.html')) === null, JSON.stringify(snap().draft))
   fr({ type: 'start' })
   delta(1, '{"content":"body{margin:0}\\n.a{}\\n.b{}\\n', 'write')
   check('正文先到的不是网页（样式表）→ 不开草稿，行数照数', snap().draft === null && snap().lines === 3 && snap().writing === '', JSON.stringify(snap()))
@@ -361,8 +383,32 @@ check('回合结束 → turn=false', tracker.snapshot(SID).turn === false)
   fr({ type: 'start' })
   delta(0, '{"content":"<!doctype html>\\n<p>一个普通网页，开头很长' + 'x'.repeat(3100), 'write')
   check('正文先到、开头三千字都没有设计标记（不在做设计的会话也会这样写）→ 有 skill 加载过时照样算设计', !!snap().draft)
+  delta(0, 'y'.repeat(20000) + '</p>","file_')
+  delta(0, 'path":"' + jp(path.join(gen, 'big.html')) + '"}')
+  check('正文先到、最后一大块两万字连着收尾 → 文件名在下一块才到也认得出', snap().writing === 'big.html' && !!snap().draft && snap().draft.key === 'big.html', JSON.stringify({ w: snap().writing, d: snap().draft }))
+  await tk.setTarget(S6, parseTarget(index), { source: 'tool' })
+  check('换到别的目录的设计 → 原来那套的草稿不再报', snap().draft === null, JSON.stringify(snap().draft))
   o('turn/end', { reason: { kind: 'completed' } })
   check('回合结束 → 草稿清掉', snap().draft === null)
+
+  // 交错写两份「正文先到」的：右侧栏已经在看第二份，第一份最后发现写的是子文件夹里的 → 第一份照样作废，第二份不受影响
+  const S10 = 'prov2'
+  skill(tk, S10)
+  tk.observe(S10, { type: 'turn/start', time: Date.now(), data: { turn: 1 } })
+  const f10 = (index, argumentsDelta, name) => tk.stream(S10, { type: 'chunk', chunk: { type: 'tool-call-delta', index, id: 'v' + index, ...(name ? { name } : {}), argumentsDelta } })
+  tk.stream(S10, { type: 'start' })
+  f10(0, '{"file_path":"' + jp(path.join(gen, 't.css')) + '","content":"a{}"}', 'write')
+  tk.stream(S10, { type: 'start' })
+  const HEAD = '{"content":"<!DOCTYPE html>\\n<html lang=\\"zh\\">\\n<head>\\n<meta name=\\"dsh-design\\" content=\\"app\\">\\n<title>'
+  f10(0, HEAD + '甲', 'write')
+  f10(1, HEAD + '乙', 'write')
+  await wait()
+  const v10 = tk.snapshot(S10).draft
+  const nB = Number((/__ddp_draft_(\d+)__/.exec((v10 && v10.url) || '') || [])[1])
+  const provA = path.join(gen, `__ddp_draft_${nB - 1}__.html`)
+  check('交错两份：右侧栏看的是后开的那份', nB > 1 && !!drafts.get(provA), JSON.stringify(v10))
+  f10(0, '</title></head></html>","file_path":"' + jp(path.join(gen, 'parts', 'x.html')) + '"}')
+  check('交错两份：前一份是子文件夹里的 → 作废（临时地址读不到），在看的后一份不动', drafts.get(provA) === null && tk.snapshot(S10).draft && tk.snapshot(S10).draft.url === v10.url, JSON.stringify(tk.snapshot(S10).draft))
 }
 
 // 重放历史：老事件不动手

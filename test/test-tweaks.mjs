@@ -164,6 +164,24 @@ check('体检：都接上了就没话说', lintTweaks(dir).length === 0, JSON.st
   check('外观直接改：找不到的记下来；名字、值不老实的不写', r.missed.length === 1 && r.missed[0].id === '--nope' && tok.includes('--bg: #fff;') && !fs.existsSync(path.join(d4, 'tweaks.json')), JSON.stringify(r))
   check('外观直接改：什么都没给就是没东西可写', applyTweaks(d4, {}, {}).ok === false)
 }
+{
+  // 外观面板改了一个有颜色滑块管着的变量：tweaks.json 里那个滑块的值跟着改（滑块不再显示旧颜色）
+  const d5 = path.join(tmp, 'look-tw')
+  fs.mkdirSync(d5)
+  fs.writeFileSync(path.join(d5, 'tokens.css'), ':root { --color-primary: #c26a32; --radius-md: 16px; }\n')
+  fs.writeFileSync(path.join(d5, 'home.html'), PAGE('首页'))
+  fs.writeFileSync(path.join(d5, 'tweaks.json'), JSON.stringify({ tweaks: SAMPLE.tweaks.slice(0, 3) }))
+  const r = applyTweaks(d5, {}, { '--color-primary': '#112233' })
+  const saved = JSON.parse(fs.readFileSync(path.join(d5, 'tweaks.json'), 'utf8')).tweaks
+  const bk = saved.find((x) => x.var === '--color-primary')
+  check('外观改颜色：滑块管着同一个变量 → tweaks.json 里的值跟着改', r.ok && !!bk && String(bk.value).toLowerCase() === '#112233' && fs.readFileSync(path.join(d5, 'tokens.css'), 'utf8').includes('--color-primary: #112233;'), JSON.stringify({ r, bk }))
+  // 同一次保存：滑块改成一种颜色、配色又把同一个变量设回原色 → 两边都以配色为准
+  fs.writeFileSync(path.join(d5, 'tokens.css'), ':root { --color-primary: #c26a32; --radius-md: 16px; }\n')
+  fs.writeFileSync(path.join(d5, 'tweaks.json'), JSON.stringify({ tweaks: SAMPLE.tweaks.slice(0, 3) }))
+  const r2 = applyTweaks(d5, { brand: '#abcdef' }, { '--color-primary': '#c26a32' })
+  const bk2 = JSON.parse(fs.readFileSync(path.join(d5, 'tweaks.json'), 'utf8')).tweaks.find((x) => x.var === '--color-primary')
+  check('同一次保存滑块和配色都动了同一个颜色 → 文件和 tweaks.json 对得上', r2.ok && String(bk2.value).toLowerCase() === '#c26a32' && fs.readFileSync(path.join(d5, 'tokens.css'), 'utf8').includes('--color-primary: #c26a32;'), JSON.stringify({ r2, bk2 }))
+}
 if (process.platform !== 'win32') {
   // 软链接：指到设计目录外的样式、tweaks.json 不写
   const d3 = path.join(tmp, 'links')

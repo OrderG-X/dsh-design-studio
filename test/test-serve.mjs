@@ -385,6 +385,22 @@ fs.rmSync(tmp, { recursive: true, force: true })
   check('没写 doctype → 插在最前面', b.push('<p>hi') === TAG + '<p>hi')
   const c = draftInjector(TAG)
   check('一直只有空白就写完了 → 收尾时补上', c.push('\n') === '' && c.flush() === TAG + '\n')
+  const cm = draftInjector(TAG)
+  const cm1 = [cm.push('<!-- a > b '), cm.push('-->\n<!DOC'), cm.push('TYPE html><p>')]
+  check('开头先有注释（注释里还有 >、被切开）→ 跳过注释，照样插在 doctype 后面', cm1[0] === '' && cm1[1] === '' && cm1[2] === '<!-- a > b -->\n<!DOCTYPE html>' + TAG + '<p>', JSON.stringify(cm1))
+  const lg = draftInjector(TAG)
+  const longCm = '<!--' + 'a'.repeat(4100)
+  const lg1 = [lg.push(longCm), lg.push('-'), lg.push('->\n<!doctype html><p>'), lg.push('x')]
+  const lgAll = lg1.join('') + lg.flush()
+  check('开头一段超长注释（超过攒的上限）→ 注释先吐出去，脚本照样插在 doctype 后面', lg1[0].length > 4000 && lgAll === longCm + '-->\n<!doctype html>' + TAG + '<p>x', JSON.stringify(lg1.map((x) => x.length)))
+  const lu = draftInjector(TAG)
+  const luAll = lu.push('<!--' + 'b'.repeat(5000)) + lu.flush()
+  check('超长注释写到最后都没收尾 → 收尾时补上 -->，脚本放在后面（照样会跑）', luAll === '<!--' + 'b'.repeat(5000) + '-->' + TAG)
+  const l2 = draftInjector(TAG)
+  const l2All = l2.push('<!--' + 'c'.repeat(5000)) + l2.push('-->\n<!-- second') + l2.flush()
+  check('超长注释收了尾、又开了一段没收尾就写完了 → 补的 --> 收的是第二段，脚本在注释外面', l2All === '<!--' + 'c'.repeat(5000) + '-->\n<!-- second-->' + TAG, l2All.slice(-80))
+  const cn = draftInjector(TAG)
+  check('注释后面没有 doctype → 插在注释后面', cn.push('<!-- x --><html>') === '<!-- x -->' + TAG + '<html>')
 
   const drafts = createDrafts()
   const hd = createHub({ drafts })
@@ -420,7 +436,7 @@ fs.rmSync(tmp, { recursive: true, force: true })
   const done2 = await get(`${dor}/${encodeURIComponent('新 页.html')}?__ddp_draft=1`)
   check('草稿写完了再来拿 → 一次给全', done2.status === 200 && done2.body.endsWith('<h1>巷口面馆</h1>'))
   check('没在写的文件 → 404', (await get(`${dor}/nope.html?__ddp_draft=1`)).status === 404)
-  check('草稿地址跳不出根目录', (await get(`${dor}/..%2F..%2Fsecret.html?__ddp_draft=1`)).status === 404)
+  check('草稿地址跳不出根目录', [403, 404].includes((await get(`${dor}/..%2F..%2Fsecret.html?__ddp_draft=1`)).status))
   fs.writeFileSync(path.join(dsite, 'done.html'), '<!doctype html><p>真文件</p>')
   const real = await get(`${dor}/done.html?__ddp_draft=9`)
   check('草稿已经收走了（写完了）→ 给真文件', real.status === 200 && real.body.includes('真文件') && real.body.includes('picker.js'), real.body.slice(0, 80))
@@ -438,13 +454,13 @@ fs.rmSync(tmp, { recursive: true, force: true })
   const lump = path.join(dsite, 'lump.html')
   const head = '<!doctype html><html><head><style>' + 'b{color:red}'.repeat(400) + '</style></head><body>'
   const bodyText = '<p>一段字</p>'.repeat(600)
-  drafts.begin(lump)
+  const lumpId = drafts.begin(lump)
   drafts.push(lump, head + bodyText + '</body></html>')
   drafts.end(lump)
   const lc = []
   const lt0 = Date.now()
   await new Promise((resolve, reject) => {
-    const u = new URL(`${dor}/lump.html?__ddp_draft=3`)
+    const u = new URL(`${dor}/lump.html?__ddp_draft=${lumpId}`)
     http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
       res.setEncoding('utf8')
       res.on('data', (d) => lc.push({ at: Date.now() - lt0, d }))
@@ -455,14 +471,32 @@ fs.rmSync(tmp, { recursive: true, force: true })
   const span = lc[lc.length - 1].at - lc[0].at
   check('整页一下子到 → 一截截放（好几截、拉开一两秒以上），拼起来一字不差', lc.length >= 10 && span >= 1500 && span < 9000 && lbody === head.replace('<!doctype html>', '<!doctype html>' + TAG) + bodyText + '</body></html>', JSON.stringify({ n: lc.length, span }))
   check('整页一下子到 → <head> 里的样式和 <body> 开头头一截就全给了（看不见的不用等）', lc[0].d.includes('<body>') && lc[0].d.length < head.length + TAG.length + 400, String(lc[0].d.length))
+  // 没写 <head> / <body> 的整页（合法 HTML）→ 也一截截放，不闪现
+  const bare = path.join(dsite, 'bare.html')
+  const bareId = drafts.begin(bare)
+  const bareText = '<!doctype html><meta charset="utf-8"><main>' + '无头'.repeat(1500) + '</main>'
+  drafts.push(bare, bareText)
+  drafts.end(bare)
+  drafts.get(bare).lump = true
+  const bc = []
+  const bt0 = Date.now()
+  await new Promise((resolve, reject) => {
+    const u = new URL(`${dor}/bare.html?__ddp_draft=${bareId}`)
+    http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
+      res.setEncoding('utf8')
+      res.on('data', (d) => bc.push({ at: Date.now() - bt0, d }))
+      res.on('end', resolve)
+    }).on('error', reject).end()
+  })
+  check('没写 <body> 的整页一下子到 → 照样一截截放，拼起来一字不差', bc.length >= 10 && bc[bc.length - 1].at - bc[0].at >= 1500 && bc.map((x) => x.d).join('') === bareText.replace('<!doctype html>', '<!doctype html>' + TAG), JSON.stringify({ n: bc.length }))
   // 开着看的时候整页才一块到、紧跟着写完 → 慢放；流到一半来了一大块（还没写完）→ 照样马上给
   const live2 = path.join(dsite, 'live2.html')
-  drafts.begin(live2)
+  const live2Id = drafts.begin(live2)
   drafts.push(live2, '<!doctype html><html><head></head><body>')
   const lc2 = []
   let l2End = 0
   const l2done = new Promise((resolve, reject) => {
-    const u = new URL(`${dor}/live2.html?__ddp_draft=5`)
+    const u = new URL(`${dor}/live2.html?__ddp_draft=${live2Id}`)
     http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
       res.setEncoding('utf8')
       res.on('data', (d) => lc2.push({ at: Date.now(), d }))
@@ -484,13 +518,13 @@ fs.rmSync(tmp, { recursive: true, force: true })
   check('开着看时最后一大块到了紧跟着就写完（整页憋到最后给）→ 慢放（拉开一两秒）', l2End - tLump >= 1500 && lc2.map((x) => x.d).join('').endsWith(tail), String(l2End - tLump))
   // 一点点流得很快（每 20ms 来 300 字 ≈ 每秒 1.5 万字）：来多少吐多少，写完时不落在后头
   const fast = path.join(dsite, 'fast.html')
-  drafts.begin(fast)
+  const fastId = drafts.begin(fast)
   drafts.push(fast, '<!doctype html><html><head></head><body>' + '<p>早就写好的</p>'.repeat(300))
   const fc = []
   const ft0 = Date.now()
   let fEnd = 0
   const fdone = new Promise((resolve, reject) => {
-    const u = new URL(`${dor}/fast.html?__ddp_draft=4`)
+    const u = new URL(`${dor}/fast.html?__ddp_draft=${fastId}`)
     http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
       res.setEncoding('utf8')
       res.on('data', (d) => fc.push(d))
@@ -510,7 +544,7 @@ fs.rmSync(tmp, { recursive: true, force: true })
   // 一路流着写完的（拉开一两秒）→ 不算整段到的；右侧栏换了个框事后再看（第一屏落地时等待卡片换成单屏）→ 一口气给，不再放一遍
   check('整段一下子到的草稿记着 lump', drafts.get(lump).lump === true)
   const slow = path.join(dsite, 'slow.html')
-  drafts.begin(slow)
+  const slowId = drafts.begin(slow)
   drafts.push(slow, '<!doctype html><html><head></head><body>')
   for (let i = 0; i < 18; i++) {
     drafts.push(slow, `<p>${'慢'.repeat(200)}</p>`)
@@ -522,7 +556,7 @@ fs.rmSync(tmp, { recursive: true, force: true })
   const st0 = Date.now()
   let sEnd = 0
   await new Promise((resolve, reject) => {
-    const u = new URL(`${dor}/slow.html?__ddp_draft=6`)
+    const u = new URL(`${dor}/slow.html?__ddp_draft=${slowId}`)
     http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
       res.setEncoding('utf8')
       res.on('data', (d) => sc.push(d))
@@ -530,7 +564,40 @@ fs.rmSync(tmp, { recursive: true, force: true })
     }).on('error', reject).end()
   })
   check('一路流着写完的、事后再来看 → 一口气给完，不慢放', sEnd - st0 < 300 && sc.join('').split('慢'.repeat(200)).length === 19, JSON.stringify({ took: sEnd - st0, n: sc.length }))
+  // 地址里的编号对不上（同一个文件又开始重写了，旧框子还拿着旧编号）→ 不给新的那份草稿
+  const again = path.join(dsite, 'again.html')
+  const ag1 = drafts.begin(again)
+  drafts.push(again, '<!doctype html><p>第一份</p>')
+  const ag2 = drafts.begin(again)
+  drafts.push(again, '<!doctype html><p>第二份</p>')
+  const oldFrame = await get(`${dor}/again.html?__ddp_draft=${ag1}`)
+  check('编号对不上的旧草稿地址 → 不给正在写的新一份（文件还没落地 → 404）', oldFrame.status === 404 && !oldFrame.body.includes('第二份'), String(oldFrame.status))
+  drafts.end(again)
+  check('编号对得上 → 给', (await get(`${dor}/again.html?__ddp_draft=${ag2}`)).body.includes('第二份'))
+  // 文件还不存在时也不许出根目录（Windows 下 ..\ 也算）
+  const nf = resolveInRoot(dsite, '/../outside/new.html')
+  check('还没落地的文件：../ 也被夹回根目录里', !!nf && nf.real === null && nf.abs === path.join(dsite, 'outside', 'new.html'), JSON.stringify(nf))
+  if (path.sep === '\\') {
+    const w = resolveInRoot(dsite, '/..\\..\\other\\x.html')
+    check('Windows：..\\ 绕不出根目录（被夹回根目录里）', !!w && w.abs === path.join(dsite, 'other', 'x.html'), JSON.stringify(w))
+  }
   hd.closeAll()
+}
+
+// 边写边看的第一屏：目录还没建就先开了预览服务器 → 目录建好、再 open 一次时补上监听，之后改文件照样通知
+{
+  const seen = []
+  const hw = createHub({ onChange: (key, file) => seen.push(file) })
+  const later = path.join(tmp, 'later-dir')
+  await hw.open({ kind: 'file', root: later })
+  fs.mkdirSync(later, { recursive: true })
+  fs.writeFileSync(path.join(later, 'index.html'), '<p>1</p>')
+  await hw.open({ kind: 'file', root: later })
+  await new Promise((r) => setTimeout(r, 100))
+  fs.writeFileSync(path.join(later, 'index.html'), '<p>2</p>')
+  await new Promise((r) => setTimeout(r, 600))
+  check('目录后建的：再 open 时补上监听，改文件有通知', seen.some((f) => f.endsWith('index.html')), JSON.stringify(seen))
+  hw.closeAll()
 }
 
 console.log(`\n${pass} 通过，${fail} 失败`)

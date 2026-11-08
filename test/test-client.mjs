@@ -123,6 +123,9 @@ function findComp(el, name) {
   if (typeof el.type === 'function') return el.type.name === name ? el : findComp(el.type(el.props), name)
   return findComp(el.props && el.props.children, name) || findComp(el.children || [], name)
 }
+// 假的 DSH 输入框：空的（一个空段落）
+const emptyEd = { querySelector: () => null, children: [{ textContent: '' }] }
+globalThis.document = { querySelectorAll: () => [emptyEd] }
 const sent = []
 const iaNew = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { sent.push(x); return true }, submit: () => sent.push('<submit>') }
 const homeAsk = findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: iaNew }), 'HomeAsk')
@@ -130,11 +133,22 @@ check('首页：有大输入框，「+」里三项（打开 HTML、品牌、设�
 homeAsk.props.onSend({ text: '做个面馆点单', kind: 'miniprogram', style: null })
 await new Promise((r) => setTimeout(r, 150))
 check('首页：发出去 = 放进输入框（带类型）+ 直接发', sent.length === 2 && sent[0].includes('做个面馆点单') && sent[0].includes('类型：小程序') && sent[1] === '<submit>', JSON.stringify(sent))
+// 输入框里本来就有引用标签（读不出纯文字）/ 分屏有两个输入框：只放进去，不替用户发
+for (const [name, eds] of [['有引用标签', [{ querySelector: () => ({}), children: [] }]], ['分屏两个输入框', [emptyEd, emptyEd]], ['找不到输入框', []]]) {
+  globalThis.document = { querySelectorAll: () => eds }
+  const got = []
+  const ia = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { got.push(x); return true }, submit: () => got.push('<submit>') }
+  findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: ia }), 'HomeAsk').props.onSend({ text: '做个海报', kind: '', style: null })
+  await new Promise((r) => setTimeout(r, 150))
+  check('首页：' + name + ' → 只放进去，不直接发', got.length === 1 && !got.includes('<submit>'), JSON.stringify(got))
+}
+globalThis.document = { querySelectorAll: () => [emptyEd] }
 const sentOld = []
 const iaOld = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { sentOld.push(x); return true } }
 findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: iaOld }), 'HomeAsk').props.onSend({ text: '做个海报', kind: '', style: null })
 await new Promise((r) => setTimeout(r, 150))
 check('首页：旧版 DSH（没有 submit）只放进输入框，不带类型行', sentOld.length === 1 && !sentOld[0].includes('类型'), JSON.stringify(sentOld))
+delete globalThis.document
 delete globalThis.__DSH_HOST_PATHS__
 check('空状态：网页版树里没有「浏览…」按钮', !findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse))
 
