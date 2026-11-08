@@ -132,7 +132,7 @@ const homeAsk = findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions
 check('首页：有大输入框，「+」里三项（打开 HTML、品牌、设计库）', !!homeAsk && homeAsk.props.plus.length === 3)
 homeAsk.props.onSend({ text: '做个面馆点单', kind: 'miniprogram', style: null })
 await new Promise((r) => setTimeout(r, 150))
-check('首页：发出去 = 放进输入框（带类型）+ 直接发', sent.length === 2 && sent[0].includes('做个面馆点单') && sent[0].includes('类型：小程序') && sent[1] === '<submit>', JSON.stringify(sent))
+check('首页：发出去 = 放进输入框（带类型）+ 自动挑的风格卡 + 直接发', sent.length === 3 && sent[0].includes('做个面馆点单') && sent[0].includes('类型：小程序') && /^〔风格〕/.test(sent[1]) && /自动挑的/.test(sent[1]) && sent[2] === '<submit>', JSON.stringify(sent))
 // 输入框里本来就有引用标签（读不出纯文字）/ 分屏有两个输入框：只放进去，不替用户发
 for (const [name, eds] of [['有引用标签', [{ querySelector: () => ({}), children: [] }]], ['分屏两个输入框', [emptyEd, emptyEd]], ['找不到输入框', []]]) {
   globalThis.document = { querySelectorAll: () => eds }
@@ -140,14 +140,14 @@ for (const [name, eds] of [['有引用标签', [{ querySelector: () => ({}), chi
   const ia = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { got.push(x); return true }, submit: () => got.push('<submit>') }
   findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: ia }), 'HomeAsk').props.onSend({ text: '做个海报', kind: '', style: null })
   await new Promise((r) => setTimeout(r, 150))
-  check('首页：' + name + ' → 只放进去，不直接发', got.length === 1 && !got.includes('<submit>'), JSON.stringify(got))
+  check('首页：' + name + ' → 只放进去，不直接发，也不自动挑风格（可能已有风格卡 / 参考图）', got.length === 1 && !got.includes('<submit>'), JSON.stringify(got))
 }
 globalThis.document = { querySelectorAll: () => [emptyEd] }
 const sentOld = []
 const iaOld = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { sentOld.push(x); return true } }
 findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: iaOld }), 'HomeAsk').props.onSend({ text: '做个海报', kind: '', style: null })
 await new Promise((r) => setTimeout(r, 150))
-check('首页：旧版 DSH（没有 submit）只放进输入框，不带类型行', sentOld.length === 1 && !sentOld[0].includes('类型'), JSON.stringify(sentOld))
+check('首页：旧版 DSH（没有 submit）只放进输入框，不带类型行', sentOld.length === 2 && !sentOld[0].includes('类型'), JSON.stringify(sentOld))
 delete globalThis.document
 delete globalThis.__DSH_HOST_PATHS__
 check('空状态：网页版树里没有「浏览…」按钮', !findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse))
@@ -438,6 +438,25 @@ check('调样式：交给模型的字带元素、选择器、改动和文件', a
 
 // ── 风格卡：配色都过对比度，交给模型的字带全套 ──
 const { STYLES, formatStyle, accentUse } = mod._test
+{
+  const { autoStyle, makeT, ZH } = mod._test
+  const id = (text, kind) => (autoStyle(text, kind) || { id: null }).id
+  check('自动风格：按题材挑卡', id('做一个城市民宿预订 App：首页推荐、房源详情、下单确认，三屏', 'app') === 'fresh' && id('奶茶店点单小程序：菜单、购物车、取餐码', 'miniprogram') === 'playful' && id('A landing page for an AI meeting-notes SaaS called Murmur', 'web') === 'tech' && id('A habit tracker app for runners: today, weekly stats, profile', 'app') === 'sport' && id('社区咖啡馆小程序', 'miniprogram') === 'retro',
+    [id('做一个城市民宿预订 App', 'app'), id('奶茶店点单小程序', 'miniprogram'), id('SaaS', 'web'), id('runners', 'app'), id('社区咖啡馆小程序', 'miniprogram')].join())
+  check('自动风格：用户说了风格就不挑', id('周末城市音乐节海报，霓虹夜色风', 'poster') === null && id('健身 App，配色用蓝白', 'app') === null && id('跑步 App，赛博朋克', 'app') === null && id('A fitness app in a dark luxury style', 'app') === null)
+  check('自动风格：「风景」「通风」不算说了风格', id('风景摄影分享 App', 'app') !== null && id('新风系统控制面板', 'desktop') !== null)
+  check('自动风格：审查 A 的误判都改了', id('A Black Friday sale landing page', 'web') === 'sale' && id('智能家居面板：支持照明、通风、安防', 'app') !== null && id('健身 App，风格你定', 'app') === 'sport' && id('跑步 App，用北欧风：首页、训练、我的', 'app') === null && id('北欧风的界面，做个记账 App', 'app') === null && id('I run a coffee shop', 'web') === 'retro' && id('waterpark tickets', 'web') !== 'tech' && id('A fitness app, any style', 'app') === 'sport',
+    [id('A Black Friday sale landing page', 'web'), id('智能家居面板：支持照明、通风、安防', 'app'), id('健身 App，风格你定', 'app'), id('跑步 App，用北欧风：首页、训练、我的', 'app'), id('北欧风的界面，做个记账 App', 'app'), id('I run a coffee shop', 'web'), id('waterpark tickets', 'web'), id('A fitness app, any style', 'app')].join())
+  check('自动风格：审查 B 的误判都改了', id('健身 App，配色定为蓝白', 'app') === null && id('跑步 App，清新风：首页、训练、我的', 'app') === null && id('A theme park booking app', 'app') !== null && id('A color picker app', 'app') !== null && id('金融风控管理系统', 'web') === 'tech' && id('健身 App，风格：你定', 'app') === 'sport' && id('I run a coffee shop, watch our intro video', 'web') === 'retro' && id('新风系统控制面板', 'desktop') !== null,
+    [id('健身 App，配色定为蓝白', 'app'), id('跑步 App，清新风：首页、训练、我的', 'app'), id('A theme park booking app', 'app'), id('A color picker app', 'app'), id('金融风控管理系统', 'web'), id('健身 App，风格：你定', 'app'), id('I run a coffee shop, watch our intro video', 'web')].join())
+  { const t0 = Date.now(); autoStyle('健身 App，风格' + ' '.repeat(5000) + 'x', 'app'); autoStyle('配色' + '：'.repeat(3000) + ' '.repeat(3000), 'app'); check('自动风格：长空白不卡（< 50ms）', Date.now() - t0 < 50, Date.now() - t0) }
+  check('自动风格：兜底不给米色系的卡', ['做一张招聘海报|poster', '帮我做个记账 App|app', '做个工具网站|web', '会员月报邮件|email'].every((x) => { const [a, k] = x.split('|'); return !['warm', 'cream', 'japandi', 'ink', 'retro'].includes(id(a, k)) }))
+  check('自动风格：没认出题材按类型给，App 不给米色系', id('一份 5 页的季度业务复盘幻灯片', 'slides') === 'swiss' && !['warm', 'cream', 'japandi', 'ink'].includes(id('帮我做个记账 App', 'app')) && id('', 'app') === null)
+  const tz = makeT({ locale: { t: (k) => k } })
+  const msg = formatStyle((k, v) => { let x = ZH[k] || k; for (const [a, b] of Object.entries(v || {})) x = x.split(`{${a}}`).join(b); return x }, STYLES.find((x) => x.id === 'sport'), false, true)
+  check('自动风格：交给模型的字说明是自动挑的、可被用户的话覆盖', /〔风格〕运动能量/.test(msg) && /自动挑的/.test(msg) && /以那个为准/.test(msg), msg.slice(0, 200))
+  void tz
+}
 const lum = (hex) => { const v = hex.slice(1).match(/../g).map((x) => parseInt(x, 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2] }
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
 const lowC = STYLES.flatMap((x) => [['text', x.c.text, x.c.bg], ['muted', x.c.muted, x.c.bg], ['muted', x.c.muted, x.c.surface], ['on', x.c.on, x.c.primary], ['link', x.c.link, x.c.bg], ['link', x.c.link, x.c.surface]]
