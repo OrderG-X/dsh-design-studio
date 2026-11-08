@@ -370,5 +370,72 @@ else {
 }
 
 fs.rmSync(tmp, { recursive: true, force: true })
+// ── 边写边看：草稿一边写一边吐 ──
+{
+  const { createDrafts, createJsonStringDecoder } = await import('../lib/draft.js')
+  const { draftInjector } = await import('../lib/serve.js')
+  const dec = createJsonStringDecoder()
+  const got = ['<p>你好\\', 'n', '世界 \\u4e', '2d \\"q\\"', ' \\ud83d', '\\ude00', '!"}', 'more'].map((x) => dec.push(x))
+  check('JSON 字符串流式还原：转义被切在两块中间、\\u 被切开、表情两半分开来都对，收尾引号后不再吐', got.join('') === '<p>你好\n世界 中 "q" 😀!' && dec.done && got[4] === ' ' && got[7] === '', JSON.stringify(got))
+  const TAG = '<script src="/__dsh_design__/draft.js"></script>'
+  const a = draftInjector(TAG)
+  const a1 = [a.push('  <!do'), a.push('ctype html><p>'), a.push('x')]
+  check('草稿脚本插在 doctype 后面（doctype 被切成两块也认）', a1[0] === '' && a1[1] === '  <!doctype html>' + TAG + '<p>' && a1[2] === 'x' && a.flush() === '', JSON.stringify(a1))
+  const b = draftInjector(TAG)
+  check('没写 doctype → 插在最前面', b.push('<p>hi') === TAG + '<p>hi')
+  const c = draftInjector(TAG)
+  check('一直只有空白就写完了 → 收尾时补上', c.push('\n') === '' && c.flush() === TAG + '\n')
+
+  const drafts = createDrafts()
+  const hd = createHub({ drafts })
+  const dsite = path.join(tmp, 'dsite')
+  fs.mkdirSync(dsite, { recursive: true })
+  fs.writeFileSync(path.join(dsite, 'tokens.css'), ':root{--brand:#c2410c}')
+  const { origin: dor } = await hd.open({ kind: 'file', root: dsite })
+  const abs = path.join(dsite, '新 页.html')
+  drafts.begin(abs)
+  drafts.push(abs, '<!doctype html><html><head><link rel="stylesheet" href="tokens.css">')
+  const chunks = []
+  const t0 = Date.now()
+  const streamed = new Promise((resolve, reject) => {
+    const u = new URL(`${dor}/${encodeURIComponent('新 页.html')}?__ddp_draft=1`)
+    const req = http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { host: u.host } }, (res) => {
+      res.setEncoding('utf8')
+      res.on('data', (d) => chunks.push({ at: Date.now() - t0, d }))
+      res.on('end', () => resolve(res))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+  await new Promise((r) => setTimeout(r, 150))
+  drafts.push(abs, '</head><body><h1>巷口')
+  await new Promise((r) => setTimeout(r, 150))
+  drafts.push(abs, '面馆</h1>')
+  drafts.end(abs)
+  const res = await streamed
+  const body = chunks.map((x) => x.d).join('')
+  check('草稿地址：先吐已经写到的（插上草稿脚本），之后来一截吐一截，写完收尾', res.statusCode === 200 && /text\/html/.test(res.headers['content-type']) && body === '<!doctype html>' + TAG + '<html><head><link rel="stylesheet" href="tokens.css"></head><body><h1>巷口面馆</h1>', JSON.stringify(body))
+  check('草稿地址：真的是边写边到（第一块在写完之前就到了）', chunks.length >= 2 && chunks[0].at < 120, JSON.stringify(chunks.map((x) => x.at)))
+  check('草稿地址：不缓存', /no-store/.test(res.headers['cache-control'] || ''))
+  const done2 = await get(`${dor}/${encodeURIComponent('新 页.html')}?__ddp_draft=1`)
+  check('草稿写完了再来拿 → 一次给全', done2.status === 200 && done2.body.endsWith('<h1>巷口面馆</h1>'))
+  check('没在写的文件 → 404', (await get(`${dor}/nope.html?__ddp_draft=1`)).status === 404)
+  check('草稿地址跳不出根目录', (await get(`${dor}/..%2F..%2Fsecret.html?__ddp_draft=1`)).status === 404)
+  fs.writeFileSync(path.join(dsite, 'done.html'), '<!doctype html><p>真文件</p>')
+  const real = await get(`${dor}/done.html?__ddp_draft=9`)
+  check('草稿已经收走了（写完了）→ 给真文件', real.status === 200 && real.body.includes('真文件') && real.body.includes('picker.js'), real.body.slice(0, 80))
+  const js = await get(`${dor}/__dsh_design__/draft.js`)
+  check('草稿脚本：JS 类型、里面是跟着往下滚和三只鼠标', js.status === 200 && /javascript/.test(js.headers['content-type']) && js.body.includes('__ddpDraft') && js.body.includes('dshDraft'))
+  check('草稿页里还能拿到同目录的样式（相对地址照常走）', (await get(`${dor}/tokens.css`)).body.includes('--brand'))
+  // 正文先到的草稿挂在设计文件夹里一个临时名字上（文件不存在）：照样给
+  const prov = path.join(dsite, '__ddp_draft_1__.html')
+  drafts.begin(prov)
+  drafts.push(prov, '<!doctype html><p>正文先到')
+  drafts.end(prov)
+  const pv = await get(`${dor}/__ddp_draft_1__.html?__ddp_draft=2`)
+  check('临时名字上的草稿 → 照样给（插上草稿脚本）', pv.status === 200 && pv.body.includes('正文先到') && pv.body.includes('draft.js'), pv.body.slice(0, 80))
+  hd.closeAll()
+}
+
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

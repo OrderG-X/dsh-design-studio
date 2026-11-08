@@ -681,5 +681,44 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   check('拖着时：zip → zip', dragKind({ items: [{ kind: 'file', type: 'application/zip' }] }) === 'zip')
 }
 
+// ── 生成中：顶上的状态条（在做什么 + 计时）、鼠标框版面的占位 ──
+{
+  const P = mod._test.poller('sBusy')
+  const view = (x) => { P.state = x; return body.comp({ ...body.opts.inject('sBusy') }) }
+  const barOf = (x) => findComp(view(x), 'BusyBar')
+  const b1 = barOf({ url: '', turn: true, turnFor: 72000, tool: '' })
+  check('生成中：顶上状态条说「在想」，计时按服务端说的这一轮开始了多久', !!b1 && b1.props.phase.text === '在想…' && text(b1).includes('1:12'), b1 && text(b1))
+  const say = (x) => { const b = barOf({ url: '', turn: true, turnFor: 1000, ...x }); return b ? b.props.phase : null }
+  check('生成中：按调的工具说人话（体检 / 跑命令 / 看文件 / 认不出的）', say({ tool: 'check_design' }).text === '正在体检' && say({ tool: 'bash' }).text === '正在跑命令'
+    && say({ tool: 'read_file' }).text === '正在看文件' && say({ tool: 'mystery_tool' }).text === '模型正在工作', JSON.stringify([say({ tool: 'check_design' }), say({ tool: 'bash' }), say({ tool: 'read_file' }), say({ tool: 'mystery_tool' })]))
+  check('生成中：第一屏还没出来时写文件 = 正在做第 1 屏', say({ tool: 'write' }).text === '正在做第 1 屏')
+  const w1 = say({ tool: 'write', writing: 'menu.html', lines: 120 })
+  const w2 = say({ tool: 'write', writing: 'tokens.css', lines: 4 })
+  check('生成中：流里认出了文件 → 说做第几屏、带文件名和写了几行（不到 10 行不说行数）', w1.text === '正在做第 1 屏' && w1.sub === 'menu.html · 已写 120 行' && w2.text === '正在写 tokens.css' && !w2.sub, JSON.stringify([w1, w2]))
+  const ask = say({ asking: true, tool: 'ask_user_question' })
+  check('生成中：在等用户回答就直说（不闪光、没有进度线）', ask.asking === true && ask.text === '模型在等你回答（在对话里）' && !text(findComp(view({ url: '', turn: true, asking: true }), 'BusyBar')).includes('undefined'))
+  const v = view({ url: '', turn: true, kind: 'app', tool: '' })
+  const stage = findEl(v, (el) => el.props && typeof el.props.className === 'string' && el.props.className.startsWith('ddp-stage'))
+  check('生成中：状态条占了顶上，舞台带 bz（提示、消息往下让）', !!stage && stage.props.className === 'ddp-stage bz', stage && stage.props.className)
+  const gd = findComp(v, 'GhostDraw')
+  const gdEl = gd && gd.type(gd.props)
+  const boxes = []
+  findEl(gdEl, (el) => { if (el.type === 'i' && el.props && el.props.className === 'b') boxes.push(el); return false })
+  check('生成中：第一屏出来前的占位按类型画（手机 7 块），三只鼠标带名字', !!gd && gd.props.kind === 'app' && boxes.length === 7 && text(gdEl).includes('排版') && text(gdEl).includes('配色') && text(gdEl).includes('文案'), gd && JSON.stringify({ kind: gd.props.kind, n: boxes.length }))
+  check('生成中：不再有底部的「模型正在工作」小条', !findEl(v, (el) => el.props && typeof el.props.className === 'string' && el.props.className.startsWith('ddp-chip')))
+  // 边写边看：服务端有了正在写的那页的草稿 → 占位上面盖一层真页面（第一屏：按设备大小缩进等待卡片）
+  const DU = 'http://127.0.0.1:5/menu.html?__ddp_draft=1'
+  const vd = view({ url: '', turn: true, kind: 'app', tool: 'write', writing: 'menu.html', lines: 40, draft: { key: 'menu.html', url: DU } })
+  const fd = findComp(vd, 'FitDraft')
+  check('边写边看：第一屏在写 → 等待卡片里放正在写的真页面（底下还垫着占位）', !!fd && fd.props.url === DU && fd.props.kind === 'app' && !!findComp(vd, 'GhostDraw'), fd && JSON.stringify(fd.props))
+  check('边写边看：没有草稿 → 只有占位', !findComp(view({ url: '', turn: true, kind: 'app', tool: 'read_file' }), 'FitDraft'))
+  check('边写边看：不在生成了（草稿是上一轮的）→ 不放', !findComp(view({ url: '', turn: false, kind: 'app', draft: { key: 'menu.html', url: DU } }), 'FitDraft'))
+  check('占位拿到鼠标该不该动的拍子（pulse）', typeof findComp(vd, 'GhostDraw').props.pulse === 'number')
+  const { pulseStep } = mod._test
+  const pr = { key: '', lines: 0, n: 0 }
+  const seq = [[true, 'read', 0], [true, 'read', 0], [true, 'write', 3], [true, 'write', 10], [true, 'write', 30], [true, 'write', 0], [false, '', 0], [true, 'think', 0]].map(([b, k, l]) => pulseStep(pr, b, k, l))
+  check('占位的鼠标只在模型真有动静时动：同一件事不动，换了事 / 又写了 15 行才动一下，停了就不动', JSON.stringify(seq) === '[1,1,2,2,3,3,3,4]', JSON.stringify(seq))
+}
+
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

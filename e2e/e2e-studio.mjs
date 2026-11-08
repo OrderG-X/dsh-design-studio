@@ -365,10 +365,10 @@ try {
   check('模型调 look_design，拿回一张真实渲染的图', imgs.length === 1 && imgs[0].source && /jpe?g/.test(imgs[0].source.media_type || '') && (imgs[0].source.data || '').length > 2000 && /375×667/.test(lookText), JSON.stringify(look || llmLog.slice(-3)).slice(0, 400))
 
   // ②c 模型用提问卡问用户 → 右侧栏不转圈，提示在等回答；答完就没了
-  const ASKING = `[...document.querySelectorAll('.ddp-chip')].some((c) => /在等你回答|waiting for your answer/.test(c.textContent))`
+  const ASKING = `[...document.querySelectorAll('.ddp-busy, .ddp-chip')].some((c) => /在等你回答|waiting for your answer/.test(c.textContent))`
   await say('ASK-ME 先问问我')
   const asking = await until(ASKING, 30000)
-  check('模型提问时右侧栏提示「在等你回答」', asking, await page(`[...document.querySelectorAll('.ddp-chip')].map((c) => c.textContent).join(' | ') || '没有提示条'`))
+  check('模型提问时右侧栏提示「在等你回答」', asking, await page(`[...document.querySelectorAll('.ddp-busy, .ddp-chip')].map((c) => c.textContent).join(' | ') || '没有提示条'`))
   await shot('1a-asking')
   const answered = await page(`(() => {
     const opt = [...document.querySelectorAll('button, [role="radio"]')].find((b) => /温暖手作/.test(b.textContent || ''))
@@ -379,7 +379,7 @@ try {
   await sleep(500)
   await page(`(() => { const b = [...document.querySelectorAll('button')].find((x) => /^\s*(提交|Submit)\s*$/.test(x.textContent || '')); if (b) b.click(); return !!b })()`)
   const notAsking = await until(`!(${ASKING})`, 20000)
-  check('答完以后提示没了', answered === 'ok' && notAsking, `${answered} / ${await page(`[...document.querySelectorAll('.ddp-chip')].map((c) => c.textContent).join(' | ')`)}`)
+  check('答完以后提示没了', answered === 'ok' && notAsking, `${answered} / ${await page(`[...document.querySelectorAll('.ddp-busy, .ddp-chip')].map((c) => c.textContent).join(' | ')`)}`)
   await sleep(3000) // 这一轮结束后的自动体检
 
   // ③ 设计体检
