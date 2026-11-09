@@ -47,6 +47,7 @@
 - **照品牌风格做、转成代码**：给官网地址，提一套品牌设计系统，以后都照它做；做好的设计转成 React / Vue / HTML，小程序直接转成 uni-app 或原生小程序代码（HBuilderX 建的项目也认得出），逐屏和设计稿比对。
 
 全部功能、工具参数和安全设计见[完整功能](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/功能详解.md)；开发和测试见[开发说明](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/开发.md)。
+- **自带照片库**：民宿酒店、餐饮、奶茶咖啡、健身、美妆、服饰、教育、旅行风景这些靠照片说话的设计，模型会直接用上照片，不再只画插画。第一次用到时下载约 8 MB。都是 AI 生成的示意图，上线前请换成真实照片。
 
 ## 反馈
 

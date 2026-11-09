@@ -47,6 +47,7 @@ If DSH can't reach the npm registry, it falls back to a mirror in China. To upda
 - **Your brand, and real code:** give a site URL to extract a brand design system and design with it from then on; turn a finished design into React / Vue / HTML (mini programs straight into uni-app or native WeChat code, HBuilderX projects included), compared screen by screen against the design.
 
 See [all features](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/features.md) for every feature, the tool parameters and the security design, and [development](https://github.com/OrderG-X/dsh-design-studio/blob/main/docs/development.md) for dev setup and tests.
+- **Built-in photo library:** for designs that rely on photos (hotels, food, cafes, fitness, beauty, fashion, education, travel), the model uses real-looking photos instead of only drawing illustrations. About 8 MB is downloaded the first time it is needed. All of them are AI-generated placeholders, so replace them with real photos before launch.
 
 ## Feedback
 

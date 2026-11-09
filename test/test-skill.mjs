@@ -71,7 +71,7 @@ check('工作台本体不再自己挂技能（交给技能那行）', mounted.le
 // 工具那行：挂 preview_page；工作台关着时调用会说清楚
 const tools = []
 toolRow.apply({ tools: { register: (t) => tools.push(t) } })
-check('工具那行挂上 preview_page、check_design、look_design、extract_design_system、handoff_design、compare_design', tools.map((x) => x.name).join() === 'preview_page,check_design,look_design,extract_design_system,handoff_design,compare_design' && tools[0].parameters.required.includes('target') && tools[3].parameters.required.includes('sources') && tools[5].parameters.required.includes('url'))
+check('工具那行挂上 preview_page、check_design、look_design、extract_design_system、handoff_design、compare_design、find_photos', tools.map((x) => x.name).join() === 'preview_page,check_design,look_design,extract_design_system,handoff_design,compare_design,find_photos' && tools[0].parameters.required.includes('target') && tools[3].parameters.required.includes('sources') && tools[5].parameters.required.includes('url'))
 const saved = studio.tracker
 studio.tracker = null
 let msg = ''
