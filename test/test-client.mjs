@@ -9,12 +9,19 @@ import fs from 'node:fs'
 
 const src = fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
 
+let keptRefs = null // 要跨两次渲染记住 useRef 的测试：置成 [] 再按顺序取
+let keptAt = 0
 const react = {
   createElement: (type, props, ...children) => ({ type, props: props || {}, children }),
   useState: (init) => [typeof init === 'function' ? init() : init, () => {}],
   useEffect: () => {},
-  useRef: (v = null) => ({ current: v }),
+  useRef: (v = null) => {
+    if (!keptRefs) return { current: v }
+    if (keptAt >= keptRefs.length) keptRefs.push({ current: v })
+    return keptRefs[keptAt++]
+  },
   useCallback: (fn) => fn,
+  useMemo: (fn) => fn(),
   useLayoutEffect: () => {},
 }
 let mod
@@ -210,6 +217,8 @@ const { parseMeta, sizeOf, layoutGrid, fitCam, nearestLive, LIVE_MAX } = mod._te
   const near = nearestLive(ids, pos, 50, 50, 25, 25, '', 24)
   check('画布：只挂最近的 24 屏', near.size === 24 && near.has('s0') && near.has('s23') && !near.has('s24') && LIVE_MAX === 24)
   const withSel = nearestLive(ids, pos, 50, 50, 25, 25, 's29', 24)
+  const sticky = nearestLive(ids, pos, 50, 50, 125, 25, '', 24, near)
+  check('画布：镜头挪一点，挂着的不换', [...near].every((id) => sticky.has(id)))
   check('画布：选中的那屏再远也挂着', withSel.size === 24 && withSel.has('s29') && !withSel.has('s23'))
 }
 {
@@ -799,6 +808,25 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   const sdv = raw(sv, (el) => typeof el.type === 'function' && el.type.name === 'Device' && el.props.key === 'draft')
   const sdf = sdv && raw(sdv.children, (el) => typeof el.type === 'function' && el.type.name === 'DraftFrame')
   check('第一屏整段到、这轮已说完：单屏先放草稿，外框按草稿写的小程序（不铺满）', !!sdv && sdv.props.kind === 'miniprogram' && sdv.props.fill === false && !!sdf && sdf.props.url === DU, sdv && JSON.stringify({ kind: sdv.props.kind, fill: sdv.props.fill }))
+  // #13：生成中自己双击已做好的那屏，要看到这屏，不是生成动画；没自己点的单屏照旧看着写
+  const draftDev = (el) => typeof el.type === 'function' && el.type.name === 'Device' && el.props.key === 'draft'
+  const genBase = { turn: true, kind: 'app', target: { kind: 'file', root: '/d', file: '/d/home.html' }, origin: O,
+    screens: [{ key: 'home.html', url: O + '/home.html' }, { key: 'menu.html', url: O + '/menu.html' }], draft: { key: 'cart.html', url: O + '/cart.html?__ddp_draft=7', live: true } }
+  const single = { ...genBase, url: O + '/menu.html', view: 'single', focus: 'menu.html' }
+  check('#13 没自己点开：单屏照旧看着模型写', !!raw(view(single), draftDev))
+  keptRefs = []; keptAt = 0
+  findComp(view({ ...genBase, url: O + '/home.html', view: 'canvas', focus: 'home.html' }), 'Canvas').props.onOpen('menu.html')
+  keptAt = 0
+  check('#13 生成中双击已做好的那屏：看这屏，不盖生成动画', !raw(view(single), draftDev))
+  keptAt = 0
+  check('#13 点开后模型换写下一屏：还停在这屏', !raw(view({ ...single, draft: { key: 'pay.html', url: O + '/pay.html?__ddp_draft=8', live: true } }), draftDev))
+  keptRefs = []; keptAt = 0
+  const watching = view(single)
+  check('#13 单屏正看着写', !!raw(watching, draftDev))
+  findComp(watching, 'ScreenMenu').props.onPick('home.html')
+  keptAt = 0
+  check('#13 单屏看着写时从菜单换页：回包前 focus 还是旧的，也不再盖生成动画', !raw(view(single), draftDev))
+  keptRefs = null
   check('边写边看照旧：在写的那屏还没落地 → 两块真的都在，草稿在占位格里', !!c3 && c3.props.draft === O + '/cart.html?__ddp_draft=2' && c3.props.screens.length === 2)
   const { pulseStep } = mod._test
   const pr = { key: '', lines: 0, n: 0 }
