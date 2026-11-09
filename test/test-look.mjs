@@ -12,7 +12,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { PassThrough, Writable } from 'node:stream'
-import { parseMeta, sizeOf, designOf, metaOfFile, pickScreens, scaleFor, formatMeasure, issueSnapshot, formatShots, detailOf, measureAll, shootAll, pickCrops, cropIssues } from '../lib/look.js'
+import { autoSize, fitSize, parseMeta, sizeOf, designOf, metaOfFile, pickScreens, scaleFor, formatMeasure, issueSnapshot, formatShots, detailOf, measureAll, shootAll, pickCrops, cropIssues } from '../lib/look.js'
 import { findBrowser, frameReader, createBrowser } from '../lib/browser.js'
 import { checkTool, lookTool, studio } from '../lib/index.js'
 import { createHub } from '../lib/serve.js'
@@ -35,6 +35,13 @@ check('尺寸：认不出 / 太小太大给 null', sizeOf('abc', 'app') === null
 check('小程序：meta 和只给宽度的尺寸（按手机的高）', parseMeta('miniprogram').kind === 'miniprogram' && parseMeta('weapp 375x667').size === '375x667' && sizeOf('375', 'miniprogram').join('x') === '375x667' && sizeOf('414', 'miniprogram').join('x') === '414x896' && JSON.stringify(designOf({ kind: 'miniprogram' }, () => '')) === '{"kind":"miniprogram","size":[375,812]}')
 check('类型尺寸：preview_page 给了 app → 390×844', JSON.stringify(designOf({ kind: 'app' }, () => '')) === '{"kind":"app","size":[390,844]}')
 check('类型尺寸：没给就看页面里的 meta', JSON.stringify(designOf({}, () => 'poster 1080x1920')) === '{"kind":"poster","size":[1080,1920]}')
+check('画幅探测：幻灯片比默认大就按页面', autoSize([[1440, 810]], 'slides') === '1440x810' && autoSize([[1280, 720]], 'slides') === '' && autoSize([null, [1440, 810], [1200, 700]], 'slides') === '1440x810' && autoSize([[1440, 650]], 'slides') === '1440x650' && autoSize([null, [1440, 650]], 'slides') === '1440x720')
+check('画幅探测：几页竖着堆的、比例不像一页的不算；只管幻灯片和海报', autoSize([[1440, 2430]], 'slides') === '' && autoSize([[1440, 810]], 'web') === '' && autoSize([[1080, 1920]], 'poster') === '1080x1920' && autoSize([[1080, 2700]], 'poster') === '' && autoSize([[9000, 5000]], 'slides') === '' && autoSize([['a', 1]], 'slides') === '')
+check('画幅探测：写了尺寸的不量', !designOf({}, () => 'slides 1440x810').auto && !designOf({ size: '1600x900' }, () => 'slides').auto && designOf({}, () => 'slides').auto === true && !designOf({}, () => 'app').auto)
+{
+  const fake = (natural) => ({ withPage: async (o, fn) => fn({ eval: async () => ({ natural }) }) })
+  check('画幅探测：量到了按量的，量不到还是默认', (await fitSize(fake([1440, 810]), [{ url: 'a' }], 'slides', [1280, 720])).join('x') === '1440x810' && (await fitSize(fake(null), [{ url: 'a' }], 'slides', [1280, 720])).join('x') === '1280x720' && (await fitSize({ withPage: async () => { throw new Error('x') } }, [{ url: 'a' }], 'slides', [1280, 720])).join('x') === '1280x720')
+}
 check('类型尺寸：都没有就是网页', JSON.stringify(designOf({}, () => '')) === '{"kind":"web","size":[1280,800]}')
 fs.writeFileSync(path.join(tmp, 'm.html'), '<!doctype html><head><meta charset="utf-8"><meta content="app 375x812" name="dsh-design"></head>')
 check('读文件开头的 dsh-design meta', metaOfFile(path.join(tmp, 'm.html')) === 'app 375x812' && metaOfFile(path.join(tmp, 'nope.html')) === '')
@@ -606,6 +613,21 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
   fs.writeFileSync(path.join(site, 'lowc.css'), '/* 浅色字 */\n.faint { color: #ccc; font-size: 15px }\n')
   fs.writeFileSync(path.join(site, 'lowc.html'), `<!doctype html><html><head><meta charset="utf-8"><title>浅色</title><link rel="stylesheet" href="lowc.css"></head>
 <body style="background:#fff;margin:0;padding:16px"><p class="faint">很淡的一行说明文字</p><p style="font-size:9px;color:#333">很小的字</p></body></html>`)
+  // 画幅探测：写死尺寸的一整块、写在 body 上的、居中溢出的、默认 margin；自适应、几页竖着堆、只有装饰往外撑的都不算
+  const stage = (name, css, body) => fs.writeFileSync(path.join(site, name), `<!doctype html><html><head><meta charset="utf-8"><title>${name}</title><meta name="dsh-design" content="slides"><style>${css}</style></head><body>${body}</body></html>`)
+  stage('st-fixed.html', 'body{margin:0}.s{width:1440px;height:810px;background:#123}', '<div class="s"></div>')
+  stage('st-body.html', 'body{margin:0;width:1920px;height:1080px;background:#123}', '<h1 style="margin:0;color:#fff">标题</h1>')
+  stage('st-center.html', 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}.s{flex:none;width:1440px;height:810px;background:#123}', '<div class="s"></div>')
+  stage('st-margin.html', '.s{width:1440px;height:810px;background:#123}', '<div class="s"></div>')
+  stage('st-short.html', 'body{margin:0}.s{width:1440px;height:650px;background:#123}', '<div class="s"></div>')
+  stage('st-small.html', 'body{margin:0}.s{width:1280px;height:720px;background:#123}', '<div class="s"></div>')
+  stage('st-2poster.html', 'body{margin:0}.s{width:1080px;height:1350px;background:#123}', '<div class="s"></div><div class="s"></div>')
+  stage('st-grid.html', 'body{margin:0}.s{width:1440px;height:810px;display:grid;grid-template-rows:1fr 1fr}.s>div{background:#123}', '<div class="s"><div></div><div></div></div>')
+  stage('st-rows.html', 'body{margin:0;width:1440px}.r{height:405px;background:#123}', '<div class="r"></div><div class="r"></div>')
+  stage('st-tallbody.html', 'body{margin:0;width:1280px;height:960px}.s{width:1000px;height:960px;background:#123}', '<div class="s"></div>')
+  stage('st-resp.html', 'body{margin:0}.s{width:100vw;height:100vh;background:#123}', '<div class="s"></div>')
+  stage('st-stack.html', 'body{margin:0}.s{width:1440px;height:810px;background:#123}', '<div class="s"></div><div class="s"></div><div class="s"></div>')
+  stage('st-decor.html', 'body{margin:0}.s{width:1280px;height:720px;background:#123}.d{position:absolute;left:1400px;top:40px;width:200px;height:200px;background:#f00}', '<div class="s"></div><div class="d"></div>')
   const hub = createHub({ parents: () => [] })
   const entry = await hub.open({ kind: 'file', root: site })
   const screens = ['home.html', 'shell.html', 'clean.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key }))
@@ -725,6 +747,21 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
       check(`伪元素图标伸没伸进横条区（${mode}）：${Object.keys(cases).length} 种写法都对`, wrong.length === 0, JSON.stringify(wrong))
     }
     check('真浏览器手机规矩：行内 span 写了 overflow:hidden（不起作用）一直写到胶囊下面，照样报', rvT('ph-inline.html').some((x) => x.type === 'capsule') && !rvT('ph-inline.html').some((x) => x.type === 'navbar'), JSON.stringify(rvT('ph-inline.html')))
+    const natOf = (key) => b.withPage({ url: `${entry.origin}/${key}`, w: 1280, h: 720 }, (p) => p.eval('window.__dshDesign.info().natural'))
+    const nats = {}
+    for (const k of ['fixed', 'body', 'center', 'margin', 'resp', 'stack', 'decor']) nats[k] = await natOf(`st-${k}.html`)
+    check('真浏览器画幅探测：写死的一整块、写在 body 上、居中溢出、默认 margin 都量得出', String(nats.fixed) === '1440,810' && String(nats.body) === '1920,1080' && String(nats.center) === '1440,810' && String(nats.margin) === '1448,818', JSON.stringify(nats))
+    check('真浏览器画幅探测：自适应、几页竖着堆、只有装饰往外撑的不报', nats.resp === null && nats.stack === null && nats.decor === null, JSON.stringify(nats))
+    const natAt = (key, w, h) => b.withPage({ url: `${entry.origin}/${key}`, w, h }, (p) => p.eval('window.__dshDesign.info().natural'))
+    check('真浏览器画幅探测：一页里上下等分的不当成几页；写死的 body 不当成被窗口撑宽', String(await natOf('st-grid.html')) === '1440,810' && String(await natOf('st-rows.html')) === '1440,810' && String(await natOf('st-tallbody.html')) === '1280,960')
+    check('真浏览器画幅探测：比默认宽但矮的也量得出', String(await natOf('st-short.html')) === '1440,650')
+    check('真浏览器画幅探测：画幅放大过、页面又改小了 → 不裁内容（只多留白）', String(await natAt('st-small.html', 1440, 810)) === '1440,720')
+    check('真浏览器画幅探测：写死的 body 放大后原样刷新不来回变', (await natAt('st-tallbody.html', 1280, 960)) === null)
+    check('真浏览器画幅探测：两张海报竖着堆的不算一页', (await natAt('st-2poster.html', 1080, 1350)) === null)
+    const fit = await fitSize(b, [{ url: `${entry.origin}/st-fixed.html` }, { url: `${entry.origin}/st-resp.html` }], 'slides', [1280, 720])
+    check('真浏览器画幅探测：一组屏里有比默认大的就按它', fit.join('x') === '1440x810', fit.join('x'))
+    const grown = await b.withPage({ url: `${entry.origin}/st-fixed.html`, w: 1440, h: 810 }, (p) => p.eval('window.__dshDesign.info().natural'))
+    check('真浏览器画幅探测：画幅放大后不再报（右侧栏记着上回的，不会缩回去）', grown === null, String(grown))
     const dk = await measureAll(b, { screens: ['dk-ok.html', 'dk-bad.html', 'dk-win.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key })), sizes: [[1280, 800]], kind: 'desktop' })
     const winOf = (key) => { const r = dk.find((x) => x.key === key); return r ? r.issues.filter((x) => x.type === 'winctl') : null }
     check('真浏览器桌面软件：Mac 侧栏顶上空出红绿灯不报；标题从左上角写起报（被红绿灯挡住）；Windows 右上角的按钮报、Mac 的位置不报', winOf('dk-ok.html').length === 0 && winOf('dk-bad.html').map((x) => x.text).sort().join() === ['邮件', '新建'].sort().join() && winOf('dk-bad.html').every((x) => x.os === 'mac' && detailOf(x).includes('红绿灯')) && winOf('dk-win.html').length === 1 && winOf('dk-win.html')[0].text === '设置' && winOf('dk-win.html')[0].os === 'win' && detailOf(winOf('dk-win.html')[0]).includes('关闭'), JSON.stringify(dk.map((r) => [r.key, r.issues])))

@@ -75,6 +75,7 @@ function seedWelcome(cliDir) {
 
 // ── 设计稿：三屏 App，首屏埋问题 ──
 const DESIGN = path.join(tmp, 'work', 'coffee-app')
+const DECK = path.join(tmp, 'work', 'deck') // 幻灯片写死 1500×800，meta 没写尺寸（issue #10）
 const HEAD = (title) => `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="tokens.css">`
 const BASE = 'body{margin:0;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg)}header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}h1{font-size:24px;margin:0}main{padding:0 20px}.go{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:#fff;font-size:16px;text-decoration:none}'
 const HOME_BAD = `${HEAD('首页')}<style>${BASE}
@@ -171,6 +172,7 @@ const llm = http.createServer((req, res) => {
       if (!(body.tools || []).some((t) => t.name === 'look_design')) return sse(res, [{ type: 'text', text: '没有 look_design。' }], 'end_turn')
       return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_look', name: 'look_design', input: { screens: ['home.html'], size: '375x667' } }], 'tool_use')
     }
+    if (said.includes('OPEN-DECK')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DECK, 's1.html') } }], 'tool_use')
     if (said.includes('DESIGN-OPEN')) {
       if (!(body.tools || []).some((t) => t.name === 'preview_page')) return sse(res, [{ type: 'text', text: '没有 preview_page。' }], 'end_turn')
       return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DESIGN, 'home.html'), kind: 'app' } }], 'tool_use')
@@ -930,6 +932,24 @@ try {
   check('远程看：导出这一屏照样能导（沙盒里也画得出图）', /已导出/.test(exMsg || '') && pngs().length > pngBefore, `${exMsg} / ${pngs().join(',')}`)
   await chrome.cdp('Target.closeTarget', { targetId: rt }).catch(() => {})
 
+  // ⑨z 幻灯片比默认画幅大、meta 没写尺寸（issue #10）：画幅跟页面走，导出不裁。这时是单看模式，同一个组件换到别的设计目录（导出的消息要发对地址）
+  fs.mkdirSync(DECK, { recursive: true })
+  fs.writeFileSync(path.join(DECK, 's1.html'), '<!doctype html><html><head><meta charset="utf-8"><title>第一页</title><meta name="dsh-design" content="slides"><style>body{margin:0}.s{width:1500px;height:800px;background:#123;color:#fff}</style></head><body><div class="s"><h1 style="margin:0">标题</h1></div></body></html>')
+  await say('OPEN-DECK 打开幻灯片')
+  const deckSize = await until(`(() => { const f = document.querySelector('iframe.ddp-frame.cur[src*="s1.html"]'); return f && f.clientWidth + 'x' + f.clientHeight === '1500x800' && '1500x800' })()`, 30000)
+  check('画幅探测：幻灯片写死 1500×800、meta 没写尺寸 → 画幅跟着变', deckSize === '1500x800', await page(`(() => { const f = document.querySelector('iframe.ddp-frame.cur'); return f ? f.src + ' ' + f.clientWidth + 'x' + f.clientHeight : '没有 iframe' })()`))
+  await sleep(1500)
+  await shot('10-deck')
+  await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+  await sleep(300)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /PDF/.test(x.textContent)).click()`)
+  const deckEnd = Date.now() + 60000
+  const deckPdf = () => { const d = path.join(DECK, 'exports'); const f = fs.existsSync(d) && fs.readdirSync(d).find((x) => x.endsWith('.pdf')); return f ? path.join(d, f) : '' }
+  const deckToasts = new Set()
+  while (Date.now() < deckEnd && !deckPdf()) { deckToasts.add(await page(`(document.querySelector('.ddp-toast') || {}).innerText || ''`).catch(() => '')); await sleep(500) }
+  const box = deckPdf() ? /\/MediaBox \[\s*0 0 ([\d.]+) ([\d.]+)/.exec(fs.readFileSync(deckPdf(), 'latin1')) : null
+  check('画幅探测：导出的 PDF 比例是页面的（没被默认画幅裁掉）', box && Math.abs(box[1] / box[2] - 1500 / 800) < 0.01, box ? box.slice(1).join('x') : `没有 PDF；提示 ${[...deckToasts].join(' / ')}；work ${fs.readdirSync(path.join(tmp, 'work'), { recursive: true }).filter((x) => /deck|pdf$/.test(x)).join(' ')}`)
+
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
   const OTHER = path.join(tmp, 'work', 'other-site')
   fs.mkdirSync(OTHER, { recursive: true })
@@ -1180,6 +1200,17 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   await page(`(() => { const c = [...document.querySelectorAll('textarea, [contenteditable=true]')].find((e) => !e.closest('.ddp')); (c || document.body).focus(); if (!c) document.querySelector('.ddp-top .ddp-input').blur(); return !!c })()`)
   const barBack = await until(`!document.querySelector('.ddp-top .wide') && !!document.querySelector('.ddp-addr')`, 3000)
   check('地址栏：输错路径报错后点到别处 → 照样收起、工具栏回来', !!addrErr && !!barBack, JSON.stringify({ addrErr, editing: await page(`!!document.querySelector('.ddp-top .wide')`) }))
+  await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
+  // ⑫ 首页风格面板不被下面的「接着做」盖住（issue #9）
+  await page(`[...document.querySelectorAll('.ddp-btn')].find((b) => /^(首页|Home)$/.test(b.textContent.trim())).click(), 1`)
+  const homeUp = await until(`!!document.querySelector('.ddp-home .ddp-askta')`, 20000)
+  if (check('工具栏回到设计台首页', homeUp, await page(`document.querySelector('.ddp') ? document.querySelector('.ddp').className : '没有 .ddp'`))) {
+    await page(`document.querySelector('.ddp-ask button.chip[aria-haspopup=dialog]').click(), 1`)
+    const popUp = await until(`!!document.querySelector('.ddp-askpop')`, 5000)
+    const covered = popUp ? await page(`(() => { const p = document.querySelector('.ddp-askpop'); const r = p.getBoundingClientRect(); let bad = 0; for (const x of [.15, .5, .85]) for (const y of [.15, .5, .85]) { const e = document.elementFromPoint(r.left + r.width * x, r.top + r.height * y); if (!e || !p.contains(e)) bad++ } return bad })()`) : -1
+    check('首页风格面板：九个点都点得到面板（没被下面盖住）', covered === 0, `被盖住 ${covered} 个点`)
+    await shot('11-home-pop')
+  }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
   const errs = webLog.split('\n').filter((l) => /dsh-design-studio/i.test(l) && /error|fail|失败/i.test(l))
   check('DSH 日志里没有设计台的报错', !errs.length, errs.slice(0, 5).join('\n'))

@@ -203,6 +203,8 @@ check('结尾留一个换行（光标落在下一行，接着打字）', out.end
 
 // ── 类型、画布排版 ──
 const { parseMeta, sizeOf, layoutGrid, fitCam } = mod._test
+check('画幅探测：和 look.js 一样的规则', mod._test.autoSize([[1440, 810], null], 'slides') === '1440x810' && mod._test.autoSize([[1280, 720]], 'slides') === '' && mod._test.autoSize([[1440, 2430]], 'slides') === '' && mod._test.autoSize([[1440, 810]], 'web') === '' && mod._test.autoSize([null, [1440, 650]], 'slides') === '1440x720' && mod._test.autoSize([[1440, 650]], 'slides') === '1440x650')
+check('首页风格面板不被下面的「接着做」盖住（入场动画留下的 transform 让每块自成一层）', src.includes('.ddp-home .ddp-start>.ddp-askwrap{position:relative;z-index:5}'))
 check('页面 meta：类型 + 尺寸', JSON.stringify(parseMeta('poster 1080x1920')) === JSON.stringify({ kind: 'poster', size: '1080x1920', os: '' }))
 check('页面 meta：别名、乱写', parseMeta('mobile').kind === 'app' && parseMeta('hello').kind === '' && parseMeta('').size === '')
 check('尺寸：没给就按类型默认', sizeOf('', 'app').join('x') === '390x844' && sizeOf('1080x1920', 'poster').join('x') === '1080x1920' && sizeOf('9x9', 'web').join('x') === '1280x800')
