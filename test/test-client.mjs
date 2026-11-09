@@ -202,7 +202,16 @@ check('区域：列出包含的元素', out.includes('包含：\n- section.cards
 check('结尾留一个换行（光标落在下一行，接着打字）', out.endsWith('\n') && !out.endsWith('\n\n'))
 
 // ── 类型、画布排版 ──
-const { parseMeta, sizeOf, layoutGrid, fitCam } = mod._test
+const { parseMeta, sizeOf, layoutGrid, fitCam, nearestLive, LIVE_MAX } = mod._test
+{
+  // 屏多的时候只挂离镜头近的（#12）
+  const ids = Array.from({ length: 30 }, (_, i) => `s${i}`)
+  const pos = ids.map((_, i) => ({ x: i * 100, y: 0 }))
+  const near = nearestLive(ids, pos, 50, 50, 25, 25, '', 24)
+  check('画布：只挂最近的 24 屏', near.size === 24 && near.has('s0') && near.has('s23') && !near.has('s24') && LIVE_MAX === 24)
+  const withSel = nearestLive(ids, pos, 50, 50, 25, 25, 's29', 24)
+  check('画布：选中的那屏再远也挂着', withSel.size === 24 && withSel.has('s29') && !withSel.has('s23'))
+}
 {
   const { precheckOf: pc, fitCanvas: fc, layoutOk: lo, fitHOk: fo } = mod._test
   const M = (o) => ({ w: 1280, h: 720, pageW: 1280, pageH: 720, natural: null, dead: 0, ...o })

@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, setStyle, mergeStyle, cleanCss, urlFor, labelOf, parseKind, parseSize, listScreens, findRule } from '../lib/core.js'
+import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, setStyle, mergeStyle, cleanCss, urlFor, labelOf, parseKind, parseSize, listScreens, allScreens, findRule } from '../lib/core.js'
 
 let pass = 0
 let fail = 0
@@ -409,6 +409,46 @@ check('回合结束 → turn=false', tracker.snapshot(SID).turn === false)
   check('交错两份：右侧栏看的是后开的那份', nB > 1 && !!drafts.get(provA), JSON.stringify(v10))
   f10(0, '</title></head></html>","file_path":"' + jp(path.join(gen, 'parts', 'x.html')) + '"}')
   check('交错两份：前一份是子文件夹里的 → 作废（临时地址读不到），在看的后一份不动', drafts.get(provA) === null && tk.snapshot(S10).draft && tk.snapshot(S10).draft.url === v10.url, JSON.stringify(tk.snapshot(S10).draft))
+}
+
+// 屏数上限（#12）：最多显示 60 屏，留最新的，正打开的那屏始终在，收起了几屏要报
+{
+  const dir = fs.mkdtempSync(path.join(tmp, 'many-'))
+  const stamp = 1700000000
+  for (let i = 1; i <= 65; i++) {
+    const f = path.join(dir, `s${String(i).padStart(2, '0')}.html`)
+    fs.writeFileSync(f, '<p>x')
+    // 创建时间在有的系统改不了，文件名兜底时顺序也一样
+    fs.utimesSync(f, stamp + i, stamp + i)
+  }
+  const shown = listScreens(dir)
+  check('超过上限：只留 60 屏', shown.length === 60, String(shown.length))
+  check('超过上限：最新的在，最早的收起', shown.includes('s65.html') && !shown.includes('s05.html'), shown.slice(0, 2).join())
+  check('按文件名找、改全套：收起的也算', allScreens(dir).length === 65 && allScreens(dir).includes('s01.html'))
+  const listedDir = fs.mkdtempSync(path.join(tmp, 'listed-'))
+  const stems = Array.from({ length: 65 }, (_, i) => `s${String(i + 1).padStart(2, '0')}.html`)
+  for (const f of stems) fs.writeFileSync(path.join(listedDir, f), '<p>x')
+  fs.writeFileSync(path.join(listedDir, 'design.json'), JSON.stringify({ screens: stems.slice(5).reverse() }))
+  const listed = listScreens(listedDir)
+  check('有清单也是留最新的，顺序按清单', listed.length === 60 && listed[0] === 's65.html' && !listed.includes('s01.html'), listed.slice(0, 2).join())
+  const keptOld = listScreens(listedDir, 's01.html')
+  check('留着正打开的旧屏：挤掉最早的，不挤掉最新的', keptOld.length === 60 && keptOld.includes('s01.html') && keptOld.includes('s65.html') && !keptOld.includes('s06.html'), keptOld.slice(0, 2).join())
+  const tk = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:42200' }) })
+  await tk.setTarget('many', { kind: 'file', file: path.join(dir, 's65.html'), root: dir }, { source: 'tool' })
+  let snap = tk.snapshot('many')
+  check('超过上限：快照报收起了 5 屏', snap.hidden === 5 && snap.maxScreens === 60 && snap.screens.length === 60, `${snap.hidden}/${snap.screens.length}`)
+  await tk.setTarget('many', { kind: 'file', file: path.join(dir, 's01.html'), root: dir }, { source: 'tool' })
+  snap = tk.snapshot('many')
+  check('打开被收起的那屏：它显示出来，总数还是 60', snap.screens.some((x) => x.key === 's01.html') && snap.screens.length === 60 && snap.hidden === 5, `${snap.hidden}/${snap.screens.length}`)
+  const few = fs.mkdtempSync(path.join(tmp, 'few-'))
+  for (let i = 0; i < 25; i++) fs.writeFileSync(path.join(few, `f${i}.html`), '<p>x')
+  await tk.setTarget('few', { kind: 'file', file: path.join(few, 'f24.html'), root: few }, { source: 'tool' })
+  snap = tk.snapshot('few')
+  check('25 屏全部显示，不提示', snap.screens.length === 25 && snap.hidden === 0, `${snap.hidden}/${snap.screens.length}`)
+  const routes = Array.from({ length: 70 }, (_, i) => `/r${i}`)
+  await tk.setTarget('dev', { kind: 'proxy', port: 5173, path: '/r65' }, { source: 'tool', routes })
+  snap = tk.snapshot('dev')
+  check('路由超过上限：60 个，正看的在，报收起 10 个', snap.screens.length === 60 && snap.screens.some((x) => x.key === '/r65') && snap.hidden === 10, `${snap.hidden}/${snap.screens.length}`)
 }
 
 // 重放历史：老事件不动手

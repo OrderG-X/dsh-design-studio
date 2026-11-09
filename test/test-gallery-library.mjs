@@ -105,6 +105,18 @@ const p2 = packDesign(des, { screens })
 check('打包：真手机号、脚本拦下，每条带怎么改', !p2.ok && p2.errors.some((e) => e.code === 'phone' && /假号/.test(e.msg)) && p2.errors.some((e) => e.code === 'tag' && e.x === 'menu.html'), JSON.stringify(p2.errors.map((e) => e.code)))
 fs.writeFileSync(path.join(des, 'menu.html'), page('菜单', '<p>拿铁 ¥28</p>'))
 
+// 屏多的设计（#12）：自己打 zip 到 60 屏都行，分享到市场还是最多 24 屏
+{
+  const big = path.join(tmp, 'sixty')
+  fs.mkdirSync(big)
+  fs.copyFileSync(path.join(des, 'tokens.css'), path.join(big, 'tokens.css'))
+  for (let i = 1; i <= 60; i++) fs.writeFileSync(path.join(big, `s${i}.html`), page(`第 ${i} 屏`, '<p>x</p>'))
+  const z = packDesign(big, { screens: listScreens(big), mode: 'zip' })
+  check('60 屏：自己打 zip 能过（60 个 HTML + 清单）', z.ok && z.manifest.screens.length === 60, JSON.stringify(z.errors.slice(0, 3)))
+  const sh = packDesign(big, { screens: listScreens(big), mode: 'share', description: '六十屏的设计' })
+  check('60 屏：分享到市场拦下', !sh.ok && sh.errors.some((e) => e.x === 'screens' || e.code === 'count'), JSON.stringify(sh.errors.slice(0, 3)))
+}
+
 // ── 分享包隐私：别的 JSON 不打包；所有文字查个人信息、本机路径、分享记号；WebP / GIF 去信息，AVIF 带信息拦 ──
 {
   const pv = path.join(tmp, 'privacy')
