@@ -106,6 +106,36 @@ check('PPTX：透明形状盖在下半屏（按比例换算）', sp && Number(sp
 check('PPTX：没链接的幻灯片没有多余的关系', !lk['ppt/slides/_rels/slide2.xml.rels'].data.toString('utf8').includes('relationships/slide"'))
 check('PPTX：每个 XML 收尾对', Object.entries(pp).filter(([n]) => /\.(xml|rels)$/.test(n)).every(([, x]) => /<\/[\w:]+>$|\/>$/.test(x.data.toString('utf8').trim())))
 
+// ── 版面和拼版（issue #10）──
+const { layoutSize, sheetsOf } = await import('../lib/doc.js')
+check('版面：四种写法，乱写的当没写', JSON.stringify([layoutSize('16:9'), layoutSize('4:3'), layoutSize('A3'), layoutSize('1920x1080'), layoutSize('auto'), layoutSize(''), layoutSize('abc'), layoutSize('100x100'), layoutSize('9000x900')]) === JSON.stringify([[1280, 720], [1280, 960], [1587, 1123], [1920, 1080], null, null, null, null, null]))
+const XP = [{ jpg: JPG, w: 390, h: 844, title: '一', links: [{ x: 10, y: 20, w: 100, h: 40, to: 2 }, { x: 0, y: 100, w: 50, h: 50, to: 1 }] }, { jpg: JPG, w: 390, h: 844, title: '二' }, { jpg: JPG, w: 390, h: 844, title: '三', links: [{ x: 5, y: 5, w: 50, h: 50, to: 0 }] }]
+const xd = new Date('2026-01-01T00:00:00Z')
+check('版面：不选 = 每屏一页、不缩放、不偏移', sheetsOf(XP).every((s, i) => s.W === 390 && s.H === 844 && s.items.length === 1 && s.items[0].i === i && s.items[0].x === 0 && s.items[0].y === 0 && s.items[0].k === 1))
+check('版面：写 auto、1 列和不写，文件一模一样', makePdf(XP, { title: 't', layout: 'auto', cols: 1, bg: '112233' }).equals(makePdf(XP, { title: 't' })) && makePptx(XP, { layout: 'auto', cols: 1, date: xd }).equals(makePptx(XP, { date: xd })))
+{
+  const a = sheetsOf(XP, { layout: '16:9' })[0]
+  check('版面 16:9：手机屏整张装下、居中留边', a.W === 1280 && a.H === 720 && Math.abs(a.items[0].k - 720 / 844) < 1e-9 && Math.abs(a.items[0].x - (1280 - 390 * a.items[0].k) / 2) < 1e-9 && a.items[0].y === 0)
+  const c = sheetsOf(XP, { cols: 2 })
+  check('拼版：两屏一页，单出来的放左边，每格留边', c.length === 2 && c[0].W === 852 && c[0].H === 892 && c[0].items[0].x === 24 && c[0].items[1].x === 438 && c[1].items.length === 1 && c[1].items[0].x === 24)
+  const p = makePdf(XP, { layout: '16:9', bg: '112233' }).toString('latin1')
+  check('PDF 版面：页面 960×540、三页、铺底色', (p.match(/\/MediaBox \[0 0 960 540\]/g) || []).length === 3 && p.includes('0.067 0.133 0.200 rg 0 0 960 540 re f'))
+  const q = makePdf(XP, { cols: 2, bg: '112233' }).toString('latin1')
+  const annots = q.match(/\/Subtype \/Link/g) || []
+  check('PDF 拼版：两页、一页放两张图、同页的跳转去掉', (q.match(/\/Type \/Page\b/g) || []).length === 2 && /\/XObject << \/Im0 \d+ 0 R \/Im1 \d+ 0 R >>/.test(q) && q.includes('/MediaBox [0 0 639 669]') && annots.length === 2, annots.length)
+  check('PDF 拼版：链接坐标跟着图挪（第二格的左边是 438）', q.includes(`/Rect [${(24 + 10) * 0.75} `) && q.includes(`/Rect [${(24 + 5) * 0.75} `))
+  check('PDF：没选版面拼版时 bg 不生效', !makePdf(XP, { bg: '112233' }).toString('latin1').includes(' rg '))
+  const z = unzip(makePptx(XP, { cols: 2, layout: '16:9', bg: 'ffffff', date: xd }))
+  const s1 = z['ppt/slides/slide1.xml'].data.toString('utf8')
+  const r1 = z['ppt/slides/_rels/slide1.xml.rels'].data.toString('utf8')
+  check('PPT 拼版：两张幻灯片、尺寸 16:9、一张放两张图', !z['ppt/slides/slide3.xml'] && z['ppt/presentation.xml'].data.toString('utf8').includes('<p:sldSz cx="12192000" cy="6858000"/>') && (s1.match(/<p:pic>/g) || []).length === 2 && s1.includes('r:embed="rId2"') && s1.includes('r:embed="rId3"'))
+  check('PPT 拼版：图和跳转的关系不撞号', r1.includes('Id="rId2"') && r1.includes('image1.jpeg') && r1.includes('image2.jpeg') && r1.includes('Id="rId4"') && r1.includes('slide2.xml') && s1.includes('<a:hlinkClick r:id="rId4"'))
+  const ids = [...s1.matchAll(/<p:cNvPr id="(\d+)"/g)].map((m) => m[1])
+  check('PPT 拼版：形状编号不重复', new Set(ids).size === ids.length, ids.join())
+  check('PPT 版面：A3 是实际大小（420×297 毫米）', unzip(makePptx(XP, { layout: 'a3', date: xd }))['ppt/presentation.xml'].data.toString('utf8').includes('<p:sldSz cx="15120000" cy="10692000"/>'))
+  check('PPT 版面：4:3 比例', unzip(makePptx(XP, { layout: '4:3', date: xd }))['ppt/presentation.xml'].data.toString('utf8').includes('<p:sldSz cx="12192000" cy="9144000"/>'))
+}
+
 // ── 接口 /api/doc ──
 const { apply } = await import('../lib/index.js')
 const handlers = {}
@@ -153,6 +183,11 @@ check('接口：不是 JPEG 拒', r.status === 400)
 r = await call('doc', { session: 's1', format: 'pdf', pages: [] })
 check('接口：没有页面拒', r.status === 400)
 r = await call('doc', { session: 's1', format: 'pdf', name: 'odd', pages: [{ ...page, w: -5, h: 1e9 }] })
+r = await call('doc', { session: 's1', format: 'pdf', name: 'moved', target: 'file|/没有这个目录', pages: [page] })
+check('接口：导出途中换了设计，不存', r.status === 409 && r.body.error === 'designChanged', JSON.stringify(r.body))
+r = await call('doc', { session: 's1', format: 'pdf', name: 'a3', layout: 'a3', cols: 2, bg: 'ffffff', pages: [page, page, page] })
+check('接口：版面和拼版传得进去', r.status === 200 && (fs.readFileSync(r.body.path).toString('latin1').match(/\/MediaBox \[0 0 1190\.25 842\.25\]/g) || []).length === 2, JSON.stringify(r.body))
+r = await call('doc', { session: 's1', format: 'pdf', pages: [{ ...page, w: 1, h: 1 }] })
 check('接口：页面尺寸不像话就按图片的一半算', r.status === 200 && fs.readFileSync(r.body.path).toString('latin1').includes('/MediaBox [0 0 6 3]'), JSON.stringify(r.body))
 
 srv.close()

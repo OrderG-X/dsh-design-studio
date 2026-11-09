@@ -203,6 +203,22 @@ check('结尾留一个换行（光标落在下一行，接着打字）', out.end
 
 // ── 类型、画布排版 ──
 const { parseMeta, sizeOf, layoutGrid, fitCam } = mod._test
+{
+  const { precheckOf: pc, fitCanvas: fc, layoutOk: lo, fitHOk: fo } = mod._test
+  const M = (o) => ({ w: 1280, h: 720, pageW: 1280, pageH: 720, natural: null, dead: 0, ...o })
+  const j = (x) => JSON.stringify(x)
+  check('预检：刚好装下什么都不报', j(pc([M()], 'slides', 0)) === j({ over: 0, long: 0, dead: 0, fail: 0 }))
+  check('预检：量不到的屏单独算，不当通过', j(pc([{ failed: true }, M()], 'slides', 0)) === j({ over: 0, long: 0, dead: 0, fail: 1 }))
+  check('预检：幻灯片比画幅高算「会被裁」，整页取景就不算', pc([M({ pageH: 1500 })], 'slides', 0).over === 1 && pc([M({ pageH: 1500 })], 'slides', Infinity).over === 0)
+  check('预检：比画幅宽，整页取景也会被裁', pc([M({ pageW: 1600 })], 'web', Infinity).over === 1)
+  check('预检：网页长页算「长页」，整页取景不算，指定高度按高度算', pc([M({ pageH: 1500 })], 'web', 0).long === 1 && pc([M({ pageH: 1500 })], 'web', Infinity).long === 0 && pc([M({ pageH: 1500 })], 'web', 1600).long === 0 && pc([M({ pageH: 1500 })], 'web', 1000).long === 1)
+  check('预检：差两像素以内不报；死链接累加', j(pc([M({ pageH: 722, pageW: 1282, dead: [1, 2] }), M({ dead: [3, 4, 5] })], 'web', 0)) === j({ over: 0, long: 0, dead: 5, fail: 0 }))
+  check('预检：导出范围外的死链接不报', pc([M({ pageH: 3000, dead: [100, 800] })], 'web', 0).dead === 1 && pc([M({ pageH: 3000, dead: [100, 800] })], 'web', Infinity).dead === 2 && pc([M({ pageH: 3000, dead: [100, 800] })], 'web', 500).dead === 1 && pc([M({ pageH: 3000, sy: 700, dead: [100, 800] })], 'web', 0).dead === 1)
+  check('按内容改画幅：幻灯片按量到的版面', fc([M({ natural: [1500, 800] }), M({ natural: [1440, 900] })], 'slides', [1280, 720]) === '1500x900')
+  check('按内容改画幅：竖着堆的不改高；没有要改的不给按钮', fc([M({ natural: 0, pageH: 1440 })], 'slides', [1280, 720]) === '' && fc([M()], 'slides', [1280, 720]) === '')
+  check('按内容改画幅：网页只加宽；超过上限不给', fc([M({ pageW: 1600, pageH: 3000 })], 'web', [1280, 720]) === '1600x720' && fc([M({ pageW: 9000 })], 'web', [1280, 720]) === '')
+  check('导出选项：自定义版面、指定高度的校验', lo('1920x1080') && lo('1920×1080') && !lo('19x10') && !lo('abc') && !lo('9000x900') && fo('1200') && !fo('100') && !fo('x') && !fo('40000'))
+}
 check('画幅探测：和 look.js 一样的规则', mod._test.autoSize([[1440, 810], null], 'slides') === '1440x810' && mod._test.autoSize([[1280, 720]], 'slides') === '' && mod._test.autoSize([[1440, 2430]], 'slides') === '' && mod._test.autoSize([[1440, 810]], 'web') === '' && mod._test.autoSize([null, [1440, 650]], 'slides') === '1440x720' && mod._test.autoSize([[1440, 650]], 'slides') === '1440x650')
 check('首页风格面板不被下面的「接着做」盖住（入场动画留下的 transform 让每块自成一层）', src.includes('.ddp-home .ddp-start>.ddp-askwrap{position:relative;z-index:5}'))
 check('页面 meta：类型 + 尺寸', JSON.stringify(parseMeta('poster 1080x1920')) === JSON.stringify({ kind: 'poster', size: '1080x1920', os: '' }))
@@ -451,7 +467,8 @@ const { STYLES, formatStyle, accentUse } = mod._test
     [id('A Black Friday sale landing page', 'web'), id('智能家居面板：支持照明、通风、安防', 'app'), id('健身 App，风格你定', 'app'), id('跑步 App，用北欧风：首页、训练、我的', 'app'), id('北欧风的界面，做个记账 App', 'app'), id('I run a coffee shop', 'web'), id('waterpark tickets', 'web'), id('A fitness app, any style', 'app')].join())
   check('自动风格：审查 B 的误判都改了', id('健身 App，配色定为蓝白', 'app') === null && id('跑步 App，清新风：首页、训练、我的', 'app') === null && id('A theme park booking app', 'app') !== null && id('A color picker app', 'app') !== null && id('金融风控管理系统', 'web') === 'tech' && id('健身 App，风格：你定', 'app') === 'sport' && id('I run a coffee shop, watch our intro video', 'web') === 'retro' && id('新风系统控制面板', 'desktop') !== null,
     [id('健身 App，配色定为蓝白', 'app'), id('跑步 App，清新风：首页、训练、我的', 'app'), id('A theme park booking app', 'app'), id('A color picker app', 'app'), id('金融风控管理系统', 'web'), id('健身 App，风格：你定', 'app'), id('I run a coffee shop, watch our intro video', 'web')].join())
-  { const t0 = Date.now(); autoStyle('健身 App，风格' + ' '.repeat(5000) + 'x', 'app'); autoStyle('配色' + '：'.repeat(3000) + ' '.repeat(3000), 'app'); check('自动风格：长空白不卡（< 50ms）', Date.now() - t0 < 50, Date.now() - t0) }
+  check('自动风格：冒号前后有空格也算「你定」', id('健身 App，风格 ：你定', 'app') === 'sport' && id('健身 App，风格 ： 你定', 'app') === 'sport', [id('健身 App，风格 ：你定', 'app'), id('健身 App，风格 ： 你定', 'app')].join())
+  { const t0 = Date.now(); autoStyle('健身 App，风格' + ' '.repeat(5000) + 'x', 'app'); autoStyle('配色' + '：'.repeat(3000) + ' '.repeat(3000), 'app'); autoStyle('风格' + ' '.repeat(40000) + 'x', 'app'); check('自动风格：长空白不卡（< 50ms）', Date.now() - t0 < 50, Date.now() - t0) }
   check('自动风格：兜底不给米色系的卡', ['做一张招聘海报|poster', '帮我做个记账 App|app', '做个工具网站|web', '会员月报邮件|email'].every((x) => { const [a, k] = x.split('|'); return !['warm', 'cream', 'japandi', 'ink', 'retro'].includes(id(a, k)) }))
   check('自动风格：没认出题材按类型给，App 不给米色系', id('一份 5 页的季度业务复盘幻灯片', 'slides') === 'swiss' && !['warm', 'cream', 'japandi', 'ink'].includes(id('帮我做个记账 App', 'app')) && id('', 'app') === null)
   const tz = makeT({ locale: { t: (k) => k } })

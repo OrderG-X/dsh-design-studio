@@ -950,6 +950,79 @@ try {
   const box = deckPdf() ? /\/MediaBox \[\s*0 0 ([\d.]+) ([\d.]+)/.exec(fs.readFileSync(deckPdf(), 'latin1')) : null
   check('画幅探测：导出的 PDF 比例是页面的（没被默认画幅裁掉）', box && Math.abs(box[1] / box[2] - 1500 / 800) < 0.01, box ? box.slice(1).join('x') : `没有 PDF；提示 ${[...deckToasts].join(' / ')}；work ${fs.readdirSync(path.join(tmp, 'work'), { recursive: true }).filter((x) => /deck|pdf$/.test(x)).join(' ')}`)
 
+  // ⑨za 导出选项和预检（issue #10）：单看模式也要导出所有屏；有内容会被裁先给看清单；版面、拼版传到文件里
+  fs.writeFileSync(path.join(DECK, 's2.html'), '<!doctype html><html><head><meta charset="utf-8"><title>第二页</title><meta name="dsh-design" content="slides"><style>body{margin:0}.s{width:1500px;height:800px;background:#345;color:#fff}</style></head><body><div class="s"><a href="#">占位</a> <a href="nope.html">没这页</a> <a href="s1.html">回去</a></div></body></html>')
+  fs.writeFileSync(path.join(DECK, 's3.html'), '<!doctype html><html><head><meta charset="utf-8"><title>第三页</title><meta name="dsh-design" content="slides"><style>body{margin:0}.s{width:1500px;height:800px}</style></head><body><div class="s" style="background:#567"></div><div class="s" style="background:#789"></div></body></html>')
+  const pdfsNow = () => fs.readdirSync(path.join(DECK, 'exports')).filter((x) => x.endsWith('.pdf'))
+  const openExport = async (re) => {
+    await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+    await sleep(300)
+    await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => ${re}.test(x.textContent)).click()`)
+  }
+  await sleep(3500) // 等新文件进屏列表
+  await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单看').click()`)
+  check('预检：切到单看，只挂着一屏', !!(await until(`document.querySelectorAll('iframe.ddp-frame.cur').length === 1`, 8000)), await page(`document.querySelectorAll('iframe.ddp-frame.cur').length`))
+  const pdfBefore = pdfsNow().length
+  await openExport('/PDF/')
+  const xoOpened = await until(`((el) => el && /比画幅大/.test(el.innerText) && /链接/.test(el.innerText))(document.querySelector('.ddp-xo'))`, 30000)
+  check('预检：有内容会被裁，先给看清单，不直接导出', !!xoOpened && pdfsNow().length === pdfBefore, await page(`(document.querySelector('.ddp-xo') || {}).innerText || '没有面板'`))
+  await until(`!document.querySelector('.ddp-ghost')`, 15000)
+  const xoText = await page(`document.querySelector('.ddp-xo').innerText`)
+  check('预检：比画幅大 1 屏、死链接 2 个（href="#" 和指向不存在的文件）', /1 个页面比画幅大/.test(xoText) && /2 个链接/.test(xoText), xoText)
+  await shot('10-export-options')
+  await page(`(() => { const b = (t) => [...document.querySelectorAll('.ddp-xo .seg button')].find((x) => x.textContent === t).click(); b('16:9') })()`)
+  await sleep(100)
+  await page(`[...document.querySelectorAll('.ddp-xo .seg button')].find((x) => x.textContent === '每页 2 屏').click()`)
+  await sleep(100)
+  await page(`[...document.querySelectorAll('.ddp-xo footer button')].find((x) => x.textContent === '导出 PDF').click()`)
+  const optEnd = Date.now() + 60000
+  while (Date.now() < optEnd && pdfsNow().length === pdfBefore) await sleep(400)
+  const optFile = pdfsNow().map((x) => path.join(DECK, 'exports', x)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0]
+  const optText = pdfsNow().length > pdfBefore ? fs.readFileSync(optFile, 'latin1') : ''
+  check('导出选项：单看模式三屏都导出，16:9、每页 2 屏 → 两页', (optText.match(/\/MediaBox \[0 0 960 540\]/g) || []).length === 2 && (optText.match(/\/Subtype \/Image/g) || []).length === 3, optText ? (optText.match(/\/MediaBox[^\]]*\]/g) || []).join() : '没有新 PDF')
+  await until(`!document.querySelector('.ddp-ghost')`, 15000)
+  await page(`document.querySelector('.ddp-xo header .ddp-btn').click()`)
+  await sleep(200)
+  const pdfSecond = pdfsNow().length
+  await openExport('/PDF/')
+  const secondEnd = Date.now() + 60000
+  while (Date.now() < secondEnd && pdfsNow().length === pdfSecond) await sleep(400)
+  check('预检：同样的结果只拦一次，再点直接导出', pdfsNow().length === pdfSecond + 1 && !(await page(`!!document.querySelector('.ddp-xo')`)))
+
+  // ⑨zb 「按内容改画幅」：meta 写小了的页面，预检给按钮，点了画幅跟内容走
+  fs.writeFileSync(path.join(DECK, 's1.html'), fs.readFileSync(path.join(DECK, 's1.html'), 'utf8').replace('content="slides"', 'content="slides 1280x720"'))
+  const shrunk = await until(`((f) => f && f.clientWidth === 1280)(document.querySelector('iframe.ddp-frame.cur'))`, 15000)
+  await openExport('/PDF/')
+  const fitBtn = await until(`[...document.querySelectorAll('.ddp-xo .lk')].some((b) => b.textContent.includes('1500×800'))`, 30000)
+  check('按内容改画幅：meta 写小了，预检给出按钮', !!shrunk && !!fitBtn, await page(`(document.querySelector('.ddp-xo') || {}).innerText || '没有面板'`))
+  await page(`[...document.querySelectorAll('.ddp-xo .lk')].find((b) => b.textContent.includes('1500×800')).click()`)
+  check('按内容改画幅：点了画幅变成内容的大小', !!(await until(`((f) => f && f.clientWidth === 1500 && f.clientHeight === 800)(document.querySelector('iframe.ddp-frame.cur'))`, 10000)), await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '')(document.querySelector('iframe.ddp-frame.cur'))`))
+  await page(`document.querySelector('.ddp-xo header .ddp-btn').click()`)
+
+  // ⑨zc 整页截图：根元素写了 height:100%，底下的内容也要截得到
+  fs.writeFileSync(path.join(DECK, 's1.html'), '<!doctype html><html><head><meta charset="utf-8"><title>第一页</title><meta name="dsh-design" content="slides 1500x800"><style>html,body{height:100%;margin:0}.a{height:800px;background:#123}.b{height:300px;background:#f00}</style></head><body><div class="a"></div><div class="b"></div></body></html>')
+  await sleep(2500) // 等热更新换上新页面
+  await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+  await sleep(300)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /导出选项/.test(x.textContent)).click()`)
+  await until(`!!document.querySelector('.ddp-xo')`, 8000)
+  await page(`[...document.querySelectorAll('.ddp-xo .seg button')].find((x) => x.textContent === '整页').click()`)
+  await sleep(100)
+  await page(`[...document.querySelectorAll('.ddp-xo .seg button')].find((x) => x.textContent === '跟随画幅').click()`)
+  await sleep(100)
+  await page(`[...document.querySelectorAll('.ddp-xo .seg button')].find((x) => x.textContent === '每页 1 屏').click()`)
+  await sleep(100)
+  const fullBefore = pdfsNow().length
+  await page(`[...document.querySelectorAll('.ddp-xo footer button')].find((x) => x.textContent === '导出 PDF').click()`)
+  const fullEnd = Date.now() + 60000
+  while (Date.now() < fullEnd && pdfsNow().length === fullBefore) await sleep(400)
+  const fullFile = pdfsNow().map((x) => path.join(DECK, 'exports', x)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0]
+  const fullBuf = pdfsNow().length > fullBefore ? fs.readFileSync(fullFile) : Buffer.alloc(0)
+  const fullHead = /\/Subtype \/Image \/Width (\d+) \/Height (\d+)[^>]*\/Length (\d+) >>\nstream\n/.exec(fullBuf.toString('latin1'))
+  const rootPx = fullHead ? await page(`new Promise((done) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(10, img.height - 10, 1, 1).data; done([img.width, img.height, d[0] > 200 && d[1] < 60 && d[2] < 60].join()) }; img.onerror = () => done('图坏了'); img.src = 'data:image/jpeg;base64,${fullBuf.subarray(fullHead.index + fullHead[0].length, fullHead.index + fullHead[0].length + +fullHead[3]).toString('base64')}' })`) : '没有图'
+  await page(`document.querySelector('.ddp-xo header .ddp-btn').click()`)
+  check('整页截图：根元素写了 height:100% 也截得到底下', /^3000,22\d\d,true$/.test(String(rootPx)), String(rootPx))
+
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
   const OTHER = path.join(tmp, 'work', 'other-site')
   fs.mkdirSync(OTHER, { recursive: true })
