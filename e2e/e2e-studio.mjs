@@ -31,6 +31,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const DSH_SPEC = argv.includes('--dsh') ? argv[argv.indexOf('--dsh') + 1] : 'latest'
 const KEEP = argv.includes('--keep')
+const ANNOT = process.env.E2E_ANNOT === '1' // 业务标注的试验开关打开跑一遍（平时关着跑，看有没有带出别的变化）
 const REGISTRY = 'https://registry.npmjs.org/'
 const WIN = process.platform === 'win32'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -108,7 +109,15 @@ function writeDesign() {
     fs.writeFileSync(p, s)
     fs.utimesSync(p, t0 + i * 5, t0 + i * 5)
   })
+  if (ANNOT) fs.writeFileSync(path.join(DESIGN, 'annotations.json'), JSON.stringify(ANNOTS))
 }
+const ANNOTS = { annotations: [
+  { id: 'menu-01', page: 'menu.html', type: 'rule', title: '价格含税', detail: '**第一行**\n- 列表项', selector: 'h1', anchorLabel: '标题', source: 'PRD 2.6', status: 'open' },
+  { id: 'menu-02', page: 'menu.html', type: 'state', title: '售罄置灰', selector: '.go', fallbackText: '加入购物车' },
+  { id: 'menu-03', page: 'menu.html', title: '找不到的', selector: '.gone' },
+  { id: 'cart-01', page: 'cart.html', title: '合计含配送费', fallbackText: '去结算' },
+  { id: 'cart-02', page: 'cart.html', title: '整屏的说明' },
+] }
 
 const FIRST_DRAFT = path.join(path.dirname(DESIGN), 'first-draft', 'first.html')
 // ── 假模型：Anthropic Messages，SSE ──
@@ -271,6 +280,11 @@ try {
   const add = run(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), 'plugin', '--profile', 'web', 'add', path.join(tmp, tgz)], { cwd: tmp })
   if (!check('DSH 装上插件', add.code === 0, add.out.slice(-800))) throw new Error('插件没装上')
   console.log(`  （预览版说明：${seedWelcome(cliDir)}）`)
+  if (ANNOT) {
+    const patch = path.join(env.DSH_HOME, 'profiles', 'web', 'cordis.patch.yml')
+    const old = (fs.existsSync(patch) ? fs.readFileSync(patch, 'utf8') : '').replace(/^\[\]\s*$/m, '')
+    fs.writeFileSync(patch, old + (old && !old.endsWith('\n') ? '\n' : '') + '- id: dsh-design-studio-annotations\n  disabled: false\n')
+  }
   const work = path.join(tmp, 'work')
   const url = await new Promise((resolve) => {
     web = spawn(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), 'web', '--no-open', '--port', '0', '--host', '127.0.0.1', '--trusted-host', 'remote.test'], { env, cwd: work, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -667,6 +681,142 @@ try {
     check('点选标签：接着打的字在标签后面', typed.indexOf('1 个元素') >= 0 && typed.indexOf('改成红色') > typed.indexOf('1 个元素'), JSON.stringify({ chip: typed.indexOf('1 个元素'), typed: typed.indexOf('改成红色'), len: typed.length, head: typed.slice(0, 30), active: await page(`(() => { const a = document.activeElement; return a ? a.tagName + (a.getAttribute('data-lexical-editor') ? '[lexical]' : '') + (a.tagName === 'IFRAME' ? a.src : '') : null })()`) }))
   }
 
+  // ⑦c 业务标注：开关关着没有按钮；开着：按钮带条数、面板和编号、卡片和编号互相定位、点选时编号收起
+  const anBtn = `[...document.querySelectorAll('.ddp-btn.lab')].find((b) => (b.querySelector('.lb') || {}).textContent === '业务标注')`
+  if (!ANNOT) check('业务标注：开关关着时没有按钮', await page(`!${anBtn}`))
+  else {
+    await page(CANVAS)
+    await sleep(600)
+    const badge = await until(`(() => { const b = ${anBtn}; return b && b.querySelector('.bdg') ? b.querySelector('.bdg').textContent : '' })()`, 15000)
+    check('业务标注：按钮带条数', badge === String(ANNOTS.annotations.length), String(badge))
+    await page(`${anBtn}.click(), 1`)
+    const cards = await until(`document.querySelectorAll('.ddp-anp .ddp-ancard').length`, 5000)
+    check('业务标注：点开出卡片', cards === ANNOTS.annotations.length, String(cards))
+    const lost = await until(`[...document.querySelectorAll('.ddp-anp .ddp-ancard.lost')].map((x) => x.getAttribute('data-an')).join()`, 15000)
+    check('业务标注：定位不到的标出来（编号真画到页面里了）', lost === 'menu-03', lost)
+    check('业务标注：定位不到的排在这一屏最后', await page(`[...document.querySelectorAll('.ddp-anp .ddp-ancard')].map((x) => x.getAttribute('data-an')).join()`) === 'menu-01,menu-02,menu-03,cart-01,cart-02', await page(`[...document.querySelectorAll('.ddp-anp .ddp-ancard')].map((x) => x.getAttribute('data-an')).join()`))
+    check('业务标注：正文的加粗和列表', await page(`(() => { const c = document.querySelector('[data-an="menu-01"]'); return !!c.querySelector('.md b') && !!c.querySelector('.md li') && !!c.querySelector('.tag') })()`))
+    check('业务标注：有定位不到的就有「让模型修」', await page(`[...document.querySelectorAll('.ddp-anp footer button')].some((b) => b.textContent.includes('让模型修'))`))
+    await shot('6b-annot-canvas')
+    // 页面里的元素 → 外层坐标（画布缩放过）：编号在元素左上角
+    const dotAt = async (key, sel) => {
+      const frame = `(() => { const s = document.querySelector('.ddp-shield[data-key="${key}"]'); return s ? s.parentElement.querySelector('iframe:not([style*="hidden"])') || s.parentElement.querySelector('iframe') : document.querySelector('.ddp-body iframe') })()`
+      const { result } = await chrome.cdp('Runtime.evaluate', { expression: frame }, sessionId)
+      const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
+      const { executionContextId } = await chrome.cdp('Page.createIsolatedWorld', { frameId: node.frameId, worldName: 'e2e-an' }, sessionId)
+      const r = await chrome.cdp('Runtime.evaluate', { expression: `(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.left, b.top] })()`, contextId: executionContextId, returnByValue: true }, sessionId)
+      const fr = await page(`(() => { const f = ${frame}; const b = f.getBoundingClientRect(); return [b.left, b.top, b.width / f.offsetWidth] })()`)
+      return { x: fr[0] + r.result.value[0] * fr[2] + 2, y: fr[1] + r.result.value[1] * fr[2] + 2 }
+    }
+    const realClick = async ({ x, y }) => {
+      await chrome.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }, sessionId)
+      for (const type of ['mousePressed', 'mouseReleased']) await chrome.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }, sessionId)
+    }
+    const selCard = `(document.querySelector('.ddp-anp .ddp-ancard.sel') || { getAttribute() { return '' } }).getAttribute('data-an')`
+    await page(`document.querySelector('[data-an="cart-01"]').click(), 1`)
+    check('业务标注：点卡片选中它', await until(`${selCard} === 'cart-01'`, 3000))
+    await sleep(700)
+    await realClick(await dotAt('menu.html', '.go'))
+    check('业务标注：画布上点编号，右边对应的卡片选中', await until(`${selCard} === 'menu-02'`, 3000), await page(selCard))
+    // 页面里现在画着哪几条（编号在 closed shadow 里，问页面自己；点选模式没有挡板，按屏名找 iframe）
+    const inPage = async (frameExpr, expression) => {
+      await chrome.cdp('Runtime.enable', {}, sessionId)
+      const { result } = await chrome.cdp('Runtime.evaluate', { expression: frameExpr }, sessionId)
+      const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
+      const c = chrome.events.filter((m) => m.sessionId === sessionId && m.method === 'Runtime.executionContextCreated' && m.params.context.auxData && m.params.context.auxData.frameId === node.frameId && m.params.context.auxData.isDefault).pop()
+      const r = await chrome.cdp('Runtime.evaluate', { expression, contextId: c.params.context.id, returnByValue: true }, sessionId)
+      return r.result && r.result.value
+    }
+    const cellFrame = (key) => `document.querySelector('.ddp-lab[data-key="${key}"]').closest('.ddp-cell').querySelector('iframe')`
+    const marksIn = async (key) => (await inPage(cellFrame(key), 'window.__dshDesign.annotMarks()')) || []
+    check('业务标注：页面上画着编号（定位不到的不画）', (await marksIn('menu.html')).join() === 'menu-01,menu-02', JSON.stringify(await marksIn('menu.html')))
+    check('业务标注：整屏的说明也有编号', (await marksIn('cart.html')).includes('cart-02'), JSON.stringify(await marksIn('cart.html')))
+    await inPage(cellFrame('cart.html'), `(() => { const m = document.createElement('main'); m.id = 'e2e-main'; m.style.cssText = 'height:80px;overflow:auto'; m.innerHTML = '<div style="height:600px"></div>'; document.body.append(m); m.scrollTop = 300; return m.scrollTop })()`)
+    await page(`document.querySelector('[data-an="cart-02"]').click(), 1`)
+    await sleep(500)
+    check('业务标注：点整屏的说明，里面的滚动区也回顶', (await inPage(cellFrame('cart.html'), `document.getElementById('e2e-main').scrollTop`)) === 0)
+    await inPage(cellFrame('cart.html'), `(document.getElementById('e2e-main').remove(), 1)`)
+    const pickBtn = `[...document.querySelectorAll('.ddp-tool')].find((b) => /^(选择|选择中)/.test(b.textContent.trim()))`
+    await page(`${pickBtn}.click(), 1`)
+    await sleep(600)
+    check('业务标注：点选时编号收起', (await marksIn('menu.html')).length === 0, JSON.stringify(await marksIn('menu.html')))
+    await page(`${pickBtn}.click(), 1`)
+    await sleep(800)
+    check('业务标注：退出点选后编号回来', (await marksIn('menu.html')).length === 2, JSON.stringify(await marksIn('menu.html')))
+    await realClick(await dotAt('menu.html', 'h1'))
+    check('业务标注：回来后的编号点得到', await until(`${selCard} === 'menu-01'`, 3000), await page(selCard))
+    // 页面后来才长出那个元素：补上编号，状态跟着变；藏在里面滚动区的，点卡片滚出来
+    await inPage(cellFrame('menu.html'), `(() => { const d = document.createElement('div'); d.id = 'e2e-sc'; d.style.cssText = 'height:40px;overflow:auto'; d.innerHTML = '<div style="height:400px"></div><p class="gone">后来才有</p>'; document.body.append(d); return 1 })()`)
+    check('业务标注：页面后来长出元素 → 卡片不再标定位不到', await until(`!document.querySelector('[data-an="menu-03"].lost')`, 5000))
+    check('业务标注：藏在里面滚动区没滚到的，编号先不飘出来', !(await marksIn('menu.html')).includes('menu-03'), JSON.stringify(await marksIn('menu.html')))
+    await page(`document.querySelector('[data-an="menu-03"]').click(), 1`)
+    await sleep(900)
+    check('业务标注：点卡片把里面滚动区滚到它，编号出来', (await inPage(cellFrame('menu.html'), `document.getElementById('e2e-sc').scrollTop`)) > 0 && (await marksIn('menu.html')).includes('menu-03'), JSON.stringify(await marksIn('menu.html')))
+    const partAt = await inPage(cellFrame('menu.html'), `(() => { const d = document.getElementById('e2e-sc'); const p = d.querySelector('.gone'); d.scrollTop = p.offsetTop - d.offsetTop - d.clientHeight + 8; return d.scrollTop })()`)
+    await sleep(300)
+    await page(`document.querySelector('[data-an="menu-03"]').click(), 1`)
+    await sleep(900)
+    const pageY = await inPage(cellFrame('menu.html'), `(() => { const h = document.getElementById('e2e-sc'); h.style.height = '40px'; const sp = document.createElement('div'); sp.id = 'e2e-sp'; sp.style.height = '1600px'; document.body.append(sp); const b = document.querySelector('h1').getBoundingClientRect(); scrollTo(0, scrollY + b.top + b.height / 2); return scrollY })()`)
+    await sleep(300)
+    await page(`document.querySelector('[data-an="menu-01"]').click(), 1`)
+    await sleep(900)
+    const pageYAfter = await inPage(cellFrame('menu.html'), `(() => { const y = scrollY; document.getElementById('e2e-sp').remove(); scrollTo(0, 0); return y })()`)
+    check('业务标注：被视口边切掉一截的也滚过去', pageYAfter < pageY, JSON.stringify([pageY, pageYAfter]))
+    check('业务标注：只露出一点点的也滚过去', (await inPage(cellFrame('menu.html'), `document.getElementById('e2e-sc').scrollTop`)) > partAt)
+    await inPage(cellFrame('menu.html'), `(document.getElementById('e2e-sc').remove(), 1)`)
+    check('业务标注：元素又没了 → 标回定位不到', await until(`!!document.querySelector('[data-an="menu-03"].lost')`, 5000))
+    // 和交付面板互斥（先开「转成代码」再开标注，只留一个）
+    await page(`(async () => { const b = [...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((x) => /^(导出|Export)$/.test(x.dataset.tip || '')); b.click(); await new Promise((r) => setTimeout(r, 150)); [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /转成代码/.test(x.textContent)).click(); return 1 })()`)
+    const hoUp = await until(`!!document.querySelector('.ddp-ho') && !document.querySelector('.ddp-anp')`, 5000)
+    await page(`${anBtn}.click(), 1`)
+    check('业务标注：和「转成代码」面板互斥', hoUp && await until(`!!document.querySelector('.ddp-anp') && !document.querySelector('.ddp-ho')`, 3000), await page(`document.querySelectorAll('.ddp-ho').length + '/' + document.querySelectorAll('.ddp-anp').length`))
+    // 改文件：卡片跟着变，页面不重载
+    const probe = await (async () => {
+      const { result } = await chrome.cdp('Runtime.evaluate', { expression: `document.querySelector('.ddp-shield[data-key="menu.html"]').parentElement.querySelector('iframe')` }, sessionId)
+      const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
+      return node.frameId
+    })()
+    const world = async () => (await chrome.cdp('Page.createIsolatedWorld', { frameId: probe, worldName: 'e2e-an2' }, sessionId)).executionContextId
+    await chrome.cdp('Runtime.evaluate', { expression: `document.documentElement.setAttribute('data-e2e-mark', '1')`, contextId: await world() }, sessionId)
+    const more = { annotations: [...ANNOTS.annotations.slice(0, 2), ANNOTS.annotations[3], { id: 'menu-09', page: 'menu.html', title: '新加的一条', selector: 'h1' }] }
+    fs.writeFileSync(path.join(DESIGN, 'annotations.json'), JSON.stringify(more))
+    check('业务标注：改文件后卡片跟着变', await until(`!!document.querySelector('[data-an="menu-09"]') && !document.querySelector('[data-an="menu-03"]')`, 8000))
+    await sleep(1200)
+    const still = await chrome.cdp('Runtime.evaluate', { expression: `document.documentElement.getAttribute('data-e2e-mark')`, contextId: await world(), returnByValue: true }, sessionId)
+    check('业务标注：改文件页面不重载', still.result.value === '1', JSON.stringify(still.result))
+    // 转到单页：编号跟过去；点卡片换屏
+    await page(`document.querySelector('[data-an="cart-01"]').click(), 1`)
+    await sleep(400)
+    await page(SINGLE)
+    await until(`!!document.querySelector('.ddp-anp')`, 3000)
+    await sleep(1200)
+    await shot('6b-annot-single')
+    await page(`window.__anGone = 0; window.__anT = setInterval(() => { if (!${anBtn}) window.__anGone++ }, 30), 1`)
+    await page(`document.querySelector('[data-an="menu-02"]').click(), 1`)
+    check('业务标注：单页时点别的屏的卡片，换到那一屏', await until(`/菜单|menu/i.test((document.querySelector('.ddp-top .ddp-addr') || {}).textContent || '') || !!document.querySelector('iframe[src*="menu.html"]')`, 6000))
+    await sleep(1500)
+    const singleFrame = `[...document.querySelectorAll('.ddp-body iframe')].filter((f) => f.getClientRects().length && getComputedStyle(f).visibility !== 'hidden').pop()`
+    let focused = ''
+    for (let i = 0; i < 25 && focused !== 'menu-02'; i++) { focused = await inPage(singleFrame, 'window.__dshDesign.annotLast()').catch(() => ''); if (focused !== 'menu-02') await sleep(200) }
+    check('业务标注：换过去以后定位到那一条', focused === 'menu-02', String(focused))
+    // 页面里的链接把这一帧带到别的屏：标注跟着实际那屏走，不把菜单的规则标到购物车上
+    await inPage(singleFrame, `(document.querySelector('a.go').click(), 1)`)
+    let after = []
+    for (let i = 0; i < 30 && !after.includes('cart-01'); i++) { await sleep(200); after = (await inPage(singleFrame, 'window.__dshDesign && window.__dshDesign.annotMarks()').catch(() => [])) || [] }
+    check('业务标注：点页面里的链接到购物车，编号换成购物车的', after.includes('cart-01') && !after.includes('menu-01'), JSON.stringify(after))
+    await page(`document.querySelector('[data-an="menu-01"]').click(), 1`)
+    let back = []
+    for (let i = 0; i < 40 && !back.includes('menu-01'); i++) { await sleep(200); back = (await inPage(singleFrame, 'window.__dshDesign && window.__dshDesign.annotMarks()').catch(() => [])) || [] }
+    await sleep(300)
+    const backFocus = await inPage(singleFrame, 'window.__dshDesign.annotLast()')
+    check('业务标注：走到别的屏后点这屏的卡片，回到这屏并定位', back.includes('menu-01') && !back.includes('cart-01') && backFocus === 'menu-01', JSON.stringify({ back, backFocus }))
+    check('业务标注：换屏过程中按钮一直在（换屏的回包也带标注）', await page(`(clearInterval(window.__anT), window.__anGone)`) === 0, String(await page('window.__anGone')))
+    await page(`${anBtn}.click(), 1`)
+    check('业务标注：再点一下面板收起', await until(`!document.querySelector('.ddp-anp')`, 3000))
+    fs.writeFileSync(path.join(DESIGN, 'annotations.json'), JSON.stringify(ANNOTS))
+    await sleep(800)
+  }
+
   // ⑧ 换风格：外观面板 →「换风格」→ 点一张卡
   await page(`document.querySelector('.ddp-top button[data-tip="外观"]').click()`)
   await sleep(300)
@@ -950,7 +1100,19 @@ try {
   check('远程看：文件改了 → 跟着重新打包换上来', /cart\.html$/.test(c2.base || '') && /拿铁 × 2/.test(c2.text || ''), JSON.stringify(c2))
   await rpage(`${CHECK_BTN}.click()`).catch(() => {})
   const rck = await runtil(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.querySelector('.tip')?.textContent || '') && p.querySelectorAll('.ddp-ck').length })()`, 30000)
-  check('远程看：体检照样量得出（改坏的购物车：浅灰小字）', rck >= 2, await rpage(`document.querySelector('.ddp-check')?.innerText.slice(0, 300) || '没有面板'`).catch((e) => e.message))
+  let rdiag = ''
+  if (!(rck >= 2)) {
+    const panel = await rpage(`document.querySelector('.ddp-check')?.innerText.slice(0, 300) || '没有面板'`).catch((e) => e.message)
+    const frames = await rpage(`JSON.stringify([...document.querySelectorAll('.ddp iframe')].map((f) => [f.className, (f.src || '').slice(-40), Math.round(f.getBoundingClientRect().width)]))`).catch((e) => e.message)
+    const inside = await inFrame(`JSON.stringify({ href: location.href.slice(-40), ready: document.readyState, bad: !!document.querySelector('p[style*="d4d4d4"]'), two: document.body.innerText.includes('拿铁 × 2') })`)
+    await sleep(2500)
+    await rpage(`document.querySelector('.ddp-check header .ddp-btn')?.click()`).catch(() => {})
+    await sleep(400)
+    await rpage(`${CHECK_BTN}.click()`).catch(() => {})
+    const again = await runtil(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.querySelector('.tip')?.textContent || '') && p.querySelectorAll('.ddp-ck').length })()`, 30000)
+    rdiag = JSON.stringify({ panel, frames, inside, again })
+  }
+  check('远程看：体检照样量得出（改坏的购物车：浅灰小字）', rck >= 2, rdiag)
   await rpage(`document.querySelector('.ddp-check header .ddp-btn')?.click()`).catch(() => {})
   const pngs = () => (fs.existsSync(path.join(DESIGN, 'exports')) ? fs.readdirSync(path.join(DESIGN, 'exports')).filter((f) => f.endsWith('.png')) : [])
   const pngBefore = pngs().length
@@ -1256,7 +1418,7 @@ ${id}.addEventListener('drop', (e) => { e.preventDefault()${stop ? '; e.stopProp
       return [Math.round(fr[0] + inner[0] * k), Math.round(fr[1] + inner[1] * k)]
     }
     const blank = await page(`(() => { const r = ${FRAME}.getBoundingClientRect(); return [Math.round(r.left + 30), Math.round(r.top + r.height * 0.5)] })()`)
-    const PNG = path.join(OTHER, 'ref.png')
+    const PNG = path.join(tmp, 'ref.png') // 别写进正在看的目录：会触发换帧，读到的是新的一帧
     fs.writeFileSync(PNG, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'))
     const said0 = await page(composerText)
     const res = []
@@ -1269,9 +1431,17 @@ ${id}.addEventListener('drop', (e) => { e.preventDefault()${stop ? '; e.stopProp
       const hint = await until(`!!document.querySelector('.ddp-drop.soft')`, 3000)
       await at(zp, 'dragOver'); await sleep(250); await at(zp, 'dragOver')
       const off = await until(`!document.querySelector('.ddp-drop')`, 3000)
+      const UPF = `JSON.stringify([...document.querySelectorAll('.ddp iframe')].filter((f) => /upload\\.html/.test(f.src)).map((f) => f.className + '|' + Math.round(f.getBoundingClientRect().width)))`
+      const pre = await page(`(() => { const e = document.elementFromPoint(${zp[0]}, ${zp[1]}); return (e ? e.tagName + '.' + e.className : '') + ' ' + ${UPF} })()`)
+      const t0 = Date.now()
       await at(zp, 'drop')
       await sleep(600)
       const got = await inFrame(`document.body.getAttribute('data-got') || ''`)
+      if (!got) {
+        const post = await page(UPF)
+        await sleep(1500)
+        res.push({ id, miss: true, pre, post, later: await inFrame(`document.body.getAttribute('data-got') || ''`), framesLater: await page(UPF), ms: Date.now() - t0 })
+      }
       const under = await page(`(() => { const e = document.elementFromPoint(${blank[0]}, ${blank[1]}); return e ? e.tagName + '.' + e.className : '' })()`)
       res.push({ id, hint, off, got, under })
     }

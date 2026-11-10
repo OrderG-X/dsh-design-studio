@@ -12,6 +12,10 @@
     - id: dsh-design-studio-offline
       name: dsh-design-studio/offline
       disabled: true
+    # 业务标注（试验，默认关）：打开后模型随设计写 annotations.json，右侧栏多一个按钮
+    - id: dsh-design-studio-annotations
+      name: dsh-design-studio/annotations
+      disabled: true
     # 其他模式（标准、创造 …）也能用预览工具、设计技能；设计模式里自带一份，不受这两行影响
     - id: dsh-design-studio-tool
       name: dsh-design-studio/tool

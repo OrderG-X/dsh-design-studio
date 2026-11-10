@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
-import { createPhotos, loadPhotoIndex, searchPhotos, onlyByTheme, usedPhotos, isPhotoAsset, orientOf } from '../lib/photos.js'
+import { createPhotos, loadPhotoIndex, searchPhotos, ratioNote, onlyByTheme, usedPhotos, isPhotoAsset, orientOf } from '../lib/photos.js'
 import { pinRoots } from '../lib/handoff.js'
 import { packDesign } from '../lib/gallery/pack.js'
 import { createMarket } from '../lib/gallery/market.js'
@@ -64,6 +64,7 @@ check('单字词单独写是算的', ids(searchPhotos(sea, { query: '海', count
 check('最长词优先：「运动鞋」只算服饰', searchPhotos(sea, { query: '运动鞋', count: 8 }).every((p) => p.theme === 'shop') && searchPhotos(sea, { query: '运动鞋', count: 8 }).length === 1)
 check('标签里含题材词也算题材（「健身房」）', searchPhotos(sea, { query: '健身房的照片', count: 1 })[0].id === 'gym-01')
 check('说了具体画面只要命中的，宁少勿滥', ids(searchPhotos(index, { query: '民宿 浴缸', count: 3 })) === 'hotel-03')
+check('比例不够时照实说，都对得上就不多话', ratioNote([{ w: 800, h: 1200 }, { w: 1200, h: 800 }], 'landscape').includes('1 张不是横图') && ratioNote([{ w: 1200, h: 800 }], 'landscape') === '' && ratioNote([{ w: 800, h: 1200 }], '') === '')
 check('内容比横竖要紧', searchPhotos(index, { query: '民宿 卧室', ratio: 'portrait', count: 1 })[0].id === 'hotel-01')
 check('只说题材：题材里都能选（奶茶本身也是某张的标签）', searchPhotos(index, { query: '奶茶', count: 8 }).length === 2)
 {

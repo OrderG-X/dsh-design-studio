@@ -54,6 +54,7 @@ The plugin is split into parts, each with its own switch under DSH Plugins → D
 | Design skill (other modes) | Standard, Creator and other modes can load the `ui-design` skill | On |
 | Design mode | The Design entry in the mode menu | On |
 | Design library offline | The design library makes no network requests: no gallery catalog, no downloads. A catalog already cached still shows | Off |
+| Business annotations (experimental) | The model also writes `annotations.json` with the rules, states and edge cases the UI does not show. The sidebar gains a Notes button: numbered markers on the page, cards on the right, each locating the other. Handoff notes include them. Designs take a little longer | Off |
 
 To design only in Design mode and keep other modes clean, turn off the two "(other modes)" switches. Design mode carries its own tool and skill and ignores them.
 

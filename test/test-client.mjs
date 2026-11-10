@@ -477,17 +477,23 @@ check('调样式：交给模型的字带元素、选择器、改动和文件', a
 // ── 风格卡：配色都过对比度，交给模型的字带全套 ──
 const { STYLES, formatStyle, accentUse } = mod._test
 {
+  const clientSrc = fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+  const server = await import('../lib/styles.js')
+  check('风格卡：服务端（pick_style）那份和右侧栏一字不差', JSON.stringify(server.STYLES) === JSON.stringify(STYLES))
+  check('自动风格：服务端的题材规则和右侧栏一样', server.AUTO_STYLE.every(([k, re]) => clientSrc.includes(`['${k}', /${re.source}/`)) && [server.SAID_STYLE, server.NOT_STYLE_FENG].every((re) => clientSrc.includes(re.source)))
+  check('自动风格：服务端的兜底和右侧栏一样', clientSrc.includes(`const AUTO_SPREAD = ${JSON.stringify(server.AUTO_SPREAD).replace(/"/g, "'").replace(/,/g, ', ')}`) && Object.entries(server.AUTO_BY_KIND).every(([k, v]) => new RegExp(`const AUTO_BY_KIND = \\{[^}]*\\b${k}: '${v}'`).test(clientSrc)))
+}
+{
   const { autoStyle, makeT, ZH } = mod._test
   const id = (text, kind) => (autoStyle(text, kind) || { id: null }).id
   check('自动风格：按题材挑卡', id('做一个城市民宿预订 App：首页推荐、房源详情、下单确认，三屏', 'app') === 'fresh' && id('奶茶店点单小程序：菜单、购物车、取餐码', 'miniprogram') === 'playful' && id('A landing page for an AI meeting-notes SaaS called Murmur', 'web') === 'tech' && id('A habit tracker app for runners: today, weekly stats, profile', 'app') === 'sport' && id('社区咖啡馆小程序', 'miniprogram') === 'retro',
     [id('做一个城市民宿预订 App', 'app'), id('奶茶店点单小程序', 'miniprogram'), id('SaaS', 'web'), id('runners', 'app'), id('社区咖啡馆小程序', 'miniprogram')].join())
   check('自动风格：用户说了风格就不挑', id('周末城市音乐节海报，霓虹夜色风', 'poster') === null && id('健身 App，配色用蓝白', 'app') === null && id('跑步 App，赛博朋克', 'app') === null && id('A fitness app in a dark luxury style', 'app') === null)
   check('自动风格：「风景」「通风」不算说了风格', id('风景摄影分享 App', 'app') !== null && id('新风系统控制面板', 'desktop') !== null)
-  check('自动风格：审查 A 的误判都改了', id('A Black Friday sale landing page', 'web') === 'sale' && id('智能家居面板：支持照明、通风、安防', 'app') !== null && id('健身 App，风格你定', 'app') === 'sport' && id('跑步 App，用北欧风：首页、训练、我的', 'app') === null && id('北欧风的界面，做个记账 App', 'app') === null && id('I run a coffee shop', 'web') === 'retro' && id('waterpark tickets', 'web') !== 'tech' && id('A fitness app, any style', 'app') === 'sport',
+  check('自动风格：审查 A 的误判都改了', id('A Black Friday sale landing page', 'web') === 'sale' && id('智能家居面板：支持照明、通风、安防', 'app') !== null && id('健身 App，风格你定', 'app') === null && id('跑步 App，用北欧风：首页、训练、我的', 'app') === null && id('北欧风的界面，做个记账 App', 'app') === null && id('I run a coffee shop', 'web') === 'retro' && id('waterpark tickets', 'web') !== 'tech' && id('A fitness app, any style', 'app') === null,
     [id('A Black Friday sale landing page', 'web'), id('智能家居面板：支持照明、通风、安防', 'app'), id('健身 App，风格你定', 'app'), id('跑步 App，用北欧风：首页、训练、我的', 'app'), id('北欧风的界面，做个记账 App', 'app'), id('I run a coffee shop', 'web'), id('waterpark tickets', 'web'), id('A fitness app, any style', 'app')].join())
-  check('自动风格：审查 B 的误判都改了', id('健身 App，配色定为蓝白', 'app') === null && id('跑步 App，清新风：首页、训练、我的', 'app') === null && id('A theme park booking app', 'app') !== null && id('A color picker app', 'app') !== null && id('金融风控管理系统', 'web') === 'tech' && id('健身 App，风格：你定', 'app') === 'sport' && id('I run a coffee shop, watch our intro video', 'web') === 'retro' && id('新风系统控制面板', 'desktop') !== null,
+  check('自动风格：审查 B 的误判都改了', id('健身 App，配色定为蓝白', 'app') === null && id('跑步 App，清新风：首页、训练、我的', 'app') === null && id('A theme park booking app', 'app') !== null && id('A color picker app', 'app') !== null && id('金融风控管理系统', 'web') === 'tech' && id('健身 App，风格：你定', 'app') === null && id('I run a coffee shop, watch our intro video', 'web') === 'retro' && id('新风系统控制面板', 'desktop') !== null,
     [id('健身 App，配色定为蓝白', 'app'), id('跑步 App，清新风：首页、训练、我的', 'app'), id('A theme park booking app', 'app'), id('A color picker app', 'app'), id('金融风控管理系统', 'web'), id('健身 App，风格：你定', 'app'), id('I run a coffee shop, watch our intro video', 'web')].join())
-  check('自动风格：冒号前后有空格也算「你定」', id('健身 App，风格 ：你定', 'app') === 'sport' && id('健身 App，风格 ： 你定', 'app') === 'sport', [id('健身 App，风格 ：你定', 'app'), id('健身 App，风格 ： 你定', 'app')].join())
   { const t0 = Date.now(); autoStyle('健身 App，风格' + ' '.repeat(5000) + 'x', 'app'); autoStyle('配色' + '：'.repeat(3000) + ' '.repeat(3000), 'app'); autoStyle('风格' + ' '.repeat(40000) + 'x', 'app'); check('自动风格：长空白不卡（< 50ms）', Date.now() - t0 < 50, Date.now() - t0) }
   check('自动风格：兜底不给米色系的卡', ['做一张招聘海报|poster', '帮我做个记账 App|app', '做个工具网站|web', '会员月报邮件|email'].every((x) => { const [a, k] = x.split('|'); return !['warm', 'cream', 'japandi', 'ink', 'retro'].includes(id(a, k)) }))
   check('自动风格：没认出题材按类型给，App 不给米色系', id('一份 5 页的季度业务复盘幻灯片', 'slides') === 'swiss' && !['warm', 'cream', 'japandi', 'ink'].includes(id('帮我做个记账 App', 'app')) && id('', 'app') === null)
@@ -544,7 +550,7 @@ check('插入：直接发的字不加空行', pi('〔选定方向〕…\n', '', 
 // ── 点选标签（DSH 0.2.1 起：输入框里一个短标签，悬停看详情，发出去是整段） ──
 const { pickInfo, pickLabel, pickRule } = mod._test
 const src0 = sources[0]
-check('标签：每种图标注册一个 @ 的来源，不出候选、不占菜单标题', sources.length === 11 && src0.name === 'dsh-design-studio' && sources.every((x) => x.name.startsWith('dsh-design-studio') && x.trigger === '@' && x.showGroupTitle === false) && new Set(sources.map((x) => x.name)).size === 11 && (await src0.candidates()).length === 0, sources.map((x) => x.name).join(','))
+check('标签：每种图标注册一个 @ 的来源，不出候选、不占菜单标题', sources.length === 12 && src0.name === 'dsh-design-studio' && sources.every((x) => x.name.startsWith('dsh-design-studio') && x.trigger === '@' && x.showGroupTitle === false) && new Set(sources.map((x) => x.name)).size === 12 && (await src0.candidates()).length === 0, sources.map((x) => x.name).join(','))
 check('点选标签：复制出来、发给模型都是整段，前后空一行', src0.codec.clipboardText('〔选中元素〕a') === '\n\n〔选中元素〕a\n\n' && (await src0.codec.serialize('〔选中元素〕a')) === '\n\n〔选中元素〕a\n\n')
 check('点选标签：消息里的规则和标签都注册了', rules.length === 1 && rules[0].id === 'ddp-pick' && slots.some((s) => s.opts.name === 'conversation.user.text.node' && s.opts.key === 'ddp-pick'))
 const PK = formatPick(el, fileSt).trim()

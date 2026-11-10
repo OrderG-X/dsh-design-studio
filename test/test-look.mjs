@@ -957,6 +957,39 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     const negOv = neg[0].issues.find((x) => x.type === 'overlap'), absOv = neg[1].issues.find((x) => x.type === 'overlap')
     check('真浏览器：叠字找到原因——价格行的负 margin，规则在 neg.css 第 3 行', negOv && negOv.cause && negOv.cause.prop === 'margin-top' && negOv.cause.value === '-24px' && /div\.row/.test(negOv.cause.sel) && negOv.rule && negOv.rule.sel === '.row' && negOv.rule.file === 'neg.css' && negOv.rule.line === 3, JSON.stringify(negOv))
     check('真浏览器：叠字找到原因——价格是绝对定位；量出叠了多少 px', absOv && absOv.px > 0 && absOv.cause && absOv.cause.prop === 'position' && absOv.cause.value === 'absolute' && /price/.test(absOv.cause.sel), JSON.stringify(absOv))
+    // 业务标注：定位（选择器、文字兜底、写错的、匹配多个、整屏说明）
+    fs.writeFileSync(path.join(site, 'an.html'), `<!doctype html><html><head><meta charset="utf-8"><title>标注</title></head><body>
+<button id="agree">同意并继续</button><p class="row">一</p><p class="row">二</p>
+<label>我已阅读并同意<a href="#">《用户协议》</a>与<a href="#">《隐私政策》</a></label>
+<div><p>有字</p><span style="opacity:0">只在透明的子元素里</span></div><div style="opacity:0"><span>查看详情</span></div><button id="see">查看详情</button><div hidden><span>只在藏着的地方有</span></div><section><p>看得见的一段</p><div hidden><span>藏在看得见的容器里</span></div></section><section><div><b>含双人早餐</b></div></section><footer>含双人早餐</footer></body></html>`)
+    const anRows = await measureAll(b, { screens: [{ key: 'an.html', url: `${entry.origin}/an.html`, label: 'an' }], sizes: [[390, 844], [320, 568]], kind: 'app', annots: new Map([['an.html', [
+      { id: 'sel', selector: '#agree', fallbackText: '' },
+      { id: 'fall', selector: '.gone', fallbackText: '同意并继续' },
+      { id: 'split', selector: '', fallbackText: '我已阅读并同意《用户协议》与《隐私政策》' },
+      { id: 'lost', selector: '.gone', fallbackText: '页面上没有的字' },
+      { id: 'bad', selector: 'div[', fallbackText: '' },
+      { id: 'many', selector: '.row', fallbackText: '' },
+      { id: 'whole', selector: '', fallbackText: '' },
+      { id: 'hidden', selector: '', fallbackText: '只在藏着的地方有' },
+      { id: 'nested', selector: '', fallbackText: '藏在看得见的容器里' },
+      { id: 'clear', selector: '', fallbackText: '查看详情' },
+      { id: 'clearKid', selector: '', fallbackText: '只在透明的子元素里' },
+      { id: 'first', selector: '', fallbackText: '含双人早餐' },
+    ]]]) })
+    const anOf = Object.fromEntries((anRows[0].annots || []).map((x) => [x.id, x]))
+    check('真浏览器：业务标注只在第一种尺寸上核对', Array.isArray(anRows[0].annots) && anRows[1].annots === undefined, JSON.stringify(anRows.map((r) => r.annots)))
+    check('真浏览器：选择器找到', anOf.sel && anOf.sel.how === 'selector' && anOf.sel.count === 1)
+    check('真浏览器：选择器失效时按文字找到', anOf.fall && anOf.fall.how === 'text')
+    check('真浏览器：一段字被链接切开也找得到', anOf.split && anOf.split.how === 'text')
+    check('真浏览器：都找不到算定位不到', anOf.lost && anOf.lost.how === '')
+    check('真浏览器：选择器写法不合法算定位不到', anOf.bad && anOf.bad.how === '')
+    check('真浏览器：匹配到多个记下个数', anOf.many && anOf.many.how === 'selector' && anOf.many.count === 2)
+    check('真浏览器：不写定位的是整屏说明', anOf.whole && anOf.whole.how === 'page')
+    check('真浏览器：看不见的文字不算找到', anOf.hidden && anOf.hidden.how === '')
+    check('真浏览器：字藏在看得见的容器里也不算找到', anOf.nested && anOf.nested.how === '', JSON.stringify(anOf.nested))
+    check('真浏览器：透明弹层里的同样文字不抢', anOf.clear && anOf.clear.how === 'text', JSON.stringify(anOf.clear))
+    check('真浏览器：字只在透明子元素里，不算找到', anOf.clearKid && anOf.clearKid.how === '', JSON.stringify(anOf.clearKid))
+    check('真浏览器：同样的文字取最靠前最小的元素', anOf.first && anOf.first.how === 'text')
     const overScreens = [{ key: 'over.html', url: `${entry.origin}/over.html`, label: 'over' }]
     for (const dk of [false, true]) {
       const ov = await measureAll(b, { screens: overScreens, sizes: [[390, 844]], kind: 'app', dark: dk })

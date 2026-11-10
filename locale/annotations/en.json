@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Business annotations (experimental)",
+    "description": "When on, the model also writes annotations.json with the business rules, states and edge cases the UI does not show, which takes a little longer. The sidebar gains a Notes button: numbered markers on the page, cards on the right, each locating the other. The rules are included when you turn a design into code."
+  }
+}

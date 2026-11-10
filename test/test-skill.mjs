@@ -71,7 +71,7 @@ check('工作台本体不再自己挂技能（交给技能那行）', mounted.le
 // 工具那行：挂 preview_page；工作台关着时调用会说清楚
 const tools = []
 toolRow.apply({ tools: { register: (t) => tools.push(t) } })
-check('工具那行挂上 preview_page、check_design、look_design、extract_design_system、handoff_design、compare_design、find_photos', tools.map((x) => x.name).join() === 'preview_page,check_design,look_design,extract_design_system,handoff_design,compare_design,find_photos' && tools[0].parameters.required.includes('target') && tools[3].parameters.required.includes('sources') && tools[5].parameters.required.includes('url'))
+check('工具那行挂上 preview_page、check_design、look_design、extract_design_system、handoff_design、compare_design、find_photos、pick_style', tools.map((x) => x.name).join() === 'preview_page,check_design,look_design,extract_design_system,handoff_design,compare_design,find_photos,pick_style' && tools[0].parameters.required.includes('target') && tools[3].parameters.required.includes('sources') && tools[5].parameters.required.includes('url'))
 const saved = studio.tracker
 studio.tracker = null
 let msg = ''
@@ -208,7 +208,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const patch = fs.readFileSync(path.join(root, 'cordis.patch.yml'), 'utf8').replace(/\r\n/g, '\n') // Windows 上签出可能是 CRLF
 const rowNames = [...patch.matchAll(/^\s+name: '?(dsh-design-studio[^'\s]*)'?$/gm)].map((m) => m[1])
 check('patch 里的几行都能从包里找到', rowNames.length >= 6 && rowNames.every((n) => n === 'dsh-design-studio' || pkg.exports['./' + n.split('/')[1]]), rowNames.join(','))
-for (const sub of ['auto', 'offline', 'tool', 'skill', 'preset']) {
+for (const sub of ['auto', 'offline', 'annotations', 'tool', 'skill', 'preset']) {
   const ok = ['zh', 'en'].every((l) => {
     const f = pkg.exports[`./${sub}/locale/*.json`]
     const meta = f && JSON.parse(fs.readFileSync(path.join(root, f.replace('*', l)), 'utf8')).meta

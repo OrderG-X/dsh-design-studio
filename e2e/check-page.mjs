@@ -292,6 +292,8 @@ try {
     process.exit(0)
   }
 
+  const flat = await run('bad.html', 'app', '0x0')
+  check('还没排版（视口 0×0）：不报「没问题」，照实说没量成', flat && flat.error === 'layout' && !flat.issues, JSON.stringify(flat))
   const bad = await run('bad.html', 'app', '390x844')
   check('坏页面：报上来了', bad && Array.isArray(bad.issues), JSON.stringify(bad))
   const issues = (bad && bad.issues) || []

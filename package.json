@@ -1,6 +1,6 @@
 {
   "name": "dsh-design-studio",
-  "version": "0.16.1",
+  "version": "0.17.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.mjs"
@@ -28,6 +28,9 @@
     "./offline": "./lib/offline.js",
     "./offline/locale/*.json": "./locale/offline/*.json",
     "./offline/icon": "./icon.svg",
+    "./annotations": "./lib/annotations-row.js",
+    "./annotations/locale/*.json": "./locale/annotations/*.json",
+    "./annotations/icon": "./icon.svg",
     "./tool": "./lib/tool.js",
     "./tool/locale/*.json": "./locale/tool/*.json",
     "./tool/icon": "./icon.svg",

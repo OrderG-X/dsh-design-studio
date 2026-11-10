@@ -56,7 +56,8 @@ check('resolveInRoot：../ 跳不出去（被夹回根目录里）', resolveInRo
 check('resolveInRoot：软链接指到外面 → 拒', resolveInRoot(site, '/leak.txt') === null)
 
 const changes = []
-const hub = createHub({ onChange: (key, file) => changes.push({ key, file }) })
+let skipAnnots = false
+const hub = createHub({ onChange: (key, file, files) => changes.push({ key, file, files }), skipAnnots: () => skipAnnots })
 
 // ── 本地文件 ──
 const a = await hub.open({ kind: 'file', root: site })
@@ -100,7 +101,38 @@ const sse = await new Promise((resolve) => {
   })
 })
 check('文件：改了 CSS → SSE 推 change', sse.includes('event: change') && sse.includes('a.css'), JSON.stringify(sse))
-const hubGot = () => changes.some((c) => c.key === 'file:' + site && c.file.endsWith('a.css'))
+// 开关关着：annotations.json 只是个普通文件，改了照旧刷新（和以前一样）
+const offSse = await new Promise((resolve) => {
+  const u = new URL(a.origin + '/__dsh_design__/events')
+  const req = http.get({ host: u.hostname, port: u.port, path: u.pathname, headers: { host: u.host } }, (res) => {
+    let buf = ''
+    res.on('data', (c) => { buf += c; if (buf.includes('annotations.json')) { resolve(buf); req.destroy() } })
+    setTimeout(() => fs.writeFileSync(path.join(site, 'annotations.json'), '[]'), 150)
+    setTimeout(() => { resolve(buf); req.destroy() }, 3000)
+  })
+})
+check('开关关着：annotations.json 改了照常推 change', offSse.includes('annotations.json'), JSON.stringify(offSse))
+fs.rmSync(path.join(site, 'annotations.json'), { force: true })
+await new Promise((r) => setTimeout(r, 400))
+skipAnnots = true
+// 业务标注开着：这个文件（和 DSH 写文件时的 .tmp）不算设计改了：页面别跟着刷新；别的文件照常推
+const anSse = await new Promise((resolve) => {
+  const u = new URL(a.origin + '/__dsh_design__/events')
+  const req = http.get({ host: u.hostname, port: u.port, path: u.pathname, headers: { host: u.host } }, (res) => {
+    let buf = ''
+    res.on('data', (c) => { buf += c; if (buf.includes('a2.css')) { resolve(buf); req.destroy() } })
+    setTimeout(() => fs.writeFileSync(path.join(site, 'annotations.json.1a2b3c.tmp'), '[]'), 150)
+    setTimeout(() => fs.renameSync(path.join(site, 'annotations.json.1a2b3c.tmp'), path.join(site, 'annotations.json')), 300)
+    setTimeout(() => fs.writeFileSync(path.join(site, 'annotations.json'), '[{}]'), 500)
+    setTimeout(() => fs.writeFileSync(path.join(site, 'css', 'a2.css'), 'h1{color:red}'), 1200)
+    setTimeout(() => { resolve(buf); req.destroy() }, 4000)
+  })
+})
+check('业务标注的文件改了不推 change，别的文件照常', anSse.includes('a2.css') && !anSse.includes('annotations.json'), JSON.stringify(anSse))
+fs.rmSync(path.join(site, 'annotations.json'), { force: true })
+fs.rmSync(path.join(site, 'css', 'a2.css'), { force: true })
+// 一批里改了几个文件时 file 只是最后一个，a.css 在 files 里也算（建测试目录的改动可能和它并成一批）
+const hubGot = () => changes.some((c) => c.key === 'file:' + site && (c.file.endsWith('a.css') || (c.files || []).some((x) => x.endsWith('a.css'))))
 for (let i = 0; i < 40 && !hubGot(); i++) await new Promise((r) => setTimeout(r, 50)) // hub 的通知可能比 SSE 晚到一点（CI 机器上见过）
 check('文件：改动也通知到 hub（让右侧栏知道）', hubGot(), JSON.stringify(changes))
 
