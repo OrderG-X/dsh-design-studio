@@ -725,6 +725,11 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
   stage('st-resp.html', 'body{margin:0}.s{width:100vw;height:100vh;background:#123}', '<div class="s"></div>')
   stage('st-stack.html', 'body{margin:0}.s{width:1440px;height:810px;background:#123}', '<div class="s"></div><div class="s"></div><div class="s"></div>')
   stage('st-decor.html', 'body{margin:0}.s{width:1280px;height:720px;background:#123}.d{position:absolute;left:1400px;top:40px;width:200px;height:200px;background:#f00}', '<div class="s"></div><div class="d"></div>')
+  // 业务标注用的页面：开服务前写好（开着时再写会触发自动刷新，慢机器上量到一半页面被换掉）
+  fs.writeFileSync(path.join(site, 'an.html'), `<!doctype html><html><head><meta charset="utf-8"><title>标注</title></head><body>
+<button id="agree">同意并继续</button><p class="row">一</p><p class="row">二</p>
+<label>我已阅读并同意<a href="#">《用户协议》</a>与<a href="#">《隐私政策》</a></label>
+<div><p>有字</p><span style="opacity:0">只在透明的子元素里</span></div><div style="opacity:0"><span>查看详情</span></div><button id="see">查看详情</button><div hidden><span>只在藏着的地方有</span></div><section><p>看得见的一段</p><div hidden><span>藏在看得见的容器里</span></div></section><section><div><b>含双人早餐</b></div></section><footer>含双人早餐</footer></body></html>`)
   const hub = createHub({ parents: () => [] })
   const entry = await hub.open({ kind: 'file', root: site })
   const screens = ['home.html', 'shell.html', 'clean.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key }))
@@ -958,10 +963,6 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     check('真浏览器：叠字找到原因——价格行的负 margin，规则在 neg.css 第 3 行', negOv && negOv.cause && negOv.cause.prop === 'margin-top' && negOv.cause.value === '-24px' && /div\.row/.test(negOv.cause.sel) && negOv.rule && negOv.rule.sel === '.row' && negOv.rule.file === 'neg.css' && negOv.rule.line === 3, JSON.stringify(negOv))
     check('真浏览器：叠字找到原因——价格是绝对定位；量出叠了多少 px', absOv && absOv.px > 0 && absOv.cause && absOv.cause.prop === 'position' && absOv.cause.value === 'absolute' && /price/.test(absOv.cause.sel), JSON.stringify(absOv))
     // 业务标注：定位（选择器、文字兜底、写错的、匹配多个、整屏说明）
-    fs.writeFileSync(path.join(site, 'an.html'), `<!doctype html><html><head><meta charset="utf-8"><title>标注</title></head><body>
-<button id="agree">同意并继续</button><p class="row">一</p><p class="row">二</p>
-<label>我已阅读并同意<a href="#">《用户协议》</a>与<a href="#">《隐私政策》</a></label>
-<div><p>有字</p><span style="opacity:0">只在透明的子元素里</span></div><div style="opacity:0"><span>查看详情</span></div><button id="see">查看详情</button><div hidden><span>只在藏着的地方有</span></div><section><p>看得见的一段</p><div hidden><span>藏在看得见的容器里</span></div></section><section><div><b>含双人早餐</b></div></section><footer>含双人早餐</footer></body></html>`)
     const anRows = await measureAll(b, { screens: [{ key: 'an.html', url: `${entry.origin}/an.html`, label: 'an' }], sizes: [[390, 844], [320, 568]], kind: 'app', annots: new Map([['an.html', [
       { id: 'sel', selector: '#agree', fallbackText: '' },
       { id: 'fall', selector: '.gone', fallbackText: '同意并继续' },
