@@ -110,6 +110,7 @@ function writeDesign() {
   })
 }
 
+const FIRST_DRAFT = path.join(path.dirname(DESIGN), 'first-draft', 'first.html')
 // ── 假模型：Anthropic Messages，SSE ──
 const llmLog = []
 function sse(res, blocks, stop) {
@@ -129,6 +130,23 @@ function sse(res, blocks, stop) {
   ev('message_delta', { delta: { stop_reason: stop, stop_sequence: null }, usage: { output_tokens: 5 } })
   ev('message_stop', {})
   res.end()
+}
+// 慢慢写一个文件：先流开头，隔一会儿再流完（文件要等工具跑了才落地）
+function slowWrite(res, file, html, holdMs) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+  const ev = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`)
+  ev('message_start', { message: { id: `msg_${Date.now()}`, type: 'message', role: 'assistant', model: 'deepseek-flash', content: [], stop_reason: null, usage: { input_tokens: 10, output_tokens: 0 } } })
+  ev('content_block_start', { index: 0, content_block: { type: 'tool_use', id: 'toolu_e2e_slow', name: 'write', input: {} } })
+  const json = JSON.stringify({ file_path: file, content: html })
+  const cut = Math.floor(json.length / 2)
+  ev('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: json.slice(0, cut) } })
+  setTimeout(() => {
+    ev('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: json.slice(cut) } })
+    ev('content_block_stop', { index: 0 })
+    ev('message_delta', { delta: { stop_reason: 'tool_use', stop_sequence: null }, usage: { output_tokens: 5 } })
+    ev('message_stop', {})
+    res.end()
+  }, holdMs)
 }
 const textOf = (m) => (typeof m.content === 'string' ? m.content : (m.content || []).map((c) => c.text || (c.type === 'tool_result' ? '[tool_result]' : '')).join(' '))
 let fixAsk = '' // 「发到对话」发出去后模型收到的那段
@@ -172,6 +190,7 @@ const llm = http.createServer((req, res) => {
       if (!(body.tools || []).some((t) => t.name === 'look_design')) return sse(res, [{ type: 'text', text: '没有 look_design。' }], 'end_turn')
       return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_look', name: 'look_design', input: { screens: ['home.html'], size: '375x667' } }], 'tool_use')
     }
+    if (said.includes('DRAFT-FIRST')) return slowWrite(res, FIRST_DRAFT, `${HEAD('第一屏')}<meta name="dsh-design" content="app"></head><body><main><h1>第一屏草稿</h1><p>${'边写边看的内容。'.repeat(80)}</p></main></body></html>`, 8000)
     if (said.includes('OPEN-DECK')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DECK, 's1.html') } }], 'tool_use')
     if (said.includes('DESIGN-OPEN')) {
       if (!(body.tools || []).some((t) => t.name === 'preview_page')) return sse(res, [{ type: 'text', text: '没有 preview_page。' }], 'end_turn')
@@ -332,6 +351,16 @@ try {
     await sleep(300)
     await enter()
   }
+
+  // ②0 第一屏边写边看：右侧栏关着，草稿一开始流就弹出来，不等文件落地
+  fs.mkdirSync(path.dirname(FIRST_DRAFT), { recursive: true })
+  const drawerShut = await page(`!document.querySelector('.ddp-stage, .ddp-home')`)
+  await say('DRAFT-FIRST 写第一屏')
+  const earlyDraft = await until(`!!document.querySelector('.ddp-stage, .ddp-home')`, 7000)
+  check('第一屏边写边看：右侧栏关着，草稿开始流就弹出来（文件还没落地）', drawerShut === true && !!earlyDraft && !fs.existsSync(FIRST_DRAFT), JSON.stringify({ drawerShut, earlyDraft, landed: fs.existsSync(FIRST_DRAFT) }))
+  await shot('draft-first')
+  for (let i = 0; i < 60 && !fs.existsSync(FIRST_DRAFT); i++) await sleep(250)
+  await sleep(2500)
 
   // ② 模型调 preview_page → 右侧栏画布三屏
   await say('DESIGN-OPEN 做一个咖啡 App')
@@ -929,8 +958,59 @@ try {
   await sleep(400)
   await rpage(`[...document.querySelectorAll('.ddp-menu button')].find((b) => b.textContent.trim().endsWith(' · 纯画面')).click()`).catch(() => {})
   const exMsg = await runtil(`(document.body.innerText.match(/(已导出|导出失败)[^\\n]*/) || [''])[0]`, 30000)
-  check('远程看：导出这一屏照样能导（沙盒里也画得出图）', /已导出/.test(exMsg || '') && pngs().length > pngBefore, `${exMsg} / ${pngs().join(',')}`)
+  check('远程看：导出这一屏照样能导（沙盒里也画得出图），纯画面文件名带 -plain', /已导出/.test(exMsg || '') && pngs().length > pngBefore && pngs().some((x) => /-plain\.png$/.test(x)), `${exMsg} / ${pngs().join(',')}`)
   await chrome.cdp('Target.closeTarget', { targetId: rt }).catch(() => {})
+
+  // ⑨y 版本面板开着：看旧版本的横幅、对比时的手机都让到面板左边，「回到这一版」点得到
+  await page(`document.querySelector('.ddp-more > .ddp-btn').click()`)
+  await sleep(250)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /版本/.test(x.textContent)).click()`)
+  const oldVer = await until(`document.querySelectorAll('.ddp-hist .ddp-ver').length >= 2`, 8000)
+  await page(`document.querySelectorAll('.ddp-hist .ddp-ver')[1].click()`)
+  await until(`!!document.querySelector('.ddp-banner .ddp-go.pri')`, 8000)
+  await sleep(400)
+  const clearOf = (sel) => `((a, p) => a && p ? a.getBoundingClientRect().right <= p.getBoundingClientRect().left + 1 : null)(document.querySelector('${sel}'), document.querySelector('.ddp-hist'))`
+  const bannerClear = await page(clearOf('.ddp-banner'))
+  const restoreHit = await page(`((b) => { const r = b.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === b })(document.querySelector('.ddp-banner .ddp-go.pri'))`)
+  await shot('banner-side')
+  await page(`document.querySelector('.ddp-banner .ddp-go.sec').click()`)
+  await until(`!!document.querySelector('.ddp-cmp')`, 8000)
+  await sleep(400)
+  const phoneClear = await page(clearOf('.ddp-fit'))
+  await shot('compare-side')
+  check('版本面板：看旧版本的横幅让到左边，「回到这一版」点得到', !!oldVer && bannerClear === true && restoreHit === true, JSON.stringify({ oldVer, bannerClear, restoreHit }))
+  check('版本面板：对比时手机也让开', phoneClear === true, JSON.stringify({ phoneClear }))
+  const canvasBtn = `[...document.querySelectorAll('.ddp-top .ddp-btn.lab')].find((x) => /画布/.test(x.textContent))`
+  await page(`${canvasBtn}.click()`)
+  await sleep(500)
+  const cmpLeft = await page(`({ cmp: !!document.querySelector('.ddp-cmp'), sel: ${canvasBtn}.classList.contains('sel'), banner: !!document.querySelector('.ddp-banner .ddp-go.pri') })`)
+  check('版本对比时点「画布」：退出对比回到画布，按钮和实际一致', cmpLeft && !cmpLeft.cmp && cmpLeft.sel && cmpLeft.banner, JSON.stringify(cmpLeft))
+  await page(`(() => { const d = document.querySelector('.ddp'); d.style.width = '480px'; d.style.flex = 'none' })()`)
+  await sleep(500)
+  const narrowVer = await page(`((b, p, go) => { const r = go.getBoundingClientRect(); return { side: b.classList.contains('side'), clear: b.getBoundingClientRect().bottom <= p.getBoundingClientRect().top + 1, hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === go } })(document.querySelector('.ddp-banner'), document.querySelector('.ddp-hist'), document.querySelector('.ddp-banner .ddp-go.pri'))`)
+  await shot('banner-narrow')
+  await page(`document.querySelector('.ddp').style.cssText = ''`)
+  await sleep(300)
+  check('版本面板：侧栏窄时横幅在面板上面，「回到这一版」点得到', narrowVer && !narrowVer.side && narrowVer.clear && narrowVer.hit, JSON.stringify(narrowVer))
+  const EN = { 首页: 'Home', 画布: 'Canvas', 外观: 'Look', 体检: 'Check', 导出: 'Export' }
+  const navFit = (w, en) => page(`(() => {
+    const d = document.querySelector('.ddp'), css = d.style.cssText
+    const lbs = [...document.querySelectorAll('.ddp-top .lb')], old = lbs.map((x) => x.textContent)
+    if (${en}) lbs.forEach((x) => { x.textContent = ${JSON.stringify(EN)}[x.textContent] || x.textContent })
+    d.style.width = '${w}px'; d.style.flex = 'none'
+    const tl = document.querySelector('.ddp-top>.tl'), tr = document.querySelector('.ddp-top>.tr')
+    const right = Math.max(...[...tl.children].map((c) => c.getBoundingClientRect().right))
+    const r = { w: ${w}, en: ${en}, gap: Math.round(tr.getBoundingClientRect().left - right) }
+    d.style.cssText = css; lbs.forEach((x, i) => { x.textContent = old[i] })
+    return r
+  })()`)
+  const navs = []
+  for (const w of [320, 380, 441, 460, 480, 500, 520, 540, 560, 600, 640]) for (const en of [false, true]) navs.push(await navFit(w, en))
+  check('窄侧栏：顶部两组按钮不互相压（中英文，320 到 640）', navs.every((x) => x.gap >= 0), JSON.stringify(navs.filter((x) => x.gap < 0)))
+  await page(`[...document.querySelectorAll('.ddp-banner .ddp-btn')].pop().click()`)
+  await sleep(200)
+  await page(`document.querySelector('.ddp-hist header .ddp-btn').click()`)
+  await sleep(300)
 
   // ⑨z 幻灯片比默认画幅大、meta 没写尺寸（issue #10）：画幅跟页面走，导出不裁。这时是单看模式，同一个组件换到别的设计目录（导出的消息要发对地址）
   fs.mkdirSync(DECK, { recursive: true })
@@ -962,6 +1042,13 @@ try {
   await sleep(3500) // 等新文件进屏列表
   await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单看').click()`)
   check('预检：切到单看，只挂着一屏', !!(await until(`document.querySelectorAll('iframe.ddp-frame.cur').length === 1`, 8000)), await page(`document.querySelectorAll('iframe.ddp-frame.cur').length`))
+  // issue #14：导航里的「画布」排在「首页」后面，单看时点一下就回画布
+  const navOrder = await page(`[...document.querySelectorAll('.ddp-isl.tl .ddp-btn.lab')].map((b) => b.textContent.trim()).join()`)
+  await page(`[...document.querySelectorAll('.ddp-isl.tl .ddp-btn')].find((b) => b.textContent.trim() === '画布').click()`)
+  const backCanvas = await until(`document.querySelectorAll('iframe.ddp-frame.cur').length >= 3 && [...document.querySelectorAll('.ddp-isl.tl .ddp-btn')].find((b) => b.textContent.trim() === '画布').classList.contains('sel')`, 8000)
+  check('导航：「画布」在「首页」后面，单看时点一下回画布', /^首页,画布/.test(navOrder) && !!backCanvas, navOrder)
+  await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单看').click()`)
+  await until(`document.querySelectorAll('iframe.ddp-frame.cur').length === 1`, 8000)
   const pdfBefore = pdfsNow().length
   await openExport('/PDF/')
   const xoOpened = await until(`((el) => el && /比画幅大/.test(el.innerText) && /链接/.test(el.innerText))(document.querySelector('.ddp-xo'))`, 30000)

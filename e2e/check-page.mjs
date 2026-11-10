@@ -141,6 +141,22 @@ fs.writeFileSync(path.join(site, 'chart.html'), head('app') + `<svg width="375" 
 const gpage = (c) => `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}</style></head><body><svg width="150" height="60" style="display:block"><defs><linearGradient id="g"><stop offset="0" stop-color="${c}"/><stop offset="1" stop-color="${c}"/></linearGradient></defs><rect width="150" height="60" fill="url(#g)"/></svg></body></html>`
 fs.writeFileSync(path.join(site, 'g1.html'), gpage('#dc2626'))
 fs.writeFileSync(path.join(site, 'g2.html'), gpage('#2563eb'))
+// 整页长图：贴底的固定栏、悬浮按钮放到整张图的底部；贴顶的留在顶上；铺满整高的、被 transform 接管的不动
+fs.writeFileSync(path.join(site, 'fixedbar.html'), head('app') + `<style>
+.hero{height:812px;background:rgb(22,163,74)}.rest{height:1200px;background:rgb(255,255,255)}
+.nav{position:fixed;left:0;right:0;top:0;height:50px;background:rgb(37,99,235)}
+.tab{position:fixed;left:0;right:0;bottom:0;height:84px;background:rgb(220,38,38)}
+.fab{position:fixed;right:16px;bottom:100px;width:56px;height:56px;background:rgb(147,51,234)}
+.side{position:fixed;left:0;top:0;bottom:0;width:20px;background:rgb(6,182,212)}
+.held{position:absolute;left:0;top:600px;width:100%;height:100px;transform:translateZ(0)}.held i{position:fixed;left:0;right:0;bottom:0;height:20px;background:rgb(249,115,22)}
+.pin{position:fixed;left:0;right:0;top:500px;height:40px;background:rgb(234,179,8)}
+</style><div class="hero"></div><div class="rest"></div><div class="nav"></div><div class="pin"></div><div class="tab"><a href="flash.html" style="display:block;width:60px;height:84px">去</a><div style="position:fixed;left:100px;top:20px;width:60px;height:20px"><a href="scrolled5.html" style="display:block;height:20px">浮</a></div></div><div class="fab"></div><div class="side"></div><div class="held"><i></i></div></body></html>`)
+// 闪改动：改的地方不在屏幕里，滚过去闪一下，闪完滚回来
+const flashPage = (word) => head('app') + `<style>.a{height:812px;background:rgb(37,99,235)}.b{height:1200px;background:rgb(255,255,255)}</style><div class="a"></div><div class="b"></div><p id="t">${word}</p><script>
+setInterval(() => parent.postMessage({ dshDesign: 1, type: '__y', y: scrollY }, '*'), 40)
+addEventListener('message', (e) => { if (e.data && e.data.__wheel) dispatchEvent(new WheelEvent('wheel')) })
+</script></body></html>`
+fs.writeFileSync(path.join(site, 'flash.html'), flashPage('第零版'))
 fs.writeFileSync(path.join(site, 'scrolled5.html'), head('app').replace('background:#fff', 'background:#fff;position:relative') + `<style>body::before{content:"";position:fixed;inset:0;background:#0f766e;z-index:-1}</style>
 <div style="height:3000px"></div>
 <iframe src="g1.html" style="position:absolute;left:0;top:700px;width:150px;height:60px;border:0"></iframe>
@@ -169,13 +185,15 @@ const harness = http.createServer((req, res) => {
     addEventListener('message', (e) => {
       if (e.origin !== origin || !e.data || e.data.dshDesign !== 1) return
       const d = e.data
-      if (d.type === 'hello') send({ type: 'init', seed: null })
+      if (d.type === 'hello') send({ type: 'init', seed: window.__seed || null })
+      else if (d.type === 'snap') window.__snap = d.seed
+      else if (d.type === '__y') { window.__y = d.y; window.__ymax = Math.max(window.__ymax || 0, d.y) }
       else if (d.type === 'ready') { if (${JSON.stringify(kind)} !== 'none') setTimeout(() => send({ type: 'check', id: 'c1', kind: ${JSON.stringify(kind)} }), 300) }
       else if (d.type === 'checked') window.__res = d
       else if (d.type === 'top') { window.__tops.push(d.dark); window.__log.push(['top', d.dark]) }
       else if (d.type === 'rollEnd') window.__log.push(['end'])
       else if (d.type === 'captured') {
-        window.__caps[d.id] = { top: d.top, ok: !!d.png, href: d.href || '', w: d.w, h: d.h }
+        window.__caps[d.id] = { top: d.top, ok: !!d.png, href: d.href || '', w: d.w, h: d.h, links: d.links }
         // 取截图上一点的颜色：__px[id](x, y) → [r, g, b]
         if (d.png) createImageBitmap(d.png).then((b) => {
           const c = document.createElement('canvas'); c.width = b.width; c.height = b.height
@@ -490,6 +508,96 @@ try {
     const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
     check('页面滚过：body::before 铺的固定背景还在', px && near(px.bg, [15, 118, 110]), JSON.stringify(px))
     check('两个内嵌页里同名的渐变各是各的颜色', px && near(px.g1, [220, 38, 38]) && near(px.g2, [37, 99, 235]), JSON.stringify(px))
+  }
+
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/fixedbar.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1500)
+    await ev("__send({ type: 'capture', id: 'f1', full: true, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) { await sleep(150); px = await ev("window.__px.f1 ? { h: __caps.f1.h, nav: __px.f1(187, 20), first: __px.f1(187, 772), last: __px.f1(187, 1972), fabUp: __px.f1(331, 670), fabDown: __px.f1(331, 1870), side: __px.f1(10, 400), held: __px.f1(187, 690), pinUp: __px.f1(187, 520), pinDown: __px.f1(187, 1720), link: (__caps.f1.links || []).find((l) => /flash/.test(l.path)) || null, floatLink: (__caps.f1.links || []).find((l) => /scrolled5/.test(l.path)) || null } : null") }
+    await ev("__send({ type: 'capture', id: 'f2', full: false, scale: 1 })")
+    let one = null
+    for (let i = 0; i < 60 && !one; i++) { await sleep(150); one = await ev("window.__px.f2 ? { bar: __px.f2(187, 790), fab: __px.f2(331, 670) } : null") }
+    await chrome.cdp('Target.closeTarget', { targetId })
+    const near = (c, rgb) => !!c && c.every((v, i) => Math.abs(v - rgb[i]) < 40)
+    check('整页长图：贴底的栏画在整张图的底部，第一屏底部不留', px && near(px.last, [220, 38, 38]) && near(px.first, [22, 163, 74]), JSON.stringify(px))
+    check('整页长图：悬浮按钮跟着到底部', px && near(px.fabDown, [147, 51, 234]) && near(px.fabUp, [22, 163, 74]), JSON.stringify(px))
+    check('整页长图：贴顶的留在顶上，铺满整高的、被 transform 接管的不动', px && near(px.nav, [37, 99, 235]) && near(px.side, [6, 182, 212]) && near(px.held, [249, 115, 22]), JSON.stringify(px))
+    check('截一屏：贴底的栏还在这一屏底部', one && near(one.bar, [220, 38, 38]) && near(one.fab, [147, 51, 234]), JSON.stringify(one))
+    check('整页长图：写了 top 的下半屏浮层留在原位', px && near(px.pinUp, [234, 179, 8]) && !near(px.pinDown, [234, 179, 8]), JSON.stringify(px))
+    check('整页长图：底栏里的跳转链接跟着栏到底部', px && px.link && Math.abs(px.link.y - 1928) <= 2 && !('barDy' in px.link), JSON.stringify(px && px.link))
+    check('整页长图：底栏里自己定位的浮层，链接不跟栏走', px && px.floatLink && Math.abs(px.floatLink.y - 20) <= 2, JSON.stringify(px && px.floatLink))
+  }
+  {
+    const url = `${harnessOrigin}/?src=${encodeURIComponent(`${entry.origin}/flash.html`)}&kind=none&size=375x812`
+    const { targetId } = await chrome.cdp('Target.createTarget', { url })
+    const { sessionId } = await chrome.cdp('Target.attachToTarget', { targetId, flatten: true })
+    const ev = async (x) => (await chrome.cdp('Runtime.evaluate', { expression: x, returnByValue: true }, sessionId)).result.value
+    await sleep(1200)
+    // 模型改了屏幕外的一处：记下指纹 → 改文件 → 带种子重载 → 换上来
+    let word = 0
+    const edit = async () => {
+      await ev("window.__snap = null; __send({ type: 'snapshot' })")
+      for (let i = 0; i < 40 && !(await ev('!!window.__snap')); i++) await sleep(50)
+      fs.writeFileSync(path.join(site, 'flash.html'), flashPage(`第${++word}版`))
+      await ev("window.__seed = window.__snap; window.__ymax = 0; f.src = f.src")
+      await sleep(900)
+      await ev("__send({ type: 'reveal' })")
+    }
+    await edit()
+    await sleep(1300)
+    const moved = await ev('window.__ymax')
+    await sleep(3400)
+    const back = await ev('window.__y')
+    check('闪改动：屏幕外的改动滚过去闪一下，闪完滚回原处', moved > 400 && back === 0, JSON.stringify({ moved, back }))
+
+    await edit()
+    await sleep(1000)
+    await ev("f.contentWindow.postMessage({ __wheel: 1 }, '*')")
+    await sleep(3600)
+    const stay = await ev('window.__y')
+    check('闪改动：用户自己动过页面，就不滚回去', stay > 400, JSON.stringify({ stay }))
+    await ev("f.contentWindow.postMessage({ __wheel: 0 }, '*')")
+
+    await ev('window.__seed = null; f.src = f.src')
+    await sleep(900)
+    await edit()
+    await sleep(1000)
+    await ev("__send({ type: 'checkFocus', i: 99 })")
+    await sleep(3000)
+    const focusStay = await ev('window.__y')
+    check('闪改动：用户从体检面板点了定位，就不滚回去', focusStay > 400, JSON.stringify({ focusStay }))
+
+    await ev('window.__seed = null; f.src = f.src')
+    await sleep(900)
+    await edit()
+    await sleep(3450) // 正在滚回去
+    await ev("__send({ type: 'holdScroll' })")
+    await sleep(120)
+    const held1 = await ev('window.__y')
+    await sleep(1000)
+    const held2 = await ev('window.__y')
+    check('闪改动：打开画笔标注时停在当前位置，不再滚回去', held1 > 0 && held1 === held2, JSON.stringify({ held1, held2 }))
+
+    await ev('window.__seed = null; f.src = f.src')
+    await sleep(900)
+    await edit()
+    await sleep(1000)
+    await ev("window.__px.f3 = null; __send({ type: 'capture', id: 'f3', full: false, scale: 1 })")
+    let px = null
+    for (let i = 0; i < 60 && !px; i++) { await sleep(150); px = await ev("window.__px.f3 ? { top: __px.f3(187, 20), y: window.__y } : null") }
+    check('闪改动：闪的途中导出，截的还是原来的位置', px && px.top.every((v, i) => Math.abs(v - [37, 99, 235][i]) < 40), JSON.stringify(px))
+    await edit()
+    await sleep(3390) // 闪完刚开始平滑滚回去
+    await ev("window.__px.f4 = null; __send({ type: 'capture', id: 'f4', full: false, scale: 1 })")
+    let mid = null
+    for (let i = 0; i < 60 && !mid; i++) { await sleep(150); mid = await ev("window.__px.f4 ? { top: __px.f4(187, 20), y: window.__y } : null") }
+    await chrome.cdp('Target.closeTarget', { targetId })
+    check('闪改动：滚回去的路上导出，截的也是原来的位置', mid && mid.top.every((v, i) => Math.abs(v - [37, 99, 235][i]) < 40), JSON.stringify(mid))
   }
 
   const dark = await run('dark.html', 'web', '1280x800')

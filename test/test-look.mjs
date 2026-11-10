@@ -86,8 +86,37 @@ check('问题细节：缺样式表', /样式表 a\.css 载不出来/.test(detail
     { key: 'home.html', w: 390, h: 844, issues: [], metrics: m(844) },
     { key: 'home.html', w: 375, h: 667, issues: [{ type: 'tight', sel: 'li:last-child', text: '最后一本', edge: 'bottom', bar: 'nav', px: 4 }], metrics: m(744) },
   ], { sizes: [[390, 844], [375, 667]], prev })
-  check('复查：比上次修好 3 个（两种尺寸的点击区 + 压住），新出 1 个，新的标「新」', again.includes('比上次（同样的屏和尺寸）：修好 3 个，新出 1 个') && /\[新\] \[375×667\] 离固定栏太近/.test(again), again)
+  check('复查：比上次修好 2 个（点击区两种尺寸算一个 + 压住），新出 1 个，新的标「新」', again.includes('比上次（同样的屏和尺寸）：修好 2 个，新出 1 个') && /\[新\] \[375×667\] 离固定栏太近/.test(again), again)
   check('复查：第一次量没有「比上次」', !text.includes('比上次'), text)
+  const partly = formatMeasure([
+    { key: 'home.html', w: 390, h: 844, issues: [], metrics: m(844) },
+    { key: 'home.html', w: 375, h: 667, issues: [rows[1].issues[0]], metrics: m(744) },
+  ], { sizes: [[390, 844], [375, 667]], prev })
+  check('复查：只在一种尺寸上修了、另一种还在，不算修好', partly.includes('修好 1 个') && !partly.includes('修好 2 个'), partly)
+  const only375 = issueSnapshot([
+    { key: 'home.html', w: 390, h: 844, issues: [], metrics: m(844) },
+    { key: 'home.html', w: 375, h: 667, issues: [rows[1].issues[0]], metrics: m(744) },
+  ])
+  const jumped = formatMeasure([
+    { key: 'home.html', w: 390, h: 844, issues: [rows[1].issues[0]], metrics: m(844) },
+    { key: 'home.html', w: 375, h: 667, issues: [], metrics: m(744) },
+  ], { sizes: [[390, 844], [375, 667]], prev: only375 })
+  check('复查：问题换了个尺寸出现，还在，不算修好也不算新出', jumped.includes('修好 0 个，新出 0 个'), jumped)
+  const inBoth = issueSnapshot([
+    { key: 'home.html', w: 390, h: 844, issues: [rows[1].issues[0]], metrics: m(844) },
+    { key: 'home.html', w: 375, h: 667, issues: [rows[1].issues[0]], metrics: m(744) },
+  ])
+  const timedOut = formatMeasure([
+    { key: 'home.html', w: 390, h: 844, issues: [], metrics: m(844) },
+    { key: 'home.html', w: 375, h: 667, issues: [], error: 'timeout' },
+  ], { sizes: [[390, 844], [375, 667]], prev: inBoth })
+  check('复查：另一种尺寸这次没量成，不算修好', timedOut.includes('修好 0 个'), timedOut)
+  const lap = (sel, text) => ({ type: 'overlap', sel, text, other: 'x', cause: { sel: '.t', prop: 'line-height' } })
+  const merged = [{ key: 'home.html', w: 390, h: 844, issues: [lap('.a', '甲'), lap('.b', '乙')], metrics: m(844) }]
+  const clean = formatMeasure([{ key: 'home.html', w: 390, h: 844, issues: [], metrics: m(844) }], { sizes: [[390, 844]], prev: issueSnapshot(merged) })
+  check('复查：同一个原因并成一条的，修好也只算一个', clean.includes('修好 1 个'), clean)
+  const halfDone = formatMeasure([{ key: 'home.html', w: 390, h: 844, issues: [lap('.b', '乙')], metrics: m(844) }], { sizes: [[390, 844]], prev: issueSnapshot(merged) })
+  check('复查：同一个原因只修掉一处、另一处还在，不算修好也不算新出', halfDone.includes('修好 0 个，新出 0 个'), halfDone)
 }
 {
   // 体检附图：挑严重的、有元素的；先每屏每类一条、同类里最重的；同一个问题几种尺寸只截第一种；同一个元素只截一次
@@ -167,6 +196,7 @@ function fakeLaunch(log, evalOf) {
         case 'Page.navigate': r({ frameId: 'F' }); return setTimeout(() => out.write(`${JSON.stringify({ method: 'Page.loadEventFired', sessionId: 'S1', params: {} })}\0`), 5)
         case 'Runtime.evaluate': return r({ result: { value: evalOf(msg.params.expression) } })
         case 'Page.captureScreenshot': return r({ data: Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64') })
+        case 'Browser.close': if (!log.stuck) setTimeout(() => proc.emit('exit', 0), 1); return r({})
         default: return r({})
       }
     }
@@ -185,7 +215,7 @@ function fakeLaunch(log, evalOf) {
     }), out]
     proc.args = args
     proc.pid = 1
-    proc.kill = () => setTimeout(() => proc.emit('exit', 0), 1)
+    proc.kill = (sig) => { log.killed = sig; setTimeout(() => proc.emit('exit', 0), 1) }
     log.args = args
     return proc
   }
@@ -232,6 +262,37 @@ const pageEval = (opts = {}) => (expr) => {
   check('CDP：用完关掉页面', !!m('Target.closeTarget'))
   await new Promise((r) => setTimeout(r, 80))
   check('闲置一会儿浏览器自己关', b.running() === false)
+  check('关浏览器：先让它自己关（Browser.close），不强杀', !!m('Browser.close') && !log.killed)
+}
+{
+  // 浏览器不肯自己退：到点强杀；关的途中新来的等它退了再开，不往快关掉的浏览器发命令
+  const stuckLog = []
+  stuckLog.stuck = true
+  let opened = 0
+  const stuckInner = fakeLaunch(stuckLog, pageEval())
+  const sb = createBrowser({ bin: '/fake/chrome', platform: 'fake', launch: (...a) => { opened++; return stuckInner(...a) }, idleMs: 10 })
+  await sb.withPage({ url: 'http://127.0.0.1:9/a.html', w: 100, h: 100 }, async () => 'x')
+  await new Promise((r) => setTimeout(r, 60))
+  const closingNow = sb.running()
+  const during = await sb.withPage({ url: 'http://127.0.0.1:9/b.html', w: 100, h: 100 }, async () => 'ran')
+  check('关浏览器：不肯自己退的到点强杀；关的途中新来的等它退了再开一个', closingNow === true && stuckLog.killed === 'SIGKILL' && during === 'ran' && opened === 2, JSON.stringify({ closingNow, killed: stuckLog.killed, during, opened }))
+  stuckLog.stuck = false
+  sb.destroy()
+  const winLog = []
+  const winInner = fakeLaunch(winLog, pageEval())
+  let winOpened = 0
+  const wb = createBrowser({ bin: '/fake/chrome', platform: 'win32', idleMs: 10, launch: (...a) => {
+    winOpened++
+    const p = winInner(...a)
+    p.kill = () => { winLog.killed = true; setTimeout(() => p.emit('exit', 0), 150) }
+    return p
+  } })
+  await wb.withPage({ url: 'http://127.0.0.1:9/a.html', w: 100, h: 100 }, async () => 'x')
+  await new Promise((r) => setTimeout(r, 60))
+  const winDuring = await wb.withPage({ url: 'http://127.0.0.1:9/b.html', w: 100, h: 100 }, async () => 'ran').catch((e) => e.message)
+  check('关浏览器（Windows）：taskkill 还没杀完时来的新任务，等旧的退了再开一个', winDuring === 'ran' && winOpened === 2, JSON.stringify({ winDuring, winOpened }))
+  wb.destroy()
+  await new Promise((r) => setTimeout(r, 20))
 }
 {
   // 插件停用：三个页面开着、第四个在排队 → 关掉以后排队的失败，不会再开一个浏览器

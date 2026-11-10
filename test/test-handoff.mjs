@@ -230,6 +230,7 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   const htmlByKey = new Map(['home.html', 'menu.html'].map((k) => [k, fs.readFileSync(path.join(design, k), 'utf8')]))
   const dest = path.join(tmp, 'shop-app')
   const md = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest, project: detectProject(dest), system: 'Lumen', htmlByKey, now: new Date('2026-10-30T10:00:00Z') })
+  check('交接说明：生成时间是本机时间，写明时区', /生成时间：\d{4}-\d\d-\d\d \d\d:\d\d（UTC[+-]\d{1,2}(:\d\d)?）/.test(md), md.split('\n').find((x) => x.includes('生成时间')))
   check('交接说明：标题、设计目录、新建项目的命令', md.startsWith('# 交接：shop → React + Vite') && md.includes(`\`${design}\``) && md.includes('npm create vite@latest shop-app -- --template react-ts'))
   check('交接说明：屏和路由表，跳到的屏，没有的那屏标出来', /\| 首页 \| home\.html \| `\/` \| home-1\.jpg、home-mobile\.jpg \| menu \|/.test(md) && /\| 菜单 \| menu\.html \| `\/menu` \|.*cart\.html（没有这一屏）/.test(md), md)
   check('交接说明：设计系统、设计变量（颜色列出来）', md.includes('设计系统：Lumen') && md.includes('`--color-primary: #1f3d2b`') && md.includes('`app.css`'))
