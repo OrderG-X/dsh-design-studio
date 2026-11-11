@@ -15,6 +15,7 @@ import { createLibrary, sha256 } from '../lib/works.js'
 import { createInspiration } from '../lib/inspire.js'
 import { describeWork, createLibraryRoutes, shareHashOf } from '../lib/gallery/routes.js'
 import { listScreens } from '../lib/core.js'
+import { GhError } from '../lib/gallery/submit.js'
 
 let pass = 0
 let fail = 0
@@ -808,6 +809,28 @@ check('作品库：重新定位后信任记号跟着走', library.get(path.join(
   const z1 = await call({})
   check('普通导出 zip：不带指纹', z1.body.ok && !('shareHash' in zipMan(z1.body.path)))
   check('分享：没有 Chrome 就跳过体检，标一句（机器人那边还会查）', sh1.body.flags.some((f) => f.code === 'noRender'))
+  {
+    // 一键投稿：投的是这次查过的包；同一套内容重新打包指纹不变；zip 投之前被改过就不认
+    const got = []
+    const r = createLibraryRoutes({
+      admit: () => true, readBody: async (req) => req.body, json: (res, code, obj) => { res.code = code; res.body = obj },
+      tracker: { snapshot: () => null, cwdOf: () => '' }, library, inspiration: null, studio: {}, open: () => {}, storeLoad: () => ({}), version: '0.11.0', exported: new Set(), downloads: dl,
+      github: { status: () => ({}), submit: async (o) => { got.push(o); if (o.as === 'Alice') throw new GhError('who', 'Bob'); return { url: 'https://github.com/x/y/issues/1', number: 1, login: 'a', fork: '' } } },
+    })
+    const pk = async () => { const res = {}; await r.pack({ method: 'POST', body: { dir: r1.dir, share: true, title: '晨光三店', agree } }, res); return res.body }
+    const sub = async (p, login) => { const res = {}; await r.submit({ method: 'POST', body: { path: p, ...(login ? { login } : {}) } }, res); return res }
+    const a = await pk()
+    await new Promise((ok) => setTimeout(ok, 1100)) // zip 里的时间换一秒
+    const b = await pk()
+    const sa = await sub(a.path)
+    const sb = await sub(b.path)
+    check('一键投稿：投这次查过的包，带内容指纹（重新打包也一样），不带 zip 指纹', sa.code === 200 && sb.code === 200 && got.length === 2 && /^[0-9a-f]{64}$/.test(got[0].pack) && got[0].pack === got[1].pack && !('zipSha' in got[0]) && Buffer.isBuffer(got[0].zip) && got[0].ref === a.share.ref && a.share.license === 'CC0-1.0' && got[0].license === 'CC0-1.0', JSON.stringify(got.map((g) => ({ ...g, zip: g.zip && g.zip.length }))))
+    const sw = await sub(a.path, 'Alice')
+    check('一键投稿：面板的账号带给后端；对不上回 409 和现在的账号', got[2] && got[2].as === 'Alice' && sw.code === 409 && sw.body.error === 'who' && sw.body.msg === 'Bob', JSON.stringify(sw))
+    fs.appendFileSync(b.path, 'x')
+    const sc = await sub(b.path)
+    check('一键投稿：zip 打好后被改过，不投（回去重新查）', sc.code === 404 && sc.body.error === 'notShared' && got.length === 3)
+  }
   {
     const seen = []
     const mkRoutes = (hard, boom, errors = [], qrLike = []) => createLibraryRoutes({
