@@ -3,7 +3,8 @@
  *   node test/test-bundle-cache.mjs
  *
  * 一屏打包好、文件没改过 → 直接复用上次那份并带上 ETag；带 If-None-Match 回来 → 304，body 一个字节都不传；
- * 改了这一屏用到的文件 → 换 ETag 重新打包；改目录里别的文件 → 仍然 304；坏 key / 缺屏照旧报错。
+ * 改了这一屏用到的文件 → 重新打包；改目录里别的文件 → 仍然 304；坏 key / 缺屏照旧报错。
+ * 另外管两种「印记看不出来」的情况：fresh=1 必须真的重取；刚写过的文件不进缓存。
  * 目录里没改过的东西全在临时目录里（HOME 也指过去），不碰真实的 ~/.dsh 和设计目录。
  */
 import fs from 'node:fs'
@@ -24,11 +25,18 @@ const design = fs.mkdtempSync(path.join(os.tmpdir(), 'dsp-cache-design-'))
 process.env.HOME = home
 process.env.USERPROFILE = home
 
-const store = path.join(home, '.dsh', 'cache', 'dsh-design-studio.json')
-fs.writeFileSync(path.join(design, 'tokens.css'), ':root{--brand:#c8763e}\n')
-fs.writeFileSync(path.join(design, 'app.css'), 'body{margin:0}\n')
-fs.writeFileSync(path.join(design, 'a.html'), '<!doctype html><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="app.css"><h1>A</h1><a href="b.html">go</a>')
-fs.writeFileSync(path.join(design, 'b.html'), '<!doctype html><link rel="stylesheet" href="tokens.css"><h1>B</h1><a href="a.html">back</a>')
+// 审计到的「刚写过就不进缓存」是按 mtime 算的（2 秒内）：夹具先把时间调旧，否则第一次打包都不进缓存
+const OLD = new Date(Date.now() - 30000)
+const writeOld = (name, text) => {
+  const f = path.join(design, name)
+  fs.writeFileSync(f, text)
+  fs.utimesSync(f, OLD, OLD)
+  return f
+}
+writeOld('tokens.css', ':root{--brand:#c8763e}\n')
+writeOld('app.css', 'body{margin:0}\n')
+writeOld('a.html', '<!doctype html><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="app.css"><h1>A</h1><a href="b.html">go</a>')
+writeOld('b.html', '<!doctype html><link rel="stylesheet" href="tokens.css"><h1>B</h1><a href="a.html">back</a>')
 
 const routes = new Map()
 const disposers = []
@@ -67,6 +75,7 @@ function call(url, headers = {}) {
 
 const url = (key, extra = '') => `http://127.0.0.1:3080/dsh-design-studio/api/bundle?session=t&key=${encodeURIComponent(key)}&v=0${extra}`
 const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12)
+const htmlOf = (r) => { try { return JSON.parse(r.body).html || '' } catch { return '' } }
 
 await tracker.setTarget('t', { kind: 'file', file: path.join(design, 'a.html'), root: design }, { source: 'user', popup: false })
 
@@ -83,22 +92,41 @@ check('同一屏再要一次：直接复用上次那份（同内容）', again.s
 const revalidated = await call(url('a.html'), { 'if-none-match': first.headers.ETag })
 check('带 If-None-Match：304 且不传 body', revalidated.status === 304 && revalidated.body === '', `${revalidated.status} ${revalidated.body.length}`)
 const stale = await call(url('a.html'), { 'if-none-match': 'W/"something-else"' })
-check('ETag 对不上：照常 200 给内容', stale.status === 200 && JSON.parse(stale.body).html.length > 0)
+check('ETag 对不上：照常 200 给内容', stale.status === 200 && htmlOf(stale).length > 0)
 
-fs.writeFileSync(path.join(design, 'notes.txt'), 'x')
+writeOld('notes.txt', 'x')
 const unrelated = await call(url('a.html'), { 'if-none-match': first.headers.ETag })
 check('目录里改了用不到的文件：仍然 304', unrelated.status === 304, String(unrelated.status))
 fs.rmSync(path.join(design, 'notes.txt'))
 
-const before = fs.readFileSync(path.join(design, 'tokens.css'))
-fs.writeFileSync(path.join(design, 'tokens.css'), ':root{--brand:#1f6feb}\n')
-const depChanged = await call(url('a.html'), { 'if-none-match': first.headers.ETag })
-check('改了这一屏用到的 CSS：换 ETag 重新打包', depChanged.status === 200 && depChanged.headers.ETag !== first.headers.ETag)
-check('新内容确实进去了', depChanged.body.includes('#1f6feb') || depChanged.body.includes('#1F6FEB'))
-fs.writeFileSync(path.join(design, 'tokens.css'), before)
+// 改这一屏用到的 CSS，刚写完 → 重新打包，但不进缓存（响应没有 ETag）
+const tokensFile = path.join(design, 'tokens.css')
+fs.writeFileSync(tokensFile, ':root{--brand:#1f6feb}\n')
+const justWritten = await call(url('a.html'), { 'if-none-match': first.headers.ETag })
+check('刚改过的依赖：重新打包且这次不进缓存（没有 ETag）', justWritten.status === 200 && !justWritten.headers.ETag, `${justWritten.status} ${justWritten.headers.ETag}`)
+check('新内容确实进去了', htmlOf(justWritten).includes('#1f6feb') || htmlOf(justWritten).includes('#1F6FEB'))
+// 时间调旧（模拟「已经稳定下来」）→ 又能进缓存，且内容还是新的
+fs.utimesSync(tokensFile, OLD, OLD)
+const settled = await call(url('a.html'))
+check('文件稳定下来后重新进缓存（有 ETag，内容仍是新的）', settled.status === 200 && !!settled.headers.ETag
+  && (htmlOf(settled).includes('#1f6feb') || htmlOf(settled).includes('#1F6FEB')))
 
-const restored = await call(url('a.html'))
-check('改回去：内容与最初一致', restored.status === 200 && sha(JSON.parse(restored.body).html) === sha(payload.html))
+// 同 mtime 同大小改写（粗精度盘上的真实情形）：不带 fresh 会一直给旧的那份，带 fresh 必须换出来
+const before = fs.readFileSync(tokensFile)
+const st = fs.statSync(tokensFile)
+fs.writeFileSync(tokensFile, before.toString('utf8').replace('#1f6feb', '#c8763e'))
+fs.utimesSync(tokensFile, st.atime, st.mtime)                      // 把 mtime 原样按回去，印记不变
+const sameStamp = fs.statSync(tokensFile)
+check('夹具确实构造出「内容变了、印记没变」', sameStamp.size === st.size && Math.round(sameStamp.mtimeMs) === Math.round(st.mtimeMs))
+const blind = await call(url('a.html'), { 'if-none-match': settled.headers.ETag })
+check('印记没变时，普通请求还以为是最新的（这正是要 fresh 的原因）', blind.status === 304, String(blind.status))
+const forced = await call(url('a.html', '&fresh=1'), { 'if-none-match': settled.headers.ETag })
+check('fresh=1：跳过缓存、重新打包，换出新内容', forced.status === 200
+  && (htmlOf(forced).includes('#c8763e') || htmlOf(forced).includes('#C8763E')), String(forced.status))
+const afterFresh = await call(url('a.html'), { 'if-none-match': forced.headers.ETag })
+check('fresh 那次把缓存更新了：下一次普通请求就是新内容', afterFresh.status === 304, String(afterFresh.status))
+const afterFreshBody = await call(url('a.html'))
+check('缓存里确实是新内容', htmlOf(afterFreshBody).includes('#c8763e') || htmlOf(afterFreshBody).includes('#C8763E'))
 
 const other = await call(url('b.html'))
 const otherAgain = await call(url('b.html'), { 'if-none-match': other.headers.ETag })
@@ -112,7 +140,6 @@ check('没有这一屏：404', missing.status === 404, String(missing.status))
 for (const d of disposers) { try { d() } catch { /* 关预览服务器 */ } }
 try { fs.rmSync(home, { recursive: true, force: true }) } catch { /* 临时目录，删不掉也无所谓 */ }
 try { fs.rmSync(design, { recursive: true, force: true }) } catch { /* 同上 */ }
-try { if (fs.existsSync(store)) fs.rmSync(store) } catch { /* 已经随 home 删掉 */ }
 
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)
