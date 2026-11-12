@@ -40,7 +40,7 @@ function run(cmd, argv, opts = {}) {
 // Windows 上 kill() 只结束进程本身，DSH 和 Chrome 的子进程要连根拔掉，不然临时目录删不掉
 function stop(p, signal) {
   if (!p || p.exitCode !== null) return
-  try { WIN ? spawnSync('taskkill', ['/pid', String(p.pid), '/T', '/F']) : p.kill(signal) } catch {}
+  try { WIN ? spawnSync('taskkill', ['/pid', String(p.pid), '/T', '/F'], { timeout: 30_000 }) : p.kill(signal) } catch {}
 }
 function finish() {
   stop(server, 'SIGTERM')
@@ -107,6 +107,40 @@ dshVersion = JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8
 const dsh = (argv, opts) => run(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), ...argv], opts)
 console.log(`DSH ${dshVersion}（${dshSpec}）`)
 
+// 启动 Web 版：proc 是进程，url 等它打印地址（没起来是 null），log() 是到现在为止的输出
+function startWeb() {
+  let text = ''
+  let proc = null
+  const url = new Promise((resolve) => {
+    proc = spawn(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), 'web', '--no-open', '--port', '0', '--host', '127.0.0.1'], { env, cwd: tmp, stdio: ['ignore', 'pipe', 'pipe'] })
+    const on = (d) => { text += d; const m = /dsh web: (http:\/\/\S+)/.exec(text); if (m) resolve(m[1]) }
+    proc.stdout.on('data', on)
+    proc.stderr.on('data', on)
+    proc.on('exit', () => resolve(null))
+    setTimeout(() => resolve(null), 180_000)
+  })
+  return { proc, url, log: () => text }
+}
+const startupErrors = (text) => text.split(/\n(?=\S)/).filter((b) => /did not activate|incompatible|Error/i.test(b)).map((b) => b.trim())
+// 没启动的条目单独一段：「image-offload (@deepseek-ai/dsh-compaction-image-offload): Error: …」，按开头的「名字 (包名):」认
+const entryOf = (b) => (/^(\S+ \([^()\s]+\)):/.exec(b) || [])[1] || null
+
+// 1b. 先不装插件起一次，记下 DSH 自己启动就有的报错：后面只有「装上插件后多出来的」才算插件的事
+// 起不来就再试一次；还不行就算检查失败（没有基线就看不出插件挤掉了 DSH 自带的哪部分，不能当兼容通过）
+let baseline = null
+for (let attempt = 1; attempt <= 2 && !baseline; attempt++) {
+  const bare = startWeb()
+  if (await bare.url) {
+    await new Promise((r) => setTimeout(r, 3000))
+    baseline = new Set(startupErrors(bare.log()).map(entryOf).filter(Boolean))
+  } else if (attempt === 2) {
+    problems.push(`不装插件时 Web 版两次都没起来，没法和装插件后比对启动报错\n\n${bare.log().slice(-2000)}`)
+  }
+  const exited = new Promise((r) => (bare.proc.exitCode !== null ? r() : bare.proc.once('exit', r)))
+  stop(bare.proc, 'SIGTERM')
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 15_000))])
+}
+
 // 2. 用 DSH 自己的插件安装把 tgz 装进 web 配置（版本不兼容时这里就会被拒）
 const add = dsh(['plugin', '--profile', 'web', 'add', tgz], { cwd: tmp })
 const profile = path.join(env.DSH_HOME, 'profiles', 'web')
@@ -148,21 +182,23 @@ console.log(`已安装 ${pkgName}`)
   if (gone.length) problems.push(`配置里引用的 DSH 插件在 ${dshVersion} 里没有了：${gone.join('、')}（引用它们的那一组会整个起不来）`)
 }
 
-// 3. 启动 Web 版，等它打印地址；启动日志里「did not activate」提到我们就算失败
-let log = ''
-const url = await new Promise((resolve) => {
-  server = spawn(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), 'web', '--no-open', '--port', '0', '--host', '127.0.0.1'], { env, cwd: tmp, stdio: ['ignore', 'pipe', 'pipe'] })
-  const on = (d) => { log += d; const m = /dsh web: (http:\/\/\S+)/.exec(log); if (m) resolve(m[1]) }
-  server.stdout.on('data', on)
-  server.stderr.on('data', on)
-  server.on('exit', (c) => resolve(null))
-  setTimeout(() => resolve(null), 180_000)
-})
+// 3. 启动 Web 版，等它打印地址；启动日志里「did not activate」提到我们就算失败。
+//    没提我们、但比不装插件时多了没启动的部分，也算失败：多半是插件挤掉了 DSH 自带的部分（比如抢注同名的东西，桥 #4）
+const web = startWeb()
+server = web.proc
+const url = await web.url
+const log = web.log()
 if (!url) { problems.push(`Web 版没起来\n\n${log.slice(-3000)}`); finish() }
 await new Promise((r) => setTimeout(r, 3000))
 const mentions = (s) => s.includes(pkgName) || s.includes(pkgName.replace(/^@[^/]+\//, ''))
-const failed = log.split(/\n(?=\S)/).filter((b) => /did not activate|incompatible|Error/i.test(b))
-for (const b of failed) (mentions(b) ? problems : notes).push(`启动日志：${b.trim().slice(0, 1500)}`)
+const failed = startupErrors(web.log())
+// 不装插件时好好的条目、装上后报错了：多半是被插件挤掉的（比如抢先注册了它要注册的东西）
+const extra = baseline ? failed.filter((b) => !mentions(b) && entryOf(b) && !baseline.has(entryOf(b))) : []
+for (const b of failed) {
+  if (mentions(b)) problems.push(`启动日志：${b.slice(0, 1500)}`)
+  else if (extra.includes(b)) problems.push(`装上插件后 DSH 自带的部分没启动（不装插件时没有这条）：${b.slice(0, 1500)}`)
+  else notes.push(`启动日志：${b.slice(0, 1500)}`)
+}
 
 // 4. 无头 Chrome 打开一次：我们的前端模块要被加载（200），而且不能有未捕获的异常
 const chromeBin = process.env.CHROME_BIN || [
