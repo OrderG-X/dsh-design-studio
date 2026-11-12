@@ -84,11 +84,40 @@ jobs:
         with:
           name: package
           path: .pkg
+      # Windows 上现装 DSH（1.4 GB、9 万多个文件）要十几分钟：关掉实时扫描，再按「系统 + 实际装到的版本」缓存装好的 DSH 命令行。
+      # DSH 出新版 → 版本号变了 → 缓存不中、现装新版；脚本自己也会核对版本，对不上就重装。插件本身每次现装。
+      - name: Turn off Defender real-time scan
+        if: runner.os == 'Windows'
+        shell: pwsh
+        continue-on-error: true
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: Resolve DSH version
+        id: dsh
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          V=$(npm view "@deepseek-ai/dsh@${{ matrix.dsh }}" version --registry=https://registry.npmjs.org/ | tail -1 | tr -d "'\r") || V=
+          echo "DSH ${{ matrix.dsh }} = ${V:-（没查到，不用缓存）}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - name: Restore DSH from cache
+        id: cache
+        if: steps.dsh.outputs.version
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/dsh-cli
+          key: dsh-cli-${{ runner.os }}-${{ runner.arch }}-node24-${{ steps.dsh.outputs.version }}
       # plugin.env 的 PLATFORMS 之外的系统只作参考：失败会在摘要里标出来，但不让整次检查变红
       - name: Install and boot in a fresh DSH
         shell: bash
         continue-on-error: ${{ !contains(env.PLATFORMS, runner.os) }}
-        run: node .github/dsh-compat.mjs .pkg/*.tgz --dsh ${{ matrix.dsh }}
+        run: node .github/dsh-compat.mjs .pkg/*.tgz --dsh ${{ matrix.dsh }} ${{ steps.dsh.outputs.version && '--cli-dir "$RUNNER_TEMP/dsh-cli"' || '' }}
+      # 插件没过也存：DSH 本身装好了就值得留着
+      - name: Save DSH to cache
+        if: ${{ !cancelled() && steps.dsh.outputs.version && steps.cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/dsh-cli
+          key: dsh-cli-${{ runner.os }}-${{ runner.arch }}-node24-${{ steps.dsh.outputs.version }}
 
   e2e:
     needs: test
@@ -107,6 +136,12 @@ jobs:
       - name: Load plugin settings
         shell: bash
         run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
+      # 端到端里也要现装 DSH：Windows 上关掉实时扫描能快不少
+      - name: Turn off Defender real-time scan
+        if: runner.os == 'Windows'
+        shell: pwsh
+        continue-on-error: true
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - name: End-to-end on a real machine
         shell: bash
         continue-on-error: ${{ !contains(env.PLATFORMS, runner.os) }}

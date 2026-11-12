@@ -2,9 +2,11 @@
 // DSH 兼容检查：在一个全新的临时 DSH 里装上这个插件，启动 Web 版，用无头 Chrome 打开一次，
 // 看三件事：DSH 肯不肯装（版本范围）、后端有没有启动起来、前端有没有报错。
 //
-//   node .github/dsh-compat.mjs <plugin.tgz> [--dsh latest|next|<version>] [--keep]
+//   node .github/dsh-compat.mjs <plugin.tgz> [--dsh latest|next|<version>] [--cli-dir <目录>] [--keep]
 //
 // 只碰临时目录：DSH_HOME 和 HOME 都指到 mkdtemp 出来的地方，不会读写真实的 ~/.dsh。
+// --cli-dir：DSH 命令行装在这个目录、留着下次用（CI 在 Windows 上缓存它：DSH 有 1.4 GB、9 万多个文件，现装要十几分钟）。
+//   每次都先问 npm 这个标签现在是哪个版本，和目录里装的对不上就重装，所以 DSH 出了新版照样测新版。插件本身每次现装。
 // 本模板在 dsh-plugins/_ci/，用 _ci/sync.sh 同步进五个仓库；改这里，别改仓库里的副本。
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -15,13 +17,14 @@ const args = process.argv.slice(2)
 const flag = (k, d) => { const i = args.indexOf(k); return i < 0 ? d : args.splice(i, 2)[1] }
 const keep = args.includes('--keep') && args.splice(args.indexOf('--keep'), 1)
 const dshSpec = flag('--dsh', 'latest')
+const cliOpt = flag('--cli-dir', '')
 const tgz = path.resolve(args[0] || '')
 if (!args[0] || !fs.existsSync(tgz)) { console.error('用法: node dsh-compat.mjs <plugin.tgz> [--dsh latest|next|<版本>]'); process.exit(2) }
 
 const REGISTRY = 'https://registry.npmjs.org/'
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-compat-')))
 const env = { ...process.env, DSH_HOME: path.join(tmp, 'dsh-home'), HOME: path.join(tmp, 'home'), npm_config_registry: REGISTRY }
-for (const d of [env.DSH_HOME, env.HOME, path.join(tmp, 'cli')]) fs.mkdirSync(d, { recursive: true })
+for (const d of [env.DSH_HOME, env.HOME]) fs.mkdirSync(d, { recursive: true })
 
 const problems = []
 const notes = []
@@ -32,7 +35,7 @@ let chrome = null
 
 function run(cmd, argv, opts = {}) {
   const r = spawnSync(cmd, argv, { env, encoding: 'utf8', maxBuffer: 64 << 20, ...opts })
-  return { code: r.status, out: (r.stdout || '') + (r.stderr || '') }
+  return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), stdout: r.stdout || '' }
 }
 // Windows 上 kill() 只结束进程本身，DSH 和 Chrome 的子进程要连根拔掉，不然临时目录删不掉
 function stop(p, signal) {
@@ -59,13 +62,47 @@ let dshVersion = ''
 let pkgName = ''
 
 // 1. 装指定版本的 DSH 命令行，外加它装插件要用的 pnpm（GitHub 的机器上默认没有）
-fs.writeFileSync(path.join(tmp, 'cli', 'package.json'), '{"private":true}')
 const npm = WIN ? 'npm.cmd' : 'npm'
-const inst = run(npm, ['i', `@deepseek-ai/dsh@${dshSpec}`, 'pnpm@11', `--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error'], { cwd: path.join(tmp, 'cli'), shell: WIN })
+const npmFlags = [`--registry=${REGISTRY}`, '--no-audit', '--no-fund', '--loglevel=error']
+const installCli = (dir) => {
+  fs.rmSync(dir, { recursive: true, force: true })
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}')
+  return run(npm, ['i', `@deepseek-ai/dsh@${dshSpec}`, 'pnpm@11', ...npmFlags], { cwd: dir, shell: WIN })
+}
+let cliRoot = path.join(tmp, 'cli')
+let inst
+if (cliOpt) {
+  // 这个标签现在指哪个版本（每次现问，DSH 出新版就对不上、重装）；装好的目录里记着装的是哪个版本、哪个 node
+  cliRoot = path.resolve(cliOpt)
+  const stampFile = path.join(cliRoot, 'dsh-compat.json')
+  const view = run(npm, ['view', `@deepseek-ai/dsh@${dshSpec}`, 'version', '--json', ...npmFlags], { cwd: tmp, shell: WIN })
+  let want = ''
+  try { want = [].concat(JSON.parse(view.stdout.trim())).pop() || '' } catch {}
+  let stamp = null
+  try { stamp = JSON.parse(fs.readFileSync(stampFile, 'utf8')) } catch {}
+  const node = process.versions.modules
+  if (want && stamp?.dsh === want && stamp.node === node && fs.existsSync(path.join(cliRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'))) {
+    inst = { code: 0, out: '' }
+    console.log(`用装好的 DSH 命令行（${want}）：${cliRoot}`)
+  } else {
+    // 先装在旁边，装成了再挪过去：装到一半失败不会留下一个看着像装好了的目录被缓存
+    const fresh = `${cliRoot}.new`
+    inst = installCli(fresh)
+    if (inst.code === 0) {
+      const v = JSON.parse(fs.readFileSync(path.join(fresh, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')).version
+      fs.writeFileSync(path.join(fresh, 'dsh-compat.json'), JSON.stringify({ dsh: v, node }))
+      fs.rmSync(cliRoot, { recursive: true, force: true })
+      fs.renameSync(fresh, cliRoot)
+    }
+  }
+} else {
+  inst = installCli(cliRoot)
+}
 const PATH_KEY = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH' // Windows 上叫 Path
-env[PATH_KEY] = `${path.join(tmp, 'cli', 'node_modules', '.bin')}${path.delimiter}${env[PATH_KEY]}`
+env[PATH_KEY] = `${path.join(cliRoot, 'node_modules', '.bin')}${path.delimiter}${env[PATH_KEY]}`
 if (inst.code !== 0) { problems.push(`装不上 @deepseek-ai/dsh@${dshSpec}（npm 退出码 ${inst.code}）\n\n${inst.out.slice(-2000)}`); finish() }
-const cliDir = path.join(tmp, 'cli', 'node_modules', '@deepseek-ai', 'dsh')
+const cliDir = path.join(cliRoot, 'node_modules', '@deepseek-ai', 'dsh')
 dshVersion = JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8')).version
 const dsh = (argv, opts) => run(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), ...argv], opts)
 console.log(`DSH ${dshVersion}（${dshSpec}）`)
@@ -97,7 +134,7 @@ console.log(`已安装 ${pkgName}`)
   }
   text = text.replace(/(^|\s)#.*$/gm, '$1') // YAML 注释里的插件名不算
   const refs = [...new Set([...text.matchAll(/^\s*(?:-\s+)?name:\s*['"]?(@deepseek-ai\/[\w.-]+(?:\/[\w./-]+)?)/gm)].map((m) => m[1]))]
-  const roots = [path.join(tmp, 'cli', 'node_modules'), path.join(cliDir, 'node_modules'), path.join(profile, 'node_modules')]
+  const roots = [path.join(cliRoot, 'node_modules'), path.join(cliDir, 'node_modules'), path.join(profile, 'node_modules')]
   // exports 里有这个子路径：照写的键，或 "./x/*" 这种通配
   const exported = (ex, sub) => Object.keys(ex).some((k) => k === sub || (k.includes('*') && new RegExp(`^${k.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.+')}$`).test(sub)))
   const gone = refs.filter((ref) => {
