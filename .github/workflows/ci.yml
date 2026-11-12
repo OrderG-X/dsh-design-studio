@@ -136,12 +136,15 @@ jobs:
       - name: Load plugin settings
         shell: bash
         run: grep -vE '^\s*(#|$)' .github/plugin.env >> "$GITHUB_ENV"
-      # 端到端里也要现装 DSH：Windows 上关掉实时扫描能快不少
-      - name: Turn off Defender real-time scan
+      # 端到端里也要现装 DSH（9 万多个文件）：Windows 的 C 盘很慢（现装 10 分钟，D 盘 1 分半），临时目录挪到 D 盘的 RUNNER_TEMP
+      - name: Turn off Defender real-time scan, temp dir on drive D
         if: runner.os == 'Windows'
         shell: pwsh
         continue-on-error: true
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
+        run: |
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          Set-MpPreference -DisableRealtimeMonitoring $true
       - name: End-to-end on a real machine
         shell: bash
         continue-on-error: ${{ !contains(env.PLATFORMS, runner.os) }}
