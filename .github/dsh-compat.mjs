@@ -167,7 +167,11 @@ console.log(`已安装 ${pkgName}`)
     try { text += fs.readFileSync(path.join(pkgDir, f), 'utf8') + '\n' } catch (e) { problems.push(`读不到 dsh.bundle.patch 写的 ${f}：${e.message}`) }
   }
   text = text.replace(/(^|\s)#.*$/gm, '$1') // YAML 注释里的插件名不算
-  const refs = [...new Set([...text.matchAll(/^\s*(?:-\s+)?name:\s*['"]?(@deepseek-ai\/[\w.-]+(?:\/[\w./-]+)?)/gm)].map((m) => m[1]))]
+  // 「找得到这个包才开」的那一处：name 下一行就是 disabled: !!js，里面 .resolve( 的正是这个包——旧版没有这个包时它自己关着，不算缺。
+  // 逐处判断：同一个包别处没加守卫的引用照样要查
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
+  const guardedAt = (m) => new RegExp(`^['"]?[ \\t]*\\r?\\n[ \\t]*disabled:[ \\t]*!!js[^\\n]*\\.resolve\\(\\s*['"]${esc(m[1])}(?:/package\\.json)?['"]`).test(text.slice(m.index + m[0].length))
+  const refs = [...new Set([...text.matchAll(/^\s*(?:-\s+)?name:\s*['"]?(@deepseek-ai\/[\w.-]+(?:\/[\w./-]+)?)/gm)].filter((m) => !guardedAt(m)).map((m) => m[1]))]
   const roots = [path.join(cliRoot, 'node_modules'), path.join(cliDir, 'node_modules'), path.join(profile, 'node_modules')]
   // exports 里有这个子路径：照写的键，或 "./x/*" 这种通配
   const exported = (ex, sub) => Object.keys(ex).some((k) => k === sub || (k.includes('*') && new RegExp(`^${k.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.+')}$`).test(sub)))
