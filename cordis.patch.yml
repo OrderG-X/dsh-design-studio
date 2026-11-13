@@ -52,6 +52,9 @@
             disabled: !!js process.platform !== 'win32'
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              # 和 0.2.2 标准模式一样：不要 edit 旁边的 apply_patch（旧版不认这个键，会忽略）
+              applyPatch: false
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
             config:
@@ -62,6 +65,9 @@
             name: '@deepseek-ai/dsh-tool-schedule'
           - id: skill-filesystem
             name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              # 0.2.2-rc.2 起标准模式带 DSH 自带的技能（dsh-doc 等）。找不到那个目录（旧版）就不加，出错也不让这行起不来
+              customSkillDirs: !!js "(() => { try { const p = process.getBuiltinModule('node:path'); const d = p.join(p.dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-agent-preset/package.json')), 'skills'); return process.getBuiltinModule('node:fs').existsSync(d) ? [d] : [] } catch { return [] } })()"
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
           - id: command-goal
@@ -114,6 +120,8 @@
             config:
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
+                config:
+                  interrupt: false
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
@@ -147,9 +155,14 @@
               searchTimeoutMs: 60000
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
+          # 0.2.2-rc.2 起才有。旧版没这个包，写死会让整个设计模式起不来：找得到这个包才开（和上面找自带技能目录同一个办法）。
+          # 不看 officeKit 服务在不在——预设一注册子插件就挂上，那时服务可能还没起来，之后也不会补开
+          - id: tool-office
+            name: '@deepseek-ai/dsh-tool-office'
+            disabled: !!js "(() => { try { process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-tool-office/package.json'); return false } catch { return true } })()"
           - id: tool-plugin-manager
             name: '@deepseek-ai/dsh-plugin-manager/tools'
-            disabled: true
+            disabled: !!js "!ctx.get('profileContext')"
           - id: tool-plugin-market
             name: '@deepseek-ai/dsh-plugin-market/tools'
             disabled: true

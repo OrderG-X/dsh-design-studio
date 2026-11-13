@@ -26,11 +26,13 @@ import path from 'node:path'
 import http from 'node:http'
 import { spawn, spawnSync, execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const DSH_SPEC = argv.includes('--dsh') ? argv[argv.indexOf('--dsh') + 1] : 'latest'
 const KEEP = argv.includes('--keep')
+const MODE_ONLY = argv.includes('--mode-only') // 只跑「设计模式」那段（改 cordis.patch.yml 时用）
 const ANNOT = process.env.E2E_ANNOT === '1' // 业务标注的试验开关打开跑一遍（平时关着跑，看有没有带出别的变化）
 const REGISTRY = 'https://registry.npmjs.org/'
 const WIN = process.platform === 'win32'
@@ -159,6 +161,8 @@ function slowWrite(res, file, html, holdMs) {
 }
 const textOf = (m) => (typeof m.content === 'string' ? m.content : (m.content || []).map((c) => c.text || (c.type === 'tool_result' ? '[tool_result]' : '')).join(' '))
 let fixAsk = '' // 「发到对话」发出去后模型收到的那段
+// 标准模式、设计模式各问一次：模型收到的工具、技能目录里有没有 DSH 自带的 dsh-doc；再让它加载 office 技能，看 Office 工具进来没有
+const probes = []
 const selfChecks = [] // 模型调 check_design 拿回来的结果
 const selfCheckImgs = [] // 每次 check_design 结果里带了几张图（严重问题的局部截图）
 const looks = [] // 模型调 look_design 拿回来的（原样的 tool_result 内容：一段字 + 几张图）
@@ -176,6 +180,13 @@ const llm = http.createServer((req, res) => {
     if (!req.url.includes('/messages')) { res.writeHead(404); return res.end() }
     if (!agent) return sse(res, [{ type: 'text', text: '咖啡 App' }], 'end_turn')
     const said = textOf(last)
+    // 探的那次加载技能回来了：MODE-PROBE 之后出现了工具结果（技能加载成功时 DSH 还会在后面再追加一条，所以不只看最后一条）
+    const pr = probes[probes.length - 1]
+    if (pr && !pr.after) {
+      const at = msgs.map((m) => textOf(m)).findLastIndex((t) => t.includes('MODE-PROBE'))
+      const back = at >= 0 && msgs.slice(at + 1).find((m) => Array.isArray(m.content) && m.content.some((c) => c.type === 'tool_result'))
+      if (back) pr.after = { tools: (body.tools || []).map((t) => t.name), result: resultOf(back).slice(0, 200) }
+    }
     if (said.includes('[tool_result]')) {
       const ck = (last.content || []).find((c) => c.type === 'tool_result' && String(c.tool_use_id || '').startsWith('toolu_e2e_check'))
       if (ck) {
@@ -185,6 +196,12 @@ const llm = http.createServer((req, res) => {
       const look = (last.content || []).find((c) => c.type === 'tool_result' && c.tool_use_id === 'toolu_e2e_look')
       if (look) looks.push(look.content)
       return sse(res, [{ type: 'text', text: '好了。' }], 'end_turn')
+    }
+    if (said.includes('MODE-NEXT') && probes.length) { probes[probes.length - 1].next = (body.tools || []).map((t) => t.name); return sse(res, [{ type: 'text', text: '好。' }], 'end_turn') }
+    if (said.includes('MODE-PROBE')) {
+      probes.push({ tools: (body.tools || []).map((t) => t.name), doc: raw.includes('dsh-doc'), after: null })
+      if (!(body.tools || []).some((t) => t.name === 'skill')) { probes[probes.length - 1].noSkill = true; return sse(res, [{ type: 'text', text: '没有 skill。' }], 'end_turn') }
+      return sse(res, [{ type: 'tool_use', id: `toolu_e2e_skill${probes.length - 1}`, name: 'skill', input: { name: 'office' } }], 'tool_use')
     }
     if (said.includes('ASK-ME')) {
       if (!(body.tools || []).some((t) => t.name === 'ask_user_question')) return sse(res, [{ type: 'text', text: '没有 ask_user_question。' }], 'end_turn')
@@ -257,6 +274,45 @@ function launchChrome(bin) {
   return { cdp, close, events }
 }
 
+// 设计模式 = DSH 标准模式的全部插件 + 设计台自己的两样（design-tool / design-skill）。拿装好的 DSH 的标准模式逐项比：
+// DSH 加了插件或者改了配置，这里先红（rc.2 加的 Office 工具、自带技能目录就是这样漏掉的）
+function presetDiff(cliRoot) {
+  const req = createRequire(path.join(cliRoot, 'noop.js'))
+  const yaml = req('js-yaml')
+  const schema = yaml.DEFAULT_SCHEMA.extend([new yaml.Type('tag:yaml.org,2002:js', { kind: 'scalar', construct: (x) => ({ __jsExpr: x }) })])
+  const plugins = (file) => { const doc = yaml.load(fs.readFileSync(file, 'utf8'), { schema }); let r = null; JSON.stringify(doc, (k, v) => { if (!r && v && Array.isArray(v.plugins)) r = v.plugins; return v }); return r || [] }
+  const flat = (list, pre = '') => list.flatMap((e) => [[pre + e.id, e], ...(e.group && Array.isArray(e.config) ? flat(e.config, `${pre}${e.id}/`) : [])])
+  const std = new Map(flat(plugins(path.join(cliRoot, 'node_modules', '@deepseek-ai', 'dsh-web-app', 'presets', 'standard.patch.yml'))))
+  const mine = new Map(flat(plugins(path.join(ROOT, 'cordis.patch.yml'))))
+  const js = (v) => !!v && typeof v === 'object' && '__jsExpr' in v
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  // 故意不同的地方。ours：设计模式这边必须是 !!js 表达式（多包了一层「旧版 DSH 没有就跳过」）；
+  // newer：新版标准模式才有的设置，旧版标准模式没写时设计模式也可以先写上（旧版会忽略这个键）
+  const ours = { 'tool-office': ['disabled'], 'skill-filesystem': ['customSkillDirs'] }
+  const newer = { 'delegation/tool-subagent-control': ['interrupt'], 'delegation/tool-subagent': ['modelSelectionSettings'] }
+  const out = []
+  const cmp = (id, where, a = {}, b = {}) => {
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (where === '' && (k === 'config' || k === 'id')) continue
+      const ok = (ours[id] || []).includes(k) ? js(b[k])
+        : (newer[id] || []).includes(k) && !(k in a) ? true
+        : same(a[k], b[k])
+      if (!ok) out.push(`${id}${where}.${k} 不同`)
+    }
+  }
+  for (const [id, e] of std) {
+    const m = mine.get(id)
+    if (!m) { out.push(`少了 ${id}`); continue }
+    cmp(id, '', e, m) // 包名、disabled、group、isolate……整行除了 config 都要一样
+    if (id === 'persona' || e.group) continue // 人设是设计台自己的；组的 config 是子插件，上面 flat 逐个比了
+    cmp(id, ' 的 config', e.config || {}, m.config || {})
+  }
+  // 设计模式多出来的行：只许设计台自己的两行，和旧版 DSH 还没有的 Office 工具（它那行是「找得到包才开」）
+  for (const [id, m] of mine) if (!std.has(id) && !/^design-/.test(id) && !(id === 'tool-office' && js(m.disabled))) out.push(`多了 ${id}`)
+  return out
+}
+
+const MODE_DONE = Symbol('mode-done') // --mode-only 跑完那段就收尾
 let web = null
 let webLog = ''
 let chrome = null
@@ -277,6 +333,9 @@ try {
   const cliDir = path.join(tmp, 'cli', 'node_modules', '@deepseek-ai', 'dsh')
   const dshVersion = JSON.parse(fs.readFileSync(path.join(cliDir, 'package.json'), 'utf8')).version
   console.log(`  （DSH ${dshVersion}）`)
+  let pd
+  try { pd = presetDiff(path.join(tmp, 'cli')) } catch (e) { pd = [`比不了：${e.message}`] }
+  check('设计模式和这版 DSH 的标准模式一致（故意不同的几处除外）', !pd.length, pd.join('；'))
   const add = run(process.execPath, [path.join(cliDir, 'lib', 'bin.js'), 'plugin', '--profile', 'web', 'add', path.join(tmp, tgz)], { cwd: tmp })
   if (!check('DSH 装上插件', add.code === 0, add.out.slice(-800))) throw new Error('插件没装上')
   console.log(`  （预览版说明：${seedWelcome(cliDir)}）`)
@@ -365,6 +424,51 @@ try {
     await sleep(300)
     await enter()
   }
+
+  // ⑬ 设计模式：会话顶上的模式切到「设计模式」，模型拿得到设计台的工具（整组起来了）；
+  // 有 Office 的 DSH（0.2.2-rc.2 起）还要：加载 office 技能后有 Office 工具、技能目录里有 DSH 自带的 dsh-doc
+  const modeCheck = async () => {
+    const probe = async (tag) => {
+      const n = probes.length
+      await say(`MODE-PROBE ${tag}`)
+      for (let i = 0; i < 120 && !(probes[n] && (probes[n].after || probes[n].noSkill)); i++) await sleep(250)
+      // 加载技能后新增的工具，DSH 从下一轮才放进请求：再说一句
+      if (probes[n]) { await sleep(1500); await say('MODE-NEXT 接着'); for (let i = 0; i < 80 && !probes[n].next; i++) await sleep(250) }
+      return probes[n] || null
+    }
+    // 只看加载技能之后「下一轮」的工具：那时该在的都得在（不和加载那一轮的合在一起算）
+    const officeOf = (p) => ((p && p.next) || []).filter((t) => /^office_/.test(t)).sort()
+    const done = (p) => !!p && !p.noSkill && !!p.after && !!p.next // 探完了：有 skill 工具、加载技能回来了、下一轮也问到了
+    const brief = (p) => JSON.stringify(p && { n: p.tools.length, doc: p.doc, office: officeOf(p), done: done(p), noSkill: !!p.noSkill, result: p.after && p.after.result })
+    // 先在标准模式（这个会话）问一次，当作「应该是什么样」
+    const std = await probe('standard')
+    const label = (re) => `[...document.querySelectorAll('button, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="option"]')].filter((x) => x.getClientRects().length && ${re}.test((x.textContent || '').trim()))`
+    // 发过话的会话不能换模式：开个新会话再切
+    await until(`(() => { const b = ${label('/^(新会话|New (session|chat))/i')}[0]; if (!b) return false; b.click(); return true })()`, 10000)
+    await until(`!document.querySelector('[data-message-id], .conversation-turn') || ${label('/^(标准模式|Standard)/i')}.length > 0`, 10000)
+    const opened = await until(`(() => { const b = ${label('/^(标准模式|Standard)/i')}[0]; if (!b) return false; b.click(); return true })()`, 10000)
+    const picked = opened && await until(`(() => { const i = ${label('/^(设计模式|Design)/')}.pop(); if (!i) return false; i.click(); return true })()`, 5000)
+    const now = await until(`${label('/^(设计模式|Design mode)$/i')}.length > 0 && ${label('/^(标准模式|Standard)/i')}.length === 0`, 5000)
+    if (!check('会话顶上的模式切到「设计模式」', opened && picked && now, JSON.stringify({ opened, picked, now, btns: await page(`[...document.querySelectorAll('button, [role="button"], [role^="menuitem"], [role="option"]')].filter((x) => x.getClientRects().length).map((x) => (x.textContent || '').trim()).filter(Boolean).slice(0, 40)`) }))) return
+    await shot('12-design-mode')
+    const des = await probe('design')
+    console.log(`  （标准 ${brief(std)}）\n  （设计 ${brief(des)}）`)
+    const t = (des && des.tools) || []
+    check('设计模式：模型拿得到设计台的工具（整组起来了）', ['preview_page', 'check_design', 'look_design', 'skill'].every((x) => t.includes(x)), brief(des))
+    // 这版 DSH 带不带 Office（0.2.2-rc.2 起）：带的话两边都必须有三个 Office 工具和 dsh-doc，不能「两边都没有」也算一样
+    const hasOffice = fs.existsSync(path.join(cliDir, '..', 'dsh-tool-office'))
+    const hasDoc = fs.existsSync(path.join(cliDir, '..', 'dsh-agent-preset', 'skills', 'dsh-doc'))
+    const want = JSON.stringify(hasOffice ? ['office_convert', 'office_recalculate', 'office_render'] : [])
+    const why = `标准 ${brief(std)}；设计 ${brief(des)}`
+    check('设计模式：标准模式和设计模式都探完了（没超时）', done(std) && done(des), why)
+    check(`设计模式：Office 工具和标准模式一样（这版 DSH ${hasOffice ? '有' : '没有'} Office）`, JSON.stringify(officeOf(std)) === want && JSON.stringify(officeOf(des)) === want, why)
+    check(`设计模式：DSH 自带的技能（dsh-doc）和标准模式一样（这版 DSH ${hasDoc ? '有' : '没有'}）`, !!std && !!des && std.doc === hasDoc && des.doc === hasDoc, why)
+  }
+  const logCheck = () => {
+    const errs = webLog.split('\n').filter((l) => /dsh-design-studio/i.test(l) && /error|fail|失败/i.test(l))
+    check('DSH 日志里没有设计台的报错', !errs.length, errs.slice(0, 5).join('\n'))
+  }
+  if (MODE_ONLY) { await modeCheck(); logCheck(); throw MODE_DONE }
 
   // ②0 第一屏边写边看：右侧栏关着，草稿一开始流就弹出来，不等文件落地
   fs.mkdirSync(path.dirname(FIRST_DRAFT), { recursive: true })
@@ -1542,10 +1646,10 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     await shot('11-home-pop')
   }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
-  const errs = webLog.split('\n').filter((l) => /dsh-design-studio/i.test(l) && /error|fail|失败/i.test(l))
-  check('DSH 日志里没有设计台的报错', !errs.length, errs.slice(0, 5).join('\n'))
+  await modeCheck()
+  logCheck()
 } catch (e) {
-  check('没有异常', false, (e && e.stack) || e)
+  if (e !== MODE_DONE) check('没有异常', false, (e && e.stack) || e)
 } finally {
   if (failed().length) console.log(`\n—— DSH 日志（最后 3000 字）——\n${webLog.slice(-3000)}`)
   if (chrome) await chrome.close()
