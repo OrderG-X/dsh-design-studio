@@ -7,7 +7,7 @@
   --color-text: oklch(22% 0.02 60);           /* 正文 */
   --color-muted: oklch(50% 0.02 60);          /* 次要文字（别再浅了，保证 4.5:1） */
   --color-line: oklch(91% 0.01 85);           /* 边框、分割线 */
-  --color-primary: oklch(58% 0.15 45);        /* 主色：关键按钮、选中态 */
+  --color-primary: oklch(55% 0.15 45);        /* 主色：关键按钮、选中态（配白字 5:1，按钮上的小字也够清楚） */
   --color-primary-ink: oklch(99% 0 0);        /* 主色上的文字 */
   --color-accent: oklch(70% 0.12 160);        /* 点睛色，少用 */
   --color-success: oklch(62% 0.14 150);

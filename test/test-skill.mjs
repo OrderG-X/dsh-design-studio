@@ -39,6 +39,7 @@ const refs = [...new Set(body.match(/references\/[\w-]+\.md/g) || [])]
 check('提到的参考文件都在', refs.length >= 5 && refs.every((r) => fs.existsSync(path.join(dir, r))), refs.join(','))
 check('六种类型都讲到', ['web', 'app', 'tablet', 'poster', 'slides', 'email'].every((k) => body.includes('`' + k + '`')))
 check('起手的设计变量模板在', /--color-primary/.test(fs.readFileSync(path.join(dir, 'tokens.css'), 'utf8')))
+check('图表：类型表里有 diagram，指向细则；diagram.css 在、四种图都有、没有脚本', body.includes('`diagram`') && body.includes('references/diagram.md') && (() => { const css = fs.readFileSync(path.join(dir, 'diagram.css'), 'utf8'); return ['.mm-root', '.tr-row', '.rm-bar', '.ar-layer'].every((x) => css.includes(x)) && !/<script|javascript:|@import|url\(/i.test(css) })())
 
 // 按 DSH 技能服务（dsh-skill）的校验规则过一遍
 const list = await skillProvider.list()

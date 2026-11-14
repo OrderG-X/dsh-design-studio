@@ -331,6 +331,31 @@ else {
   // 连线用：被固定底栏盖住的按钮不报，底栏里的照报
   fs.writeFileSync(path.join(tmp, 'relay', 'bar.html'), '<!doctype html><style>body{margin:0;height:600px}a{display:block}.bar{position:fixed;left:0;right:0;bottom:0;height:50px;background:#fff}</style>'
     + '<a href="b.html" style="height:40px">top</a><a href="c.html" style="position:absolute;top:160px;left:0;width:200px;height:30px">under</a><div class="bar"><a href="d.html" style="height:50px">tab</a></div>')
+  // 宽度 0、样式实线的边（Tailwind 的 *{border:0 solid}、图表连线）：导出时不能按默认 3px 画出来
+  // 会继承的属性写回默认值（粗体里的 <small> 写 400）：导出时不能跟着父元素变粗。上下两行字一样，量墨色多少
+  fs.writeFileSync(path.join(tmp, 'relay', 'weight.html'), '<!doctype html><style>body{margin:0;background:#fff;font:40px/60px sans-serif;color:#000}div{height:60px}b{font-weight:800}b span{font-weight:400}</style><div><b><span>一二三四五六七</span></b></div><div><span>一二三四五六七</span></div>')
+  // 一个 <symbol> 用 currentColor，被两个不同颜色的 <use> 复用：导出时各是各的颜色（Astra 第 2 轮）
+  fs.writeFileSync(path.join(tmp, 'relay', 'cc.html'), '<!doctype html><style>body{margin:0;background:#fff}svg{display:block;float:left}</style><svg width="0" height="0" fill="none" style="position:absolute"><symbol id="d" viewBox="0 0 10 10"><rect width="10" height="10" fill="currentColor"/></symbol></svg><svg width="40" height="40" style="color:#00aa00"><use href="#d"/></svg><svg width="40" height="40" style="color:#aa00aa"><use href="#d"/></svg>')
+  // 普通 SVG：父层 32px 粗体红填充蓝描边，子元素用 CSS 改回黑色无描边、16px 常规 → 导出也得是这样（Sol / Astra 第 3 轮）
+  fs.writeFileSync(path.join(tmp, 'relay', 'svgreset.html'), '<!doctype html><style>body{margin:0;background:#fff}svg{display:block;font:700 32px sans-serif;fill:#f00;stroke:#00f;stroke-width:6px}.k{fill:#000;stroke:none}.t{font-size:16px;font-weight:400;fill:#000;stroke:none}</style><svg width="300" height="100"><g class="k"><rect x="4" y="4" width="40" height="40"/></g><text class="t" x="60" y="80">一二三</text></svg>')
+  // <use> 直接引用不在 defs 里的普通 <g>、<rect>（Sol 第 4 轮）：一样各是各的颜色
+  fs.writeFileSync(path.join(tmp, 'relay', 'cc2.html'), '<!doctype html><style>body{margin:0;background:#fff}svg{display:block;float:left}</style><svg width="0" height="0" fill="none" style="position:absolute"><g id="g"><rect width="40" height="40" fill="currentColor"/></g><rect id="r" width="40" height="40" fill="currentColor"/></svg>'
+    + ['#00aa00', '#aa00aa'].map((c) => `<svg width="40" height="40" style="color:${c}"><use href="#g"/></svg>`).join('') + ['#00aa00', '#aa00aa'].map((c) => `<svg width="40" height="40" style="color:${c}"><use href="#r"/></svg>`).join(''))
+  // 被 <use> 复用的 SVG 里写相对字号（Sol 第 9 轮）：<g font-size="50%"> 在各处 <use> 按那里的字号算，导出不能写死成定义处算出来的值。
+  // 定义处 32px → 16px，<use> 处 64px → 32px：量 <use> 那份字的宽度。复用图形里用 CSS 改回默认值的，和 0.19.1 一样不管（见 picker.js walk）
+  fs.writeFileSync(path.join(tmp, 'relay', 'ccreset.html'), '<!doctype html><style>body{margin:0;background:#fff}svg{display:block}</style>'
+    + '<svg width="300" height="100" font-size="32"><defs><g id="kg" font-size="50%"><text x="10" y="70">一二三四</text></g></defs></svg><svg width="300" height="100" font-size="64"><use href="#kg"/></svg>')
+  // 复用的图形里 currentColor 和写死的黑色混用（Astra / Sol 第 6 轮）：底色跟着各处 <use> 的颜色，中间的黑点照样黑。
+  // symbol 和被直接引用的普通 <g> 各一个（复用图形里用 CSS 写死成默认黑色的，和 0.19.1 一样不管，见 picker.js styleText）
+  fs.writeFileSync(path.join(tmp, 'relay', 'ccmix.html'), '<!doctype html><style>body{margin:0;background:#fff}svg{display:block;float:left}</style><svg width="0" height="0" fill="none" style="position:absolute">'
+    + '<symbol id="m" viewBox="0 0 40 40"><rect width="40" height="40" fill="currentColor"/><rect x="15" y="15" width="10" height="10" fill="#000"/></symbol>'
+    + '<g id="n"><rect width="40" height="40" fill="currentColor"/><rect x="15" y="15" width="10" height="10" fill="#000"/></g></svg>'
+    + [['m', '#00aa00'], ['m', '#aa00aa'], ['n', '#00aa00'], ['n', '#aa00aa']].map(([id, c]) => `<svg width="40" height="40" style="color:${c}"><use href="#${id}"/></svg>`).join(''))
+  // 导出时被 <use> 引用的图形正在变色（Sol 第 7 轮）：导出不能把过渡打断、跳到终点。页面自己数 transitioncancel，问到了报给外层
+  fs.writeFileSync(path.join(tmp, 'relay', 'ccanim.html'), '<!doctype html><style>body{margin:0;background:#fff}svg{display:block;float:left}.t{fill:#f00;transition:fill 4000ms linear}.t.go{fill:#00f}</style>'
+    + '<svg width="40" height="40"><g id="tg"><rect class="t" width="40" height="40"/></g></svg><svg width="40" height="40"><use href="#tg"/></svg>'
+    + '<script>let n = 0; addEventListener("transitioncancel", () => n++, true); addEventListener("message", (e) => { const d = e.data || {}; const t = document.querySelector(".t"); if (d.go) t.classList.add("go"); if (d.ask) parent.postMessage({ dshDesign: 1, type: "anim:" + n + ":" + getComputedStyle(t).fill }, "*") })</script>')
+  fs.writeFileSync(path.join(tmp, 'relay', 'zero.html'), '<!doctype html><style>*,::before,::after{border:0 solid #f00}body{margin:0;background:#fff}.a{position:relative;width:200px;height:100px}.a::after{content:"";position:absolute;left:100px;top:0;width:60px;height:60px;border-bottom-width:4px}</style><div class="a"></div>')
   fs.writeFileSync(path.join(tmp, 'relay', 'icon.html'), '<!doctype html><style>body{margin:0;background:#fff}</style><svg width="40" height="40"><use href="icons.svg#sq"/></svg>')
   let preview = ''
   // 假的 DSH：嵌预览，收到 hello 回 init（relay=1 是新版右侧栏；relay=0 是老版，不说 relay）
@@ -394,6 +419,140 @@ else {
       })()`)
     })
     check('导出：外部 icons.svg 里的图标画进图里', px.px && px.px[0] > 200 && px.px[1] < 60 && px.px[2] < 60, JSON.stringify(px))
+    const zb = await b.withPage({ url: outerOrigin + '/?relay=1&page=zero.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        const at = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3)
+        return { edge: at(1, 50), top: at(130, 1), side: at(101, 30), bottom: at(130, 62) }
+      })()`)
+    })
+    const red = (p) => p && p[0] > 200 && p[1] < 60 && p[2] < 60
+    const sr = await b.withPage({ url: outerOrigin + '/?relay=1&page=svgreset.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        const at = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3)
+        const dark = (x, y, w, h) => { const d = g.getImageData(x, y, w, h).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 128 && d[i + 2] < 128) n++; return n }
+        return { rect: at(24, 24), edge: at(3, 24), text: dark(58, 60, 54, 24), past: dark(118, 40, 120, 50) }
+      })()`)
+    })
+    check('导出：普通 SVG 里用 CSS 改回默认的填充、描边、字号、字重照样生效', sr.rect && sr.rect.every((v) => v < 60) && sr.edge && sr.edge.every((v) => v > 200) && sr.text > 20 && sr.past === 0, JSON.stringify(sr))
+    const cr = await b.withPage({ url: outerOrigin + '/?relay=1&page=ccreset.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        const at = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3)
+        const dark = (x, y, w, h) => { const d = g.getImageData(x, y, w, h).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 128 && d[i + 2] < 128) n++; return n }
+        return { text: dark(10, 140, 100, 40), past: dark(110, 140, 120, 40) }
+      })()`)
+    })
+    check('导出：被 <use> 复用的 SVG 里的相对字号按 <use> 处算（定义处 16px、<use> 处 32px）', cr.text > 20 && cr.past > 20, JSON.stringify(cr))
+    const mix = await b.withPage({ url: outerOrigin + '/?relay=1&page=ccmix.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        const at = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3)
+        return [20, 60, 100, 140].map((x) => ({ base: at(x, 5), dot: at(x, 20), sheets: document.adoptedStyleSheets.length }))
+      })()`)
+    })
+    const anim = await b.withPage({ url: outerOrigin + '/?relay=1&page=ccanim.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval(`document.getElementById('f').contentWindow.postMessage({ go: 1 }, '*')`)
+      await wait(400)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      await page.eval(`document.getElementById('f').contentWindow.postMessage({ ask: 1 }, '*')`)
+      await wait(300)
+      return page.eval(`({ ok: !!(window.cap && window.cap.png), said: window.got.filter((t) => t.startsWith('anim:')) })`)
+    })
+    const cc = await b.withPage({ url: outerOrigin + '/?relay=1&page=cc.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        const at = (x, y) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3)
+        return { a: at(20, 20), b: at(60, 20) }
+      })()`)
+    })
+    const cc2 = await b.withPage({ url: outerOrigin + '/?relay=1&page=cc2.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        return [20, 60, 100, 140].map((x) => [...g.getImageData(x, 20, 1, 1).data].slice(0, 3))
+      })()`)
+    })
+    const green = (p) => p && p[1] > 140 && p[0] < 60
+    const purple = (p) => p && p[0] > 140 && p[2] > 140 && p[1] < 60
+    check('导出：复用的图形里 currentColor 和写死的黑色混用 → 底色各是各的、黑点照样黑', Array.isArray(mix) && green(mix[0].base) && purple(mix[1].base) && green(mix[2].base) && purple(mix[3].base) && mix.every((m) => m.dot.every((v) => v < 40) && m.sheets === 0), JSON.stringify(mix))
+    check('导出：被 <use> 引用的图形正在变色时导出，过渡不被打断、不跳到终点', anim.ok && anim.said.length === 1 && anim.said[0].startsWith('anim:0:') && anim.said[0] !== 'anim:0:rgb(0, 0, 255)', JSON.stringify(anim))
+    check('导出：<use> 直接引用普通 <g>、<rect>（currentColor），两处不同颜色 → 各是各的颜色', Array.isArray(cc2) && green(cc2[0]) && purple(cc2[1]) && green(cc2[2]) && purple(cc2[3]), JSON.stringify(cc2))
+    check('导出：一个 symbol 用 currentColor、两处 use 不同颜色 → 各是各的颜色', cc.a && cc.a[1] > 140 && cc.a[0] < 60 && cc.b && cc.b[0] > 140 && cc.b[2] > 140 && cc.b[1] < 60, JSON.stringify(cc))
+    const ink = await b.withPage({ url: outerOrigin + '/?relay=1&page=weight.html', w: 600, h: 400 }, async (page) => {
+      await wait(1200)
+      await page.eval('window.cap = null; window.capture()')
+      for (let i = 0; i < 40 && !(await page.eval('!!window.cap')); i++) await wait(150)
+      return page.eval(`(async () => {
+        const c = window.cap
+        if (!c || !c.png) return { error: c && c.error }
+        const im = await createImageBitmap(c.png)
+        const cv = document.createElement('canvas')
+        cv.width = im.width; cv.height = im.height
+        const g = cv.getContext('2d')
+        g.drawImage(im, 0, 0)
+        const dark = (y) => { const d = g.getImageData(0, y, 300, 60).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 128) n++; return n }
+        return { bold: dark(0), plain: dark(60) }
+      })()`)
+    })
+    check('导出：粗体里写回正常字重的字不跟着变粗', ink.plain > 0 && Math.abs(ink.bold - ink.plain) / ink.plain < 0.08, JSON.stringify(ink))
+    check('导出：border:0 solid 的边不画出来（元素和伪元素），只画写了宽度的那条', zb.edge && !red(zb.edge) && !red(zb.top) && !red(zb.side) && red(zb.bottom), JSON.stringify(zb))
   } finally {
     b.stop()
     hr.closeAll()

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="dsh-design" content="diagram 1600x1000">
+<title>技术架构 · 鲜到家</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="diagram.css">
+</head>
+<body class="dg-page">
+<main class="dg-canvas">
+  <header class="dg-head">
+    <span class="dg-kicker">系统架构</span>
+    <h1>鲜到家生鲜电商平台技术架构</h1>
+  </header>
+  <div class="dg ar">
+    <div class="ar-main">
+      <section class="ar-layer">
+        <h3 class="ar-name">接入层</h3>
+        <div class="ar-mods">
+          <div class="ar-mod">用户 App<small>iOS / Android</small></div>
+          <div class="ar-mod">微信小程序</div>
+          <div class="ar-mod">商家后台</div>
+          <div class="ar-mod">骑手端</div>
+        </div>
+      </section>
+      <section class="ar-layer">
+        <h3 class="ar-name">网关层</h3>
+        <div class="ar-mods">
+          <div class="ar-mod key">API 网关<small>限流 · 鉴权 · 路由</small></div>
+          <div class="ar-mod">CDN 加速</div>
+          <div class="ar-mod">负载均衡</div>
+        </div>
+      </section>
+      <section class="ar-layer">
+        <h3 class="ar-name">业务服务</h3>
+        <div class="ar-mods">
+          <div class="ar-group"><h4>交易</h4><div class="ar-mods"><div class="ar-mod">订单</div><div class="ar-mod">购物车</div><div class="ar-mod">支付</div></div></div>
+          <div class="ar-group"><h4>履约</h4><div class="ar-mods"><div class="ar-mod">仓储</div><div class="ar-mod">配送调度</div></div></div>
+          <div class="ar-group"><h4>用户</h4><div class="ar-mods"><div class="ar-mod">会员</div><div class="ar-mod">营销</div></div></div>
+        </div>
+      </section>
+      <section class="ar-layer">
+        <h3 class="ar-name">数据层</h3>
+        <div class="ar-mods">
+          <div class="ar-mod">MySQL 集群</div>
+          <div class="ar-mod">Redis 缓存</div>
+          <div class="ar-mod">Elasticsearch</div>
+          <div class="ar-mod">Kafka 消息队列</div>
+        </div>
+      </section>
+      <section class="ar-layer">
+        <h3 class="ar-name">基础设施</h3>
+        <div class="ar-mods">
+          <div class="ar-mod">Kubernetes</div>
+          <div class="ar-mod">对象存储</div>
+          <div class="ar-mod">日志平台</div>
+        </div>
+      </section>
+    </div>
+    <aside class="ar-side">
+      <h3 class="ar-name">运维监控</h3>
+      <div class="ar-mods"><div class="ar-mod">链路追踪</div><div class="ar-mod">告警</div><div class="ar-mod">发布平台</div></div>
+    </aside>
+    <aside class="ar-side">
+      <h3 class="ar-name">安全</h3>
+      <div class="ar-mods"><div class="ar-mod">风控</div><div class="ar-mod">数据加密</div><div class="ar-mod">审计</div></div>
+    </aside>
+  </div>
+</main>
+</body>
+</html>

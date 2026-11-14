@@ -398,6 +398,25 @@ if (!bin) {
 } else {
   const site = path.join(tmp, 'site')
   fs.mkdirSync(site)
+  // 图表：四种样图（fixtures/diagram）+ 技能目录里的 tokens.css、diagram.css；再加一张写错的
+  const skillDir = new URL('../skills/ui-design/', import.meta.url)
+  for (const f of ['tokens.css', 'diagram.css']) fs.copyFileSync(new URL(f, skillDir), path.join(site, f))
+  for (const f of ['mindmap', 'route', 'roadmap', 'arch']) fs.copyFileSync(new URL(`./fixtures/diagram/${f}.html`, import.meta.url), path.join(site, `dg-${f}.html`))
+  // 正常的变化：节点字多一点要折行、里程碑放中间 / 结尾还写得长一点 → 不该误报（折行两行差不多长，不留一两个字的尾巴）
+  fs.writeFileSync(path.join(site, 'dg-long.html'), fs.readFileSync(path.join(site, 'dg-mindmap.html'), 'utf8').replace('<span class="mm-node">用户研究</span>', '<span class="mm-node">用户研究访谈与需求分析</span>'))
+  // 网页里嵌一张图，页面别处有同名的类（nav.mm、.tr-row）：图表规矩只管图里面（Astra 第 1 轮）
+  // 手动给阶段指定颜色（c2–c6 压不住白字）：阶段名和重点框换浅底深字，对比度照样够（Astra 第 1 轮）
+  { let n = 0; fs.writeFileSync(path.join(site, 'dg-color.html'), fs.readFileSync(path.join(site, 'dg-route.html'), 'utf8').replace(/<section class="tr-stage">/g, () => `<section class="tr-stage c${++n + 1}">`)) }
+  fs.writeFileSync(path.join(site, 'dg-mixed.html'), '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>混排</title><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="diagram.css"></head><body><nav class="mm"><ul>' + Array.from({ length: 9 }, (_, i) => `<li>菜单 ${i + 1}</li>`).join('') + '</ul></nav><div class="tr-row">' + Array.from({ length: 7 }, (_, i) => `<span>标签 ${i + 1}</span>`).join('') + '</div><div class="dg ar"><div class="ar-main"><section class="ar-layer"><h3 class="ar-name">接入层</h3><div class="ar-mods"><div class="ar-mod">用户 App</div><div class="ar-mod">网关</div></div></section></div></div></body></html>')
+  fs.writeFileSync(path.join(site, 'dg-ms.html'), fs.readFileSync(path.join(site, 'dg-roadmap.html'), 'utf8').replace('<div class="rm-ms" style="--at: 2">v3.0 发布</div>', '<div class="rm-ms end" style="--at: 2">v3.0 发布</div><div class="rm-ms mid" style="--at: 3">第二阶段核心功能正式上线</div>'))
+  const dgHead = (size) => `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="dsh-design" content="diagram${size ? ' ' + size : ''}"><title>坏图</title><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="diagram.css"></head><body class="dg-page"><main class="dg-canvas">`
+  fs.writeFileSync(path.join(site, 'dg-bad.html'), dgHead('900x600') + `<div class="dg mm"><div class="mm-root">主题</div><ul class="mm-side mm-right">
+<li>直接写在 li 里</li>
+<li><span class="mm-node">这个节点写了一整句话而不是关键词所以字太多了</span><ul>${Array.from({ length: 9 }, (_, i) => `<li><span class="mm-node">子 ${i + 1}</span></li>`).join('')}</ul></li></ul></div>
+<div class="dg tr"><section class="tr-stage"><h3 class="tr-label">阶段</h3><div class="tr-body"><div class="tr-row">${Array.from({ length: 7 }, (_, i) => `<div class="tr-box">框 ${i + 1}</div>`).join('')}</div></div></section></div>
+<div class="dg rm" style="--cols: 4"><div class="rm-head"><span>Q1</span><span>Q2</span><span>Q3</span><span>Q4</span></div><section class="rm-lane"><h3 class="rm-name">线</h3><div class="rm-track"><div class="rm-bar" style="--from: 4; --span: 2">超出去</div><div class="rm-bar" style="--from: 1">正常</div></div></section></div></main></body></html>`)
+  // 没写画幅的大导图：画布按整页大小来
+  fs.writeFileSync(path.join(site, 'dg-wide.html'), dgHead('') + `<div class="dg mm"><div class="mm-root">很宽的导图</div><ul class="mm-side mm-right">${Array.from({ length: 8 }, (_, i) => `<li><span class="mm-node">分支 ${i + 1}</span><ul>${Array.from({ length: 6 }, (_, j) => `<li><span class="mm-node">第 ${j + 1} 个子节点</span><ul><li><span class="mm-node">再往下一层</span><ul><li><span class="mm-node">还有一层很长的</span></li></ul></li></ul></li>`).join('')}</ul></li>`).join('')}</ul></div></main></body></html>`)
   fs.writeFileSync(path.join(site, 'home.html'), `<!doctype html><html><head><meta charset="utf-8"><title>首页</title>
 <link rel="stylesheet" href="missing.css"><script>nope()</script>
 <style>body{margin:0;font:15px/1.4 sans-serif}header{position:fixed;top:0;left:0;right:0;height:56px;background:#fff}
@@ -1011,6 +1030,32 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     check('调样式规则：media="print" 的样式表、没生效的 @supports 不算', !R2.color && R2.background && R2.background.n === 1 && !R2.background.maybe, JSON.stringify([R2.color, R2.background]))
     check('调样式规则：@layer 里的标成「大概」', R2['border-radius'] && R2['border-radius'].maybe === true, JSON.stringify(R2['border-radius']))
     check('调样式规则：背景来自第一段 <style>', R.background && R.background.sel === '.btn' && R.background.href.endsWith('/rules.html') && R.background.n === 0, JSON.stringify(R.background))
+    // 图表：四张样图在自己的画幅下零问题（深浅色都量）；写错的那张报得出结构问题
+    {
+      const dgSize = { 'dg-mindmap.html': [1600, 1000], 'dg-route.html': [1400, 1500], 'dg-roadmap.html': [1600, 900], 'dg-arch.html': [1600, 1000], 'dg-long.html': [1600, 1000], 'dg-ms.html': [1600, 900], 'dg-color.html': [1400, 1500] }
+      const clean = []
+      for (const [key, sz] of Object.entries(dgSize)) {
+        for (const dark of [false, true]) clean.push(...(await measureAll(b, { screens: [{ key, url: `${entry.origin}/${key}`, label: key }], sizes: [sz], kind: 'diagram', dark })).map((r) => [key + (dark ? ' 深色' : ''), r.error || r.issues.map((x) => `${x.type} ${x.sel} ${x.text || ''} ${detailOf(x)}`)]))
+      }
+      check('真浏览器图表：四张样图（思维导图、技术路线、产品路线、架构）深浅色都零问题；节点字多要折行、里程碑放中间 / 结尾写长了、阶段手动换了颜色也不误报', clean.every(([, v]) => Array.isArray(v) && v.length === 0), JSON.stringify(clean.filter(([, v]) => !Array.isArray(v) || v.length)))
+      const bad = (await measureAll(b, { screens: [{ key: 'dg-bad.html', url: `${entry.origin}/dg-bad.html`, label: 'bad' }], sizes: [[900, 600]], kind: 'diagram' }))[0]
+      const tp = (t) => bad.issues.filter((x) => x.type === t)
+      check('真浏览器图表：比画幅大、字直接写在 li 里、一列 9 个、一行 7 个框、横条超出时间轴、节点字太多都报', tp('dgsize').length === 1 && tp('dgsize')[0].vw === 900 && tp('dgsize')[0].h > 600 &&
+        tp('dgli').length === 1 && tp('dgli')[0].text === '直接写在 li 里' &&
+        tp('dgmany').some((x) => x.what === 'branch' && x.n === 9) && tp('dgmany').some((x) => x.what === 'box' && x.n === 7) &&
+        tp('dgbar').length === 1 && tp('dgbar')[0].from === 4 && tp('dgbar')[0].span === 2 && tp('dgbar')[0].cols === 4 &&
+        tp('dgtext').length === 1 && tp('dgtext')[0].chars > 16 && !tp('hscroll').length, JSON.stringify(bad.issues.map((x) => [x.type, x.text, x.n, x.what])))
+      const mixed = []
+      for (const kind of ['web', 'diagram']) mixed.push(...(await measureAll(b, { screens: [{ key: 'dg-mixed.html', url: `${entry.origin}/dg-mixed.html`, label: 'mixed' }], sizes: [[1280, 800]], kind }))[0].issues.filter((x) => /^dg(li|many|bar|text)$/.test(x.type)).map((x) => `${kind} ${x.type} ${x.sel}`))
+      check('真浏览器图表：网页里嵌了图，页面别处的 nav.mm、.tr-row 不按图表规矩查', mixed.length === 0, JSON.stringify(mixed))
+      const leak = await b.withPage({ url: `${entry.origin}/dg-mixed.html`, w: 1280, h: 800 }, (p) => p.eval(`(() => { const li = document.querySelector('nav.mm li'); const row = document.querySelector('body > .tr-row'); return [getComputedStyle(li).paddingInlineStart, getComputedStyle(li, '::before').content, getComputedStyle(row).display, getComputedStyle(document.querySelector('nav.mm')).display] })()`))
+      check('真浏览器图表：引了 diagram.css 的网页，图外的 nav.mm、.tr-row 样式不被改（Sol 第 2 轮）', JSON.stringify(leak) === '["0px","none","block","block"]', JSON.stringify(leak))
+      check('真浏览器图表：问题细节说得出怎么改', /diagram \d+x\d+/.test(detailOf(tp('dgsize')[0])) && detailOf(tp('dgli')[0]).includes('mm-node') && detailOf(tp('dgbar')[0]).includes('--cols') && /一行 7 个框/.test(detailOf(tp('dgmany').find((x) => x.what === 'box'))))
+      const wide = await b.withPage({ url: `${entry.origin}/dg-wide.html`, w: 1600, h: 1000 }, (p) => p.eval('window.__dshDesign.info().natural'))
+      check('真浏览器图表：没写画幅、比默认大的导图按整页大小（右边留白也算进去）', Array.isArray(wide) && wide[1] > 1000 && autoSize([wide], 'diagram') === `${wide[0]}x${wide[1]}`, JSON.stringify(wide))
+      const fits = await b.withPage({ url: `${entry.origin}/dg-mindmap.html`, w: 1600, h: 1000 }, (p) => p.eval('window.__dshDesign.info().natural'))
+      check('真浏览器图表：放得下的不改画幅', fits === null, JSON.stringify(fits))
+    }
   } finally {
     b.stop()
     hub.closeAll()

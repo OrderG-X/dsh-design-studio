@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="dsh-design" content="diagram 1400x1500">
+<title>技术路线 · 城市内涝风险预测</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="diagram.css">
+</head>
+<body class="dg-page">
+<main class="dg-canvas">
+  <header class="dg-head">
+    <span class="dg-kicker">技术路线图</span>
+    <h1>基于多源遥感的城市内涝风险预测方法研究</h1>
+  </header>
+  <div class="dg tr">
+    <section class="tr-stage">
+      <h3 class="tr-label">数据获取<small>第 1–6 个月</small></h3>
+      <div class="tr-body">
+        <div class="tr-row">
+          <div class="tr-box">多源遥感影像<small>Sentinel-1 / 2、高分三号</small></div>
+          <div class="tr-box">地面观测数据<small>积水点 312 处</small></div>
+          <div class="tr-box">气象与水文数据<small>逐小时降水</small></div>
+        </div>
+        <div class="tr-row">
+          <div class="tr-box soft">时空配准与质量控制</div>
+        </div>
+      </div>
+      <div class="tr-out"><b>成果 1</b>城市内涝多源数据集</div>
+    </section>
+    <section class="tr-stage">
+      <h3 class="tr-label">特征构建<small>第 7–12 个月</small></h3>
+      <div class="tr-body">
+        <div class="tr-row">
+          <div class="tr-box">地形与不透水面提取</div>
+          <div class="tr-box">管网排水能力估算</div>
+        </div>
+        <div class="tr-row">
+          <div class="tr-box">内涝致灾因子体系<small>12 项因子</small></div>
+        </div>
+      </div>
+      <div class="tr-out"><b>成果 2</b>致灾因子评价指标体系</div>
+    </section>
+    <section class="tr-stage">
+      <h3 class="tr-label">模型构建<small>第 13–24 个月</small></h3>
+      <div class="tr-body">
+        <div class="tr-row seq">
+          <div class="tr-box">图神经网络编码</div>
+          <div class="tr-box key">时空注意力融合</div>
+          <div class="tr-box">风险等级输出</div>
+        </div>
+      </div>
+      <div class="tr-out"><b>成果 3</b>内涝风险预测模型<br>SCI 论文 2–3 篇</div>
+    </section>
+    <section class="tr-stage">
+      <h3 class="tr-label">验证与应用<small>第 25–36 个月</small></h3>
+      <div class="tr-body">
+        <div class="tr-row">
+          <div class="tr-box">历史暴雨回测<small>2019–2025 年 18 场</small></div>
+          <div class="tr-box">深圳示范区应用</div>
+        </div>
+      </div>
+      <div class="tr-out"><b>成果 4</b>预警示范系统 1 套</div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

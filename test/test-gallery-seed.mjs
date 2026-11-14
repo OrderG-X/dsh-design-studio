@@ -30,7 +30,9 @@ try {
   const v = market.view()
   check('断网没缓存：显示种子', v.source === 'seed', v.source)
   const kinds = v.designs.map((e) => e.kind).sort()
-  check('每种类型一套模板', JSON.stringify(kinds) === JSON.stringify([...KINDS].sort()), JSON.stringify(kinds))
+  // 图表（diagram）是 0.20.0 新加的类型，设计市场还没有图表模板：市场收了以后重做种子，再把这个例外去掉
+  const NOT_YET = ['diagram']
+  check('每种类型一套模板（市场还没有的新类型除外）', JSON.stringify(kinds) === JSON.stringify(KINDS.filter((k) => !NOT_YET.includes(k)).sort()), JSON.stringify(kinds))
   check('20 张风格卡都在', v.styles.length === STYLE_IDS.length && STYLE_IDS.every((id) => v.styles.some((s) => s.style && s.id.endsWith(`__${id}`))), `${v.styles.length}`)
   check('每套都有封面', v.designs.every((e) => e.thumb && market.thumbFile(e.id)))
   check('空白页那排有精选的', v.designs.some((e) => e.featured))

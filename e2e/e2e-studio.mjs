@@ -79,6 +79,7 @@ function seedWelcome(cliDir) {
 // ── 设计稿：三屏 App，首屏埋问题 ──
 const DESIGN = path.join(tmp, 'work', 'coffee-app')
 const DECK = path.join(tmp, 'work', 'deck') // 幻灯片写死 1500×800，meta 没写尺寸（issue #10）
+const DIAG = path.join(tmp, 'work', 'diagram') // 图表（思维导图）：用技能里的 diagram.css
 const HEAD = (title) => `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="tokens.css">`
 const BASE = 'body{margin:0;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg)}header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}h1{font-size:24px;margin:0}main{padding:0 20px}.go{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:#fff;font-size:16px;text-decoration:none}'
 const HOME_BAD = `${HEAD('首页')}<style>${BASE}
@@ -217,6 +218,7 @@ const llm = http.createServer((req, res) => {
       return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_look', name: 'look_design', input: { screens: ['home.html'], size: '375x667' } }], 'tool_use')
     }
     if (said.includes('DRAFT-FIRST')) return slowWrite(res, FIRST_DRAFT, `${HEAD('第一屏')}<meta name="dsh-design" content="app"></head><body><main><h1>第一屏草稿</h1><p>${'边写边看的内容。'.repeat(80)}</p></main></body></html>`, 8000)
+    if (said.includes('OPEN-DIAGRAM')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DIAG, 'map.html') } }], 'tool_use')
     if (said.includes('OPEN-DECK')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DECK, 's1.html') } }], 'tool_use')
     if (said.includes('DESIGN-OPEN')) {
       if (!(body.tools || []).some((t) => t.name === 'preview_page')) return sse(res, [{ type: 'text', text: '没有 preview_page。' }], 'end_turn')
@@ -1375,6 +1377,35 @@ try {
   const rootPx = fullHead ? await page(`new Promise((done) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(10, img.height - 10, 1, 1).data; done([img.width, img.height, d[0] > 200 && d[1] < 60 && d[2] < 60].join()) }; img.onerror = () => done('图坏了'); img.src = 'data:image/jpeg;base64,${fullBuf.subarray(fullHead.index + fullHead[0].length, fullHead.index + fullHead[0].length + +fullHead[3]).toString('base64')}' })`) : '没有图'
   await page(`document.querySelector('.ddp-xo header .ddp-btn').click()`)
   check('整页截图：根元素写了 height:100% 也截得到底下', /^3000,22\d\d,true$/.test(String(rootPx)), String(rootPx))
+
+  // ⑨zd 图表（思维导图）：画幅按 meta；导出没有「整页长图」，纯画面是两倍清晰的 PNG；meta 不写尺寸、图比默认画幅大 → 画幅跟着图长
+  fs.mkdirSync(DIAG, { recursive: true })
+  for (const f of ['tokens.css', 'diagram.css']) fs.copyFileSync(path.join(ROOT, 'skills', 'ui-design', f), path.join(DIAG, f))
+  const MAP = fs.readFileSync(path.join(ROOT, 'test', 'fixtures', 'diagram', 'mindmap.html'), 'utf8')
+  fs.writeFileSync(path.join(DIAG, 'map.html'), MAP)
+  await say('OPEN-DIAGRAM 打开思维导图')
+  const dgSize = await until(`((f) => f && f.clientWidth + 'x' + f.clientHeight === '1600x1000')(document.querySelector('iframe.ddp-frame.cur[src*="map.html"]'))`, 30000)
+  check('图表：画幅按 meta（1600×1000）', !!dgSize, await page(`((f) => f ? f.src + ' ' + f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(document.querySelector('iframe.ddp-frame.cur'))`))
+  await sleep(1500)
+  await shot('10-diagram')
+  await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+  await sleep(300)
+  const dgMenu = await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].map((x) => x.textContent).join(' | ')`)
+  check('图表：导出菜单有「纯画面」、没有「整页长图」', /纯画面/.test(dgMenu) && !/整页长图/.test(dgMenu), dgMenu)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /纯画面/.test(x.textContent)).click()`)
+  const dgPng = () => { const d = path.join(DIAG, 'exports'); const f = fs.existsSync(d) && fs.readdirSync(d).find((x) => x.endsWith('.png')); return f ? path.join(d, f) : '' }
+  const dgEnd = Date.now() + 60000
+  while (Date.now() < dgEnd && !dgPng()) await sleep(400)
+  await sleep(500)
+  const dgBuf = dgPng() ? fs.readFileSync(dgPng()) : Buffer.alloc(0)
+  const dgWH = dgBuf.length > 24 ? [dgBuf.readUInt32BE(16), dgBuf.readUInt32BE(20)] : []
+  if (dgBuf.length) fs.copyFileSync(dgPng(), path.join(SHOTS, '10-diagram-export.png')) // 连线（伪元素画的）有没有画进去，看这张
+  check('图表：纯画面导出 PNG，两倍清晰、比例对（3200×2000）', dgWH.join('x') === '3200x2000', dgWH.join('x') || '没有 PNG')
+  const WIDE = MAP.replace('content="diagram 1600x1000"', 'content="diagram"').replace('</head>', '<style>.mm .mm-side, .mm .mm-side ul { --gx: 150px !important }</style></head>')
+  fs.writeFileSync(path.join(DIAG, 'map.html'), WIDE)
+  const dgWide = await until(`((f) => f && f.clientWidth > 1700 && f.clientWidth + 'x' + f.clientHeight)(document.querySelector('iframe.ddp-frame.cur[src*="map.html"]'))`, 20000)
+  check('图表：meta 不写尺寸、图比 1600 宽 → 画幅跟着图变宽', !!dgWide, await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(document.querySelector('iframe.ddp-frame.cur'))`))
+  await shot('10-diagram-wide')
 
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
   const OTHER = path.join(tmp, 'work', 'other-site')
