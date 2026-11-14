@@ -401,7 +401,7 @@ if (!bin) {
   // 图表：四种样图（fixtures/diagram）+ 技能目录里的 tokens.css、diagram.css；再加一张写错的
   const skillDir = new URL('../skills/ui-design/', import.meta.url)
   for (const f of ['tokens.css', 'diagram.css']) fs.copyFileSync(new URL(f, skillDir), path.join(site, f))
-  for (const f of ['mindmap', 'route', 'roadmap', 'arch']) fs.copyFileSync(new URL(`./fixtures/diagram/${f}.html`, import.meta.url), path.join(site, `dg-${f}.html`))
+  for (const f of ['mindmap', 'route', 'roadmap', 'arch', 'fx']) fs.copyFileSync(new URL(`./fixtures/diagram/${f}.html`, import.meta.url), path.join(site, `dg-${f}.html`))
   // 正常的变化：节点字多一点要折行、里程碑放中间 / 结尾还写得长一点 → 不该误报（折行两行差不多长，不留一两个字的尾巴）
   fs.writeFileSync(path.join(site, 'dg-long.html'), fs.readFileSync(path.join(site, 'dg-mindmap.html'), 'utf8').replace('<span class="mm-node">用户研究</span>', '<span class="mm-node">用户研究访谈与需求分析</span>'))
   // 网页里嵌一张图，页面别处有同名的类（nav.mm、.tr-row）：图表规矩只管图里面（Astra 第 1 轮）
@@ -415,6 +415,36 @@ if (!bin) {
 <li><span class="mm-node">这个节点写了一整句话而不是关键词所以字太多了</span><ul>${Array.from({ length: 9 }, (_, i) => `<li><span class="mm-node">子 ${i + 1}</span></li>`).join('')}</ul></li></ul></div>
 <div class="dg tr"><section class="tr-stage"><h3 class="tr-label">阶段</h3><div class="tr-body"><div class="tr-row">${Array.from({ length: 7 }, (_, i) => `<div class="tr-box">框 ${i + 1}</div>`).join('')}</div></div></section></div>
 <div class="dg rm" style="--cols: 4"><div class="rm-head"><span>Q1</span><span>Q2</span><span>Q3</span><span>Q4</span></div><section class="rm-lane"><h3 class="rm-name">线</h3><div class="rm-track"><div class="rm-bar" style="--from: 4; --span: 2">超出去</div><div class="rm-bar" style="--from: 1">正常</div></div></section></div></main></body></html>`)
+  // 字偏小：画幅 1600 宽、正文 12px（贴进 Word 只有 3 磅多）；同样的字、画幅 1000 宽就不报
+  const smallBody = `<header class="dg-head"><h1 style="font-size:40px">标题</h1></header><div class="dg ar" style="--dg-scale:0.86"><div class="ar-main"><section class="ar-layer"><h3 class="ar-name">研究内容</h3><div class="ar-mods">${Array.from({ length: 4 }, (_, i) => `<div class="ar-mod">研究内容第 ${i + 1} 项<small>说明文字一句话</small></div>`).join('')}</div></section></div></div></main></body></html>`
+  fs.writeFileSync(path.join(site, 'dg-small.html'), dgHead('1600x1000') + smallBody)
+  fs.writeFileSync(path.join(site, 'dg-small-ok.html'), dgHead('1000x700') + smallBody)
+  // SVG 画的图：字号要按 viewBox 缩放折算（Astra 第 3 轮）：800 宽的 viewBox 放到 1600 宽，14px 的字其实是 28px，不报；3200 宽的缩到 1600 宽，24px 其实只有 12px，要报
+  const svgBody = (vb, fsz) => `<svg width="1600" height="900" viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">${Array.from({ length: 6 }, (_, i) => `<text x="20" y="${(i + 1) * 60}" font-size="${fsz}">研究内容第 ${i + 1} 项说明文字</text>`).join('')}</svg></main></body></html>`
+  fs.writeFileSync(path.join(site, 'dg-svg-up.html'), dgHead('1600x900') + svgBody('0 0 800 450', 14))
+  fs.writeFileSync(path.join(site, 'dg-svg-down.html'), dgHead('1600x900') + svgBody('0 0 3200 1800', 24))
+  // 层和层之间一排带关系词的箭头：层的颜色不因为多了这一排错位，箭头对着模块那几栏
+  fs.writeFileSync(path.join(site, 'dg-links.html'), dgHead('1600x1000') + `<div class="dg ar"><div class="ar-main">
+<section class="ar-layer"><h3 class="ar-name">目标</h3><div class="ar-mods"><div class="ar-mod">目标 1</div><div class="ar-mod">目标 2</div><div class="ar-mod">目标 3</div></div></section>
+<div class="dg-links"><div class="dg-link up"><b>支撑</b></div><div class="dg-link up"><b>支撑</b></div><div class="dg-link up two"><b>对应</b></div></div>
+<section class="ar-layer"><h3 class="ar-name">内容</h3><div class="ar-mods seq"><div class="ar-mod">内容 1</div><div class="ar-mod">内容 2</div><div class="ar-mod">内容 3</div></div></section>
+<section class="ar-layer"><h3 class="ar-name">路径</h3><div class="ar-mods"><div class="ar-mod">路径 1</div><div class="dg-link right"><b>递进</b></div><div class="ar-mod">路径 2</div><div class="dg-link left"></div><div class="ar-mod">路径 3</div></div></section>
+</div></div></main></body></html>`)
+  // 层间箭头 + 层内递进一起用（两审第 2 轮）：1200 宽、字放大 1.6 倍，下层用 ar-mods seq 对得上；层里插占位的横箭头、箭头个数对不上都报
+  const four = (w, cls = '', mid = '') => `<div class="ar-mods${cls}">${Array.from({ length: 4 }, (_, i) => (i ? mid : '') + `<div class="ar-mod">${w} ${i + 1}</div>`).join('')}</div>`
+  const links3 = (n) => `<div class="dg-links">${Array.from({ length: n }, () => '<div class="dg-link"><b>落实</b></div>').join('')}</div>`
+  const page3 = (bottom, n = 4) => dgHead('1200x900').replace('</head>', '<style>.dg-page { --dg-scale: 1.6 }</style></head>') + `<div class="dg ar"><div class="ar-main"><section class="ar-layer"><h3 class="ar-name">内容</h3>${four('内容')}</section>${links3(n)}<section class="ar-layer"><h3 class="ar-name">路径</h3>${bottom}</section></div></div></main></body></html>`
+  fs.writeFileSync(path.join(site, 'dg-links3.html'), page3(four('路径', ' seq')))
+  fs.writeFileSync(path.join(site, 'dg-links3-bad.html'), page3(four('路径', '', '<div class="dg-link right"><b>逐级递进</b></div>')))
+  fs.writeFileSync(path.join(site, 'dg-links3-count.html'), page3(four('路径', ' seq'), 3))
+  // 推荐的 1200 宽画幅、字放大 1.6 倍、全图单色：上下两层各 6 个模块中间 6 个箭头（不换行才对得上），横向箭头的四字关系词
+  const six = (w) => `<div class="ar-mods">${Array.from({ length: 6 }, (_, i) => `<div class="ar-mod">${w} ${i + 1}</div>`).join('')}</div>`
+  fs.writeFileSync(path.join(site, 'dg-links2.html'), dgHead('1200x900').replace('</head>', '<style>.dg-page { --dg-scale: 1.6 }</style></head>') + `<div class="dg ar" data-tone="mono"><div class="ar-main">
+<section class="ar-layer"><h3 class="ar-name">目标</h3>${six('目标')}</section>
+<div class="dg-links">${Array.from({ length: 6 }, () => '<div class="dg-link up"><b>支撑</b></div>').join('')}</div>
+<section class="ar-layer"><h3 class="ar-name">内容</h3>${six('内容')}</section>
+<section class="ar-layer"><h3 class="ar-name">路径</h3><div class="ar-mods"><div class="ar-mod">课堂学</div><div class="dg-link right"><b>逐级递进</b></div><div class="ar-mod">工坊练</div></div></section>
+</div></div></main></body></html>`)
   // 没写画幅的大导图：画布按整页大小来
   fs.writeFileSync(path.join(site, 'dg-wide.html'), dgHead('') + `<div class="dg mm"><div class="mm-root">很宽的导图</div><ul class="mm-side mm-right">${Array.from({ length: 8 }, (_, i) => `<li><span class="mm-node">分支 ${i + 1}</span><ul>${Array.from({ length: 6 }, (_, j) => `<li><span class="mm-node">第 ${j + 1} 个子节点</span><ul><li><span class="mm-node">再往下一层</span><ul><li><span class="mm-node">还有一层很长的</span></li></ul></li></ul></li>`).join('')}</ul></li>`).join('')}</ul></div></main></body></html>`)
   fs.writeFileSync(path.join(site, 'home.html'), `<!doctype html><html><head><meta charset="utf-8"><title>首页</title>
@@ -1032,12 +1062,12 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     check('调样式规则：背景来自第一段 <style>', R.background && R.background.sel === '.btn' && R.background.href.endsWith('/rules.html') && R.background.n === 0, JSON.stringify(R.background))
     // 图表：四张样图在自己的画幅下零问题（深浅色都量）；写错的那张报得出结构问题
     {
-      const dgSize = { 'dg-mindmap.html': [1600, 1000], 'dg-route.html': [1400, 1500], 'dg-roadmap.html': [1600, 900], 'dg-arch.html': [1600, 1000], 'dg-long.html': [1600, 1000], 'dg-ms.html': [1600, 900], 'dg-color.html': [1400, 1500] }
+      const dgSize = { 'dg-mindmap.html': [1600, 1000], 'dg-route.html': [1400, 1500], 'dg-roadmap.html': [1600, 900], 'dg-arch.html': [1600, 1000], 'dg-long.html': [1600, 1000], 'dg-ms.html': [1600, 900], 'dg-color.html': [1400, 1500], 'dg-fx.html': [1600, 1400] }
       const clean = []
       for (const [key, sz] of Object.entries(dgSize)) {
         for (const dark of [false, true]) clean.push(...(await measureAll(b, { screens: [{ key, url: `${entry.origin}/${key}`, label: key }], sizes: [sz], kind: 'diagram', dark })).map((r) => [key + (dark ? ' 深色' : ''), r.error || r.issues.map((x) => `${x.type} ${x.sel} ${x.text || ''} ${detailOf(x)}`)]))
       }
-      check('真浏览器图表：四张样图（思维导图、技术路线、产品路线、架构）深浅色都零问题；节点字多要折行、里程碑放中间 / 结尾写长了、阶段手动换了颜色也不误报', clean.every(([, v]) => Array.isArray(v) && v.length === 0), JSON.stringify(clean.filter(([, v]) => !Array.isArray(v) || v.length)))
+      check('真浏览器图表：四张样图（思维导图、技术路线、产品路线、架构）和申报书炫酷部件那张深浅色都零问题；节点字多要折行、里程碑放中间 / 结尾写长了、阶段手动换了颜色也不误报', clean.every(([, v]) => Array.isArray(v) && v.length === 0), JSON.stringify(clean.filter(([, v]) => !Array.isArray(v) || v.length)))
       const bad = (await measureAll(b, { screens: [{ key: 'dg-bad.html', url: `${entry.origin}/dg-bad.html`, label: 'bad' }], sizes: [[900, 600]], kind: 'diagram' }))[0]
       const tp = (t) => bad.issues.filter((x) => x.type === t)
       check('真浏览器图表：比画幅大、字直接写在 li 里、一列 9 个、一行 7 个框、横条超出时间轴、节点字太多都报', tp('dgsize').length === 1 && tp('dgsize')[0].vw === 900 && tp('dgsize')[0].h > 600 &&
@@ -1055,6 +1085,41 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
       check('真浏览器图表：没写画幅、比默认大的导图按整页大小（右边留白也算进去）', Array.isArray(wide) && wide[1] > 1000 && autoSize([wide], 'diagram') === `${wide[0]}x${wide[1]}`, JSON.stringify(wide))
       const fits = await b.withPage({ url: `${entry.origin}/dg-mindmap.html`, w: 1600, h: 1000 }, (p) => p.eval('window.__dshDesign.info().natural'))
       check('真浏览器图表：放得下的不改画幅', fits === null, JSON.stringify(fits))
+      const small = (await measureAll(b, { screens: [{ key: 'dg-small.html', url: `${entry.origin}/dg-small.html`, label: 'small' }], sizes: [[1600, 1000]], kind: 'diagram' }))[0].issues.filter((x) => x.type === 'dgsmall')
+      const smallOk = (await measureAll(b, { screens: [{ key: 'dg-small-ok.html', url: `${entry.origin}/dg-small-ok.html`, label: 'ok' }], sizes: [[1000, 700]], kind: 'diagram' }))[0].issues.filter((x) => x.type === 'dgsmall')
+      const smallWeb = (await measureAll(b, { screens: [{ key: 'dg-small.html', url: `${entry.origin}/dg-small.html`, label: 'web' }], sizes: [[1600, 1000]], kind: 'web' }))[0].issues.filter((x) => x.type === 'dgsmall')
+      check('真浏览器图表：字偏小（1600 宽、正文 12px）报得出贴进 Word 几磅、要放到多大；画幅 1000 宽不报；不是图表不查', small.length === 1 && small[0].px === 12 && small[0].vw === 1600 && small[0].pt === 3.5 && small[0].need === 23 && /Word/.test(detailOf(small[0])) && !smallOk.length && !smallWeb.length, JSON.stringify([small, smallOk.length, smallWeb.length]))
+      const svgUp = (await measureAll(b, { screens: [{ key: 'dg-svg-up.html', url: `${entry.origin}/dg-svg-up.html`, label: 'up' }], sizes: [[1600, 900]], kind: 'diagram' }))[0].issues.filter((x) => x.type === 'dgsmall')
+      const svgDown = (await measureAll(b, { screens: [{ key: 'dg-svg-down.html', url: `${entry.origin}/dg-svg-down.html`, label: 'down' }], sizes: [[1600, 900]], kind: 'diagram' }))[0].issues.filter((x) => x.type === 'dgsmall')
+      check('真浏览器图表：SVG 的字按 viewBox 缩放算真字号（放大 2 倍的 14px 不报，缩小一半的 24px 报 12px）', !svgUp.length && svgDown.length === 1 && svgDown[0].px === 12, JSON.stringify([svgUp, svgDown]))
+      const links = await b.withPage({ url: `${entry.origin}/dg-links.html`, w: 1600, h: 1000 }, (p) => p.eval(`(() => {
+        const ls = [...document.querySelectorAll('.ar-layer')].map((x) => getComputedStyle(x).getPropertyValue('--b').trim())
+        const c2 = getComputedStyle(document.querySelector('.dg')).getPropertyValue('--dg-c2').trim()
+        const mods = [...document.querySelectorAll('.ar-layer')[0].querySelectorAll('.ar-mod')].map((m) => { const r = m.getBoundingClientRect(); return r.left + r.width / 2 })
+        const arrows = [...document.querySelectorAll('.dg-links > .dg-link')].map((m) => { const r = m.getBoundingClientRect(); return r.left + r.width / 2 })
+        const bg = (sel) => getComputedStyle(document.querySelector(sel), '::before').backgroundImage
+        return { ls, c2, off: Math.max(...mods.map((x, i) => Math.abs(x - arrows[i]))), up: bg('.dg-links .dg-link.up'), right: bg('.ar-mods .dg-link.right'), label: getComputedStyle(document.querySelector('.dg-link b')).fontSize }
+      })()`))
+      check('真浏览器图表：两层中间插一排 dg-links，第二层还是第 2 色；箭头对着上一层的模块；横竖箭头都画出来；关系词按 --dg-scale 放大', links && links.ls[1] === links.c2 && links.ls[0] !== links.c2 && links.off < 2 && /conic-gradient/.test(links.up) && /conic-gradient/.test(links.right) && links.label === '17.5px', JSON.stringify(links))
+      const links2 = await b.withPage({ url: `${entry.origin}/dg-links2.html`, w: 1200, h: 900 }, (p) => p.eval(`(() => {
+        const box = (e) => e.getBoundingClientRect()
+        const layers = [...document.querySelectorAll('.ar-layer')]
+        const tops = [...layers[0].querySelectorAll('.ar-mod'), ...layers[1].querySelectorAll('.ar-mod')].map((m) => Math.round(box(m).top))
+        const mid = (e) => { const r = box(e); return r.left + r.width / 2 }
+        const off = Math.max(...[...layers[0].querySelectorAll('.ar-mod')].map((m, i) => Math.abs(mid(m) - mid(document.querySelectorAll('.dg-links > .dg-link')[i]))))
+        const gaps = [...document.querySelectorAll('.dg-link')].map((l) => { const a = box(l), t = box(l.querySelector('b')); return l.classList.contains('right') ? Math.min(t.left - a.left, a.right - t.right) : Math.min(t.top - a.top, a.bottom - t.bottom) })
+        return { rows: new Set(tops.slice(0, 6)).size + new Set(tops.slice(6)).size, off, gap: Math.min(...gaps), tones: new Set(layers.map((x) => getComputedStyle(x).getPropertyValue('--b').trim())).size }
+      })()`))
+      const ends = await b.withPage({ url: `${entry.origin}/dg-links3.html`, w: 1200, h: 900 }, (p) => p.eval(`(() => {
+        const mid = (e) => { const r = e.getBoundingClientRect(); return r.left + r.width / 2 }
+        const [up, down] = [...document.querySelectorAll('.ar-layer')].map((x) => [...x.querySelectorAll('.ar-mod')].map(mid))
+        const ls = [...document.querySelectorAll('.dg-links > .dg-link')].map(mid)
+        return { off: Math.max(...ls.map((x, i) => Math.max(Math.abs(x - up[i]), Math.abs(x - down[i])))), seq: getComputedStyle(document.querySelectorAll('.ar-mods.seq > .ar-mod')[1], '::before').backgroundImage }
+      })()`))
+      const lk = async (key) => (await measureAll(b, { screens: [{ key, url: `${entry.origin}/${key}`, label: key }], sizes: [[1200, 900]], kind: 'diagram' }))[0].issues.filter((x) => x.type === 'dglink')
+      const [lkOk, lkBad, lkCount] = [await lk('dg-links3.html'), await lk('dg-links3-bad.html'), await lk('dg-links3-count.html')]
+      check('真浏览器图表：层间箭头 + 层内递进（ar-mods seq）一起用，箭头上下两端都对着模块、空隙里画了递进箭头；层里插占位的横箭头、箭头比模块少都报「箭头没对着模块」（两审第 2 轮）', ends && ends.off < 2 && /conic-gradient/.test(ends.seq) && !lkOk.length && lkBad.length >= 1 && lkCount.length >= 1 && /ar-mods seq/.test(detailOf(lkBad[0])), JSON.stringify([ends, lkOk.length, lkBad.length, lkCount.length]))
+      check('真浏览器图表：1200 宽、字放大 1.6 倍：挨着箭头的两层模块各占一行、箭头对得上；横竖箭头的关系词两边都留出线和箭头；data-tone="mono" 三层同色（两审第 1 轮）', links2 && links2.rows === 2 && links2.off < 2 && links2.gap >= 20 && links2.tones === 1, JSON.stringify(links2))
     }
   } finally {
     b.stop()

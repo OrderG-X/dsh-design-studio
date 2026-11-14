@@ -410,9 +410,14 @@ check('取色：少见但鲜艳的点缀色补上', pal.colors.some((c) => c.acc
 check('取色：整体偏浅', pal.light === true)
 check('取色：深色图', paletteOf(px([['#101014', 900], ['#F5F5F5', 100]])).light === false)
 check('取色：透明的不算、空图不炸', paletteOf(new Uint8ClampedArray([255, 0, 0, 0])).colors.length === 0)
-const tz = (k, v = {}) => ({ refText: '〔参考图〕{path}（{w}×{h}，{tone}）\n主要颜色：{colors}\n{ask}\n', refLight: '整体偏浅', refDark: '整体偏深', refAccent: '（点缀）', refJoin: '、', refAsk: '改现在的', refAskNew: '新做' }[k] || k).replace(/\{(\w+)\}/g, (_, x) => v[x])
+const tz = (k, v = {}) => ({ refText: '〔参考图〕{path}（{w}×{h}，{tone}）\n主要颜色：{colors}\n{ask}\n', refLight: '整体偏浅', refDark: '整体偏深', refAccent: '（点缀）', refJoin: '、', refAsk: '改现在的', refAskNew: '新做', refAskDg: '照着画', refAskDgRe: '照着重画' }[k] || k).replace(/\{(\w+)\}/g, (_, x) => v[x])
 const txt = formatRef(tz, { path: '/d/refs/a.png', w: 1280, h: 800, palette: { light: true, colors: [{ hex: '#F4EDE4', share: 0.7 }, { hex: '#E8572A', share: 0.004, accent: true }] }, hasDesign: true })
 check('参考图文字：路径、尺寸、颜色、怎么用', txt === '〔参考图〕/d/refs/a.png（1280×800，整体偏浅）\n主要颜色：#F4EDE4 70%、#E8572A 1%（点缀）\n改现在的\n', JSON.stringify(txt))
+{
+  const p0 = { path: '/d/refs/a.png', w: 1279, h: 1554, palette: { light: true, colors: [] } }
+  const ask = (o) => formatRef(tz, { ...p0, ...o }).split('\n')[2]
+  check('参考图文字：图表照版式和画法画（新做 / 重画），别的类型照旧只照风格', ask({ kind: 'diagram', hasDesign: false }) === '照着画' && ask({ kind: 'diagram', hasDesign: true }) === '照着重画' && ask({ kind: 'web', hasDesign: true }) === '改现在的' && ask({ hasDesign: false }) === '新做', JSON.stringify([ask({ kind: 'diagram', hasDesign: false }), ask({ kind: 'diagram', hasDesign: true })]))
+}
 
 // ── check_design：体检结果交回给模型的那段字 ──
 const { formatCheckTool } = mod._test
@@ -601,6 +606,8 @@ for (const [tt, lang] of [[tZ, '中文'], [tE, '英文']]) {
     ['code', 'chipCode', tt('hoText', { fw: 'React + Vite', dest: '/d/app', scope: tt('lang') === 'en' ? 'All screens' : '全部屏', key: 'react', only: '' })],
     ['image', 'chipRef', formatRef(tt, { path: '/d/refs/a.png', w: 1280, h: 800, palette: { light: true, colors: [{ hex: '#F4EDE4', share: 0.7 }, { hex: '#E8572A', share: 0.004, accent: true }] }, hasDesign: true })],
     ['image', 'chipRef', formatRef(tt, { path: '/d/refs/a.png', w: 1280, h: 800, palette: { light: false, colors: [] }, hasDesign: false })],
+    ['image', 'chipRef', formatRef(tt, { path: '/d/refs/a.png', w: 1279, h: 1554, palette: { light: true, colors: [{ hex: '#7C5CC4', share: 0.3 }] }, hasDesign: false, kind: 'diagram' })],
+    ['image', 'chipRef', formatRef(tt, { path: '/d/refs/a.png', w: 1279, h: 1554, palette: { light: true, colors: [] }, hasDesign: true, kind: 'diagram' })],
     ['style', 'chipTweak', formatTweaks(tt, [{ id: 'gap', label: '留白', value: 16, var: '--gap', unit: 'px', type: 'range', min: 0, max: 40 }], { gap: 24 })],
     ['style', 'chipTwMake', tt('twMakeText') + '\n'],
     ['style', 'chipTwFix', tt('twFixText', { errs: 'gap 没有 var；radius 超出范围' }) + '\n'],

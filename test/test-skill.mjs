@@ -40,6 +40,12 @@ check('提到的参考文件都在', refs.length >= 5 && refs.every((r) => fs.ex
 check('六种类型都讲到', ['web', 'app', 'tablet', 'poster', 'slides', 'email'].every((k) => body.includes('`' + k + '`')))
 check('起手的设计变量模板在', /--color-primary/.test(fs.readFileSync(path.join(dir, 'tokens.css'), 'utf8')))
 check('图表：类型表里有 diagram，指向细则；diagram.css 在、四种图都有、没有脚本', body.includes('`diagram`') && body.includes('references/diagram.md') && (() => { const css = fs.readFileSync(path.join(dir, 'diagram.css'), 'utf8'); return ['.mm-root', '.tr-row', '.rm-bar', '.ar-layer'].every((x) => css.includes(x)) && !/<script|javascript:|@import|url\(/i.test(css) })())
+{
+  const md = fs.readFileSync(path.join(dir, 'references', 'diagram.md'), 'utf8')
+  const css = fs.readFileSync(path.join(dir, 'diagram.css'), 'utf8')
+  check('图表细则：申报书炫酷样式（fx-*）有部件表和骨架，diagram.css 里都有这些部件、颜色走 tokens', ['## 申报书炫酷样式', 'fx-page', 'fx-rail', 'fx-flow', 'fx-loop', '--color-primary'].every((x) => md.includes(x)) && ['.fx-page', '.fx-title', '.fx-panel', '.fx-rail', '.fx-band', '.fx-tag', '.fx-slab', '.fx-item', '.fx-arrow', '.fx-loop', '.fx-ribbon', '.fx-core', '.fx-flow', '.fx-warm', '.fx-cool'].every((x) => css.includes(x)) && /--fx-1: var\(--color-primary/.test(css))
+  check('图表细则：先列逻辑骨架请用户确认、版块之间要有关系（带关系词的箭头、对齐成栏、编号对应）、照参考图画、字号按画幅定；diagram.css 有 dg-link、字号乘 --dg-scale', ['## 先理逻辑，确认了再画', '逻辑骨架', '（推测）', '## 版块之间要有关系', '## 照参考图画', '## 字号', 'dg-links', '画幅宽 ÷ 70'].every((x) => md.includes(x)) && body.includes('先列「逻辑骨架」请用户确认再画') && ['.dg-link', '.dg-links', '.dg-link.up', '.dg-link.two'].every((x) => css.includes(x)) && !/font(-size)?: [^;]*\d+px;/.test(css.replace(/calc\([^;]*var\(--dg-scale, 1\.25\)\)/g, '')))
+}
 
 // 按 DSH 技能服务（dsh-skill）的校验规则过一遍
 const list = await skillProvider.list()
