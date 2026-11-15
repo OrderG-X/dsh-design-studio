@@ -262,6 +262,14 @@ const pageEval = (opts = {}) => (expr) => {
   check('CDP：用完关掉页面', !!m('Target.closeTarget'))
   await new Promise((r) => setTimeout(r, 80))
   check('闲置一会儿浏览器自己关', b.running() === false)
+  // 后台活（画布缩略图）可以要求早点关（#21）：默认闲置 5 秒，这一次只留 20ms
+  {
+    const lb = createBrowser({ bin: '/fake/chrome', platform: 'fake', launch: fakeLaunch([], pageEval()), idleMs: 5000 })
+    await lb.withPage({ url: 'http://127.0.0.1:9/home.html', w: 375, h: 667, linger: 20 }, async () => 1)
+    await new Promise((r) => setTimeout(r, 80))
+    check('闲置时间可以按这一次的活缩短（缩略图 10 秒、默认 30 秒）', lb.running() === false)
+    lb.destroy()
+  }
   check('关浏览器：先让它自己关（Browser.close），不强杀', !!m('Browser.close') && !log.killed)
 }
 {
