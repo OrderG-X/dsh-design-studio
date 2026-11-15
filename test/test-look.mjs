@@ -411,7 +411,7 @@ if (!bin) {
     const FR = new URL('../skills/ui-design/frames/dsh/', import.meta.url)
     fs.copyFileSync(new URL('dsh-shell.css', FR), path.join(site, 'dsh-shell.css'))
     for (const f of ['sidebar', 'settings', 'view', 'panel']) fs.copyFileSync(new URL(`${f}.html`, FR), path.join(site, `fr-${f}.html`))
-    const view = fs.readFileSync(new URL('view.html', FR), 'utf8')
+    const view = fs.readFileSync(new URL('view.html', FR), 'utf8').replace(/\r\n/g, '\n') // Windows 拉下来是 CRLF，下面按 \n 找
     const css = '<style>[data-slot="main"] .pomo { padding: 32px 40px; display: grid; gap: 16px; justify-items: start; } [data-slot="main"] .pomo-time { font: 600 56px/1 var(--dsh-font); } [data-slot="main"] .pomo-card { border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-lg); background: var(--dsh-card); padding: 16px; } [data-slot="main"] .pomo-go { height: 32px; padding: 0 16px; border: 0; border-radius: var(--dsh-radius-lg); background: var(--dsh-btn); color: var(--dsh-btn-fg); font: 500 14px var(--dsh-font); }</style>\n</head>'
     const filled = view.replace('</head>', css).replace(/<span data-slot="tab-label">[^<]*<\/span>/, '<span data-slot="tab-label">番茄钟</span>')
       .replace(/(<div data-slot="main">)[\s\S]*?(\n    <\/div>\n  <\/main>)/, '$1<section class="pomo"><div class="pomo-time">25:00</div><button class="pomo-go">开始专注</button><div class="pomo-card">今天完成 3 个番茄</div></section>$2')

@@ -611,8 +611,9 @@ check('中文 / 英文翻译都拿得到', tZ('chipMark') === '标注图' && tE(
 {
   // 每条文案都有人用（删功能时顺手删文案，别攒一堆没人用的）；拼出来的键按前缀放过
   const libSrc = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((f) => (f.isDirectory() ? libSrc(new URL(f.name + '/', d)) : /\.m?js$/.test(f.name) ? [fs.readFileSync(new URL(f.name, d), 'utf8')] : []))
-  const zs = src.indexOf('const ZH = {'), es = src.indexOf('const EN = {'), ee = src.indexOf('\n    }\n', es)
-  const rest = [src.slice(0, zs), src.slice(ee), ...libSrc(new URL('../lib/', import.meta.url)).filter((x) => x !== src)].join('\n')
+  const lf = src.replace(/\r\n/g, '\n') // Windows 拉下来是 CRLF
+  const zs = lf.indexOf('const ZH = {'), es = lf.indexOf('const EN = {'), ee = lf.indexOf('\n    }\n', es)
+  const rest = [lf.slice(0, zs), lf.slice(ee), ...libSrc(new URL('../lib/', import.meta.url)).filter((x) => x !== src)].join('\n')
   const DYN = /^(ck|cd|ckOs|ckZone|ckEdge|ckWhen|ckWhat|mkHow|anT|el|tkn|mkErr|zipWhy|pkNote|shGhErr|shSubErr)_|^styleW\d+$/
   const unused = Object.keys(LZ).filter((k) => typeof LZ[k] === 'string' && !DYN.test(k) && !new RegExp(`\\b${k}\\b`).test(rest))
   check('文案：每个键都有人用', !unused.length, unused.join(' '))
