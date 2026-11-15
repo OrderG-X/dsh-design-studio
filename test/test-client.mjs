@@ -577,6 +577,23 @@ check('点选标签：消息里显示成标签（固定写「1 个元素」）',
 
 // ── 别的整段（标注、调样式、风格、体检…）也做成标签：中英文模板都认，消息里整段收成一个标签 ──
 const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, formatPrep } = mod._test
+{
+  // 设计类型：右侧栏那份和服务端（lib/kinds.js）一样，每个类型在各张表里都有（加类型漏一处直接红）
+  const T = mod._test
+  const kinds = await import('../lib/kinds.js')
+  check('设计类型：右侧栏和服务端的类型、画幅、别名一样', JSON.stringify(T.KIND_LIST) === JSON.stringify(kinds.KINDS) && JSON.stringify(T.KIND_SIZE) === JSON.stringify(kinds.KIND_SIZE) && JSON.stringify(T.META_ALIAS) === JSON.stringify(kinds.META_ALIAS))
+  const lack = T.KIND_LIST.flatMap((k) => [['KIND_KEY', T.KIND_KEY], ['FRAME', T.FRAME], ['SHOW_COLS', T.SHOW_COLS], ['ASK_EX', T.ASK_EX], ['图标', T.KIND_ICON]].filter(([, m]) => !m[k]).map(([n]) => `${n} 缺 ${k}`))
+  if (T.ASK_KINDS.slice().sort().join() !== T.KIND_LIST.slice().sort().join()) lack.push('ASK_KINDS 和 KIND_LIST 不一样')
+  for (const k of Object.keys(T.FIXED)) if (!T.KIND_LIST.includes(k)) lack.push('FIXED 里有不认识的 ' + k)
+  const LZk = makeT({})
+  for (const k of T.KIND_LIST) if (LZk(T.KIND_KEY[k]) === T.KIND_KEY[k]) lack.push('没有文案 ' + T.KIND_KEY[k])
+  check('设计类型：每张表都有每个类型', !lack.length, lack.join('\n'))
+}
+{
+  const { pollGap, webFitOf } = mod._test
+  check('问后台状态的间隔：在跑 0.7 秒、有设计或开着面板 1.5 秒、只挂着按钮 5 秒', pollGap({ state: { turn: 1 } }) === 700 && pollGap({ heavy: 1, state: {} }) === 1500 && pollGap({ state: { target: 'x' } }) === 1500 && pollGap({ state: { screens: [1] } }) === 1500 && pollGap({ state: { screens: [] } }) === 5000 && pollGap({}) === 5000)
+  check('网页按画幅显示：切过听用户的，没切过看写没写画幅，别的类型不管', webFitOf('web', '', true) && !webFitOf('web', '', false) && webFitOf('web', 'fit', false) && !webFitOf('web', 'fill', true) && !webFitOf('app', 'fit', true))
+}
 const tZ = makeT({})
 const tE = makeT({ locale: { bind: () => (k) => LE[k] } })
 check('翻译：填进去的内容里有「{notes}」也原样保留', tZ('mkAsk', { path: '/d/project-{notes}/refs/m.png', where: 'home', notes: '' }).startsWith('〔标注〕/d/project-{notes}/refs/m.png\n这是'))
@@ -590,6 +607,15 @@ check('中文 / 英文翻译都拿得到', tZ('chipMark') === '标注图' && tE(
   const diff = new Set(['vMore']) // 故意不同：中文「等 {n} 个」、英文「and {rest} more」，调用时两个都给
   const bad = zk.filter((k) => k in LE && !diff.has(k) && holes(LZ[k]) !== holes(LE[k])).map((k) => `${k}: ${holes(LZ[k])} ≠ ${holes(LE[k])}`)
   check('中文 / 英文文案：键一个不少、占位符一致', !miss.length && !bad.length, [...miss, ...bad].slice(0, 10).join('\n'))
+}
+{
+  // 每条文案都有人用（删功能时顺手删文案，别攒一堆没人用的）；拼出来的键按前缀放过
+  const libSrc = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((f) => (f.isDirectory() ? libSrc(new URL(f.name + '/', d)) : /\.m?js$/.test(f.name) ? [fs.readFileSync(new URL(f.name, d), 'utf8')] : []))
+  const zs = src.indexOf('const ZH = {'), es = src.indexOf('const EN = {'), ee = src.indexOf('\n    }\n', es)
+  const rest = [src.slice(0, zs), src.slice(ee), ...libSrc(new URL('../lib/', import.meta.url)).filter((x) => x !== src)].join('\n')
+  const DYN = /^(ck|cd|ckOs|ckZone|ckEdge|ckWhen|ckWhat|mkHow|anT|el|tkn|mkErr|zipWhy|pkNote|shGhErr|shSubErr)_|^styleW\d+$/
+  const unused = Object.keys(LZ).filter((k) => typeof LZ[k] === 'string' && !DYN.test(k) && !new RegExp(`\\b${k}\\b`).test(rest))
+  check('文案：每个键都有人用', !unused.length, unused.join(' '))
 }
 const W = '文件：/d/home.html'
 const issue = { type: 'contrast', sel: 'p.tip', text: '小字', fg: '#cccccc', bg: '#ffffff', ratio: 1.6, size: 12 }
