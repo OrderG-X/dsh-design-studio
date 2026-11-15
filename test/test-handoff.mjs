@@ -366,7 +366,9 @@ else {
     check('比对：大画幅隔点取样，一样的 < 1%，改过的差异明显、列得出块', bigSame.pct < 1 && bigDiff.pct > 1 && bigDiff.boxes.length >= 1, JSON.stringify([bigSame.pct, bigDiff.pct, bigDiff.boxes.length]))
     // 1px 细线（表格边框）去掉也要算出来：差异逐点算，只有热力图缩小（审查发现隔点取样会把整条细线跳过去）
     const grid = '<!doctype html><meta charset="utf-8"><body style="margin:0;height:100vh;background:'
-    fs.writeFileSync(path.join(design, 'grid.html'), grid + 'repeating-linear-gradient(0deg,#222 0 1px,transparent 1px 33px),repeating-linear-gradient(90deg,#222 0 1px,transparent 1px 91px) #fff"></body>')
+    // 1px 细线用一条条 div 画（重复渐变在 CI 的 Mac 上截 1600×1600 会超时）
+    const rules = [...Array.from({ length: 48 }, (_, i) => `<i style="position:absolute;left:0;right:0;top:${i * 33}px;height:1px;background:#222"></i>`), ...Array.from({ length: 17 }, (_, i) => `<i style="position:absolute;top:0;bottom:0;left:${i * 91}px;width:1px;background:#222"></i>`)].join('')
+    fs.writeFileSync(path.join(design, 'grid.html'), grid + '#fff;position:relative">' + rules + '</body>')
     fs.writeFileSync(path.join(impl, 'nogrid.html'), grid + '#fff"></body>')
     const lines = await compareScreens(b, { design: { key: 'grid.html', url: `${entry.origin}/grid.html`, label: 'grid' }, impl: pathToFileURL(path.join(impl, 'nogrid.html')).href, size: [1600, 1600] })
     check('比对：大画幅去掉 1px 细线也算得出差异（不说基本一致）', lines.pct > 1 && !/基本一致/.test(lines.text), JSON.stringify([lines.pct, lines.text.slice(0, 80)]))
