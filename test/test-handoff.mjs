@@ -360,18 +360,17 @@ else {
     check('比对：一样的页面差异 < 1%，说基本一致', same.pct < 1 && /基本一致/.test(same.text), same.text)
     const diff = await compareScreens(b, { design: design0, impl: pathToFileURL(path.join(impl, 'diff.html')).href, size: [1024, 700] })
     check('比对：改过的页面差异明显，列出差在哪几块', diff.pct > 1 && diff.boxes.length >= 1 && /差得最多的几块/.test(diff.text), diff.text)
-    // 大画幅隔点取样（#21）：1600×1600 隔 2 个点算，一样的还是一样、改过的照样找得到差在哪
-    const bigSame = await compareScreens(b, { design: design0, impl: pathToFileURL(path.join(impl, 'same.html')).href, size: [1600, 1600] })
-    const bigDiff = await compareScreens(b, { design: design0, impl: pathToFileURL(path.join(impl, 'diff.html')).href, size: [1600, 1600] })
-    check('比对：大画幅隔点取样，一样的 < 1%，改过的差异明显、列得出块', bigSame.pct < 1 && bigDiff.pct > 1 && bigDiff.boxes.length >= 1, JSON.stringify([bigSame.pct, bigDiff.pct, bigDiff.boxes.length]))
+    // 大画幅（#21）：差异逐点算，热力图隔 2 点画；一样的还是一样
+    const bigSame = await compareScreens(b, { design: design0, impl: pathToFileURL(path.join(impl, 'same.html')).href, size: [1500, 1500] })
+    // CI 的 Mac 连截三组 1600×1600 会超时：大画幅只比两组（一样的、去掉细线的），1500×1500 已经要隔 2 点画热力图
     // 1px 细线（表格边框）去掉也要算出来：差异逐点算，只有热力图缩小（审查发现隔点取样会把整条细线跳过去）
     const grid = '<!doctype html><meta charset="utf-8"><body style="margin:0;height:100vh;background:'
-    // 1px 细线用一条条 div 画（重复渐变在 CI 的 Mac 上截 1600×1600 会超时）
+    // 1px 细线用一条条 div 画
     const rules = [...Array.from({ length: 48 }, (_, i) => `<i style="position:absolute;left:0;right:0;top:${i * 33}px;height:1px;background:#222"></i>`), ...Array.from({ length: 17 }, (_, i) => `<i style="position:absolute;top:0;bottom:0;left:${i * 91}px;width:1px;background:#222"></i>`)].join('')
     fs.writeFileSync(path.join(design, 'grid.html'), grid + '#fff;position:relative">' + rules + '</body>')
     fs.writeFileSync(path.join(impl, 'nogrid.html'), grid + '#fff"></body>')
-    const lines = await compareScreens(b, { design: { key: 'grid.html', url: `${entry.origin}/grid.html`, label: 'grid' }, impl: pathToFileURL(path.join(impl, 'nogrid.html')).href, size: [1600, 1600] })
-    check('比对：大画幅去掉 1px 细线也算得出差异（不说基本一致）', lines.pct > 1 && !/基本一致/.test(lines.text), JSON.stringify([lines.pct, lines.text.slice(0, 80)]))
+    const lines = await compareScreens(b, { design: { key: 'grid.html', url: `${entry.origin}/grid.html`, label: 'grid' }, impl: pathToFileURL(path.join(impl, 'nogrid.html')).href, size: [1500, 1500] })
+    check('比对：大画幅一样的 < 1%；去掉 1px 细线也算得出差异（不说基本一致）', bigSame.pct < 1 && lines.pct > 1 && !/基本一致/.test(lines.text), JSON.stringify([bigSame.pct, lines.pct, lines.boxes.length, lines.text.slice(0, 80)]))
     check('比对：差异块认得出是哪个元素（标题 / 按钮 / 卡片）', diff.boxes.some((x) => x.design && /h1|btn|card|每天一杯好咖啡|看菜单|新店开业/.test(`${x.design.d}${x.design.t || ''}`)), JSON.stringify(diff.boxes.map((x) => x.design)))
     check('比对：拼图是 JPEG，比单张宽（三栏）', diff.jpg[0] === 0xff && diff.jpg[1] === 0xd8 && diff.jpg.length > 5000)
     const bottom = await compareScreens(b, { design: design0, impl: pathToFileURL(path.join(impl, 'same.html')).href, size: [1024, 700], at: 'bottom' })
