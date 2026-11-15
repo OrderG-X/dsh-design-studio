@@ -1,0 +1,59 @@
+{
+  "id": "dsh",
+  "name": "DSH 插件",
+  "nameEn": "DSH plugin",
+  "desc": "DeepSeek Harness 桌面端的外框（照 DSH 0.2.2 量的），插件只设计槽位里那块",
+  "size": [1280, 800],
+  "css": "dsh-shell.css",
+  "themes": ["light", "dark"],
+  "darkAttr": "data-theme=\"dark\"",
+  "frames": [
+    {
+      "id": "sidebar",
+      "file": "sidebar.html",
+      "name": "左侧栏入口",
+      "dshSlot": "sidebar.panellist",
+      "desc": "左侧栏「插件 / 自动化任务」那一排多一行，点开主区是插件整页",
+      "slots": {
+        "entry-icon": "那一行的图标，16×16（放一个 svg）",
+        "entry-label": "那一行的字（插件名，2–6 个字）",
+        "main": "主区整页，1000×760（顶上 40px 留给 DSH 的右上角按钮）"
+      }
+    },
+    {
+      "id": "settings",
+      "file": "settings.html",
+      "name": "设置分区",
+      "dshSlot": "settings.section",
+      "desc": "设置弹窗左边导航多一项，右边是插件的设置",
+      "slots": {
+        "entry-icon": "导航那一项的图标，16×16",
+        "entry-label": "导航那一项的字",
+        "main": "右边设置内容，约 610×690，左右已留 24px"
+      }
+    },
+    {
+      "id": "view",
+      "file": "view.html",
+      "name": "会话标签页",
+      "dshSlot": "conversation.view",
+      "desc": "会话顶上「对话 / 轨迹」旁边多一个标签，下面整块是插件视图",
+      "slots": {
+        "tab-label": "标签上的字（2–6 个字）",
+        "main": "标签下面整块，1000×724"
+      }
+    },
+    {
+      "id": "panel",
+      "file": "panel.html",
+      "name": "右侧栏面板",
+      "dshSlot": "conversation.session.header.utilities + sidebarRightTabs",
+      "desc": "会话顶栏多一个按钮，点开右侧栏是插件面板",
+      "slots": {
+        "button-icon": "顶栏按钮的图标，16×16",
+        "panel-title": "右侧栏标签上的字",
+        "main": "右侧栏面板，574×762"
+      }
+    }
+  ]
+}

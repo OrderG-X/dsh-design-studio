@@ -398,6 +398,23 @@ if (!bin) {
 } else {
   const site = path.join(tmp, 'site')
   fs.mkdirSync(site)
+  // DSH 插件外框（技能目录 frames/dsh）：四个外框原样一份；填了插件的一份；改了外框文字的、插件样式漏到外框上的各一份
+  {
+    const FR = new URL('../skills/ui-design/frames/dsh/', import.meta.url)
+    fs.copyFileSync(new URL('dsh-shell.css', FR), path.join(site, 'dsh-shell.css'))
+    for (const f of ['sidebar', 'settings', 'view', 'panel']) fs.copyFileSync(new URL(`${f}.html`, FR), path.join(site, `fr-${f}.html`))
+    const view = fs.readFileSync(new URL('view.html', FR), 'utf8')
+    const css = '<style>[data-slot="main"] .pomo { padding: 32px 40px; display: grid; gap: 16px; justify-items: start; } [data-slot="main"] .pomo-time { font: 600 56px/1 var(--dsh-font); } [data-slot="main"] .pomo-card { border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-lg); background: var(--dsh-card); padding: 16px; } [data-slot="main"] .pomo-go { height: 32px; padding: 0 16px; border: 0; border-radius: var(--dsh-radius-lg); background: var(--dsh-btn); color: var(--dsh-btn-fg); font: 500 14px var(--dsh-font); }</style>\n</head>'
+    const filled = view.replace('</head>', css).replace(/<span data-slot="tab-label">[^<]*<\/span>/, '<span data-slot="tab-label">番茄钟</span>')
+      .replace(/(<div data-slot="main">)[\s\S]*?(\n    <\/div>\n  <\/main>)/, '$1<section class="pomo"><div class="pomo-time">25:00</div><button class="pomo-go">开始专注</button><div class="pomo-card">今天完成 3 个番茄</div></section>$2')
+    fs.writeFileSync(path.join(site, 'fr-filled.html'), filled)
+    fs.writeFileSync(path.join(site, 'fr-edit.html'), filled.replace('>新会话<', '>新建会话<'))
+    fs.writeFileSync(path.join(site, 'fr-leak.html'), filled.replace('</head>', '<style>div { color: #c00 } .dsh-side { color: #c00 } .dsh-app .dsh-side { background: #fee }</style>\n</head>'))
+    // 调样式改了槽位本身的内边距、插件里用了同名的 .dsh-head：都不算外框被改；外框根节点字号被盖：算；插件里 12px 的小按钮：报点击区太小
+    fs.writeFileSync(path.join(site, 'fr-slot.html'), filled.replace('<div data-slot="main">', '<div data-slot="main" class="pomo-wrap" style="padding-left: 24px">').replace('<section class="pomo">', '<header class="dsh-head" style="height: 48px">番茄钟设置</header><section class="pomo">'))
+    fs.writeFileSync(path.join(site, 'fr-root.html'), filled.replace('</head>', '<style>.dsh-app { font-size: 18px }</style>\n</head>'))
+    fs.writeFileSync(path.join(site, 'fr-tap.html'), filled.replace('<section class="pomo">', '<section class="pomo"><button style="width: 12px; height: 12px; padding: 0; border: 0" aria-label="设置"></button>'))
+  }
   // 图表：四种样图（fixtures/diagram）+ 技能目录里的 tokens.css、diagram.css；再加一张写错的
   const skillDir = new URL('../skills/ui-design/', import.meta.url)
   for (const f of ['tokens.css', 'diagram.css']) fs.copyFileSync(new URL(f, skillDir), path.join(site, f))
@@ -1060,6 +1077,23 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     check('调样式规则：media="print" 的样式表、没生效的 @supports 不算', !R2.color && R2.background && R2.background.n === 1 && !R2.background.maybe, JSON.stringify([R2.color, R2.background]))
     check('调样式规则：@layer 里的标成「大概」', R2['border-radius'] && R2['border-radius'].maybe === true, JSON.stringify(R2['border-radius']))
     check('调样式规则：背景来自第一段 <style>', R.background && R.background.sel === '.btn' && R.background.href.endsWith('/rules.html') && R.background.n === 0, JSON.stringify(R.background))
+    // DSH 插件外框：原样的四个和填了插件的深浅色都零问题（外框里的小字、字号多不算）；改了外框文字、插件样式漏到外框上都报「外框被改动」
+    {
+      const fr = []
+      for (const key of ['fr-sidebar.html', 'fr-settings.html', 'fr-view.html', 'fr-panel.html', 'fr-filled.html']) {
+        for (const dark of [false, true]) fr.push(...(await measureAll(b, { screens: [{ key, url: `${entry.origin}/${key}`, label: key }], sizes: [[1280, 800]], kind: 'dshplugin', dark })).map((r) => [key + (dark ? ' 深色' : ''), r.error || r.issues.map((x) => `${x.type} ${x.sel} ${x.text || ''} ${detailOf(x)}`)]))
+      }
+      check('真浏览器 DSH 外框：四个外框和填了插件的那屏深浅色都零问题', fr.every(([, v]) => Array.isArray(v) && v.length === 0), JSON.stringify(fr.filter(([, v]) => !Array.isArray(v) || v.length)))
+      const one = async (key) => (await measureAll(b, { screens: [{ key, url: `${entry.origin}/${key}`, label: key }], sizes: [[1280, 800]], kind: 'dshplugin' }))[0].issues.filter((x) => x.type === 'frame')
+      const ed = await one('fr-edit.html'), lk = await one('fr-leak.html')
+      check('真浏览器 DSH 外框：改了外框的字报「外框被改动」（结构）', ed.length === 1 && ed[0].what === 'dom', JSON.stringify(ed))
+      check('真浏览器 DSH 外框：插件样式改到外框（.dsh-app .dsh-side 底色）报（样式）；不带前缀的 div、.dsh-side 盖不过外框、不报', lk.length === 1 && lk[0].what === 'style' && lk[0].prop === 'background-color', JSON.stringify(lk))
+      const sl = await one('fr-slot.html'), rt = await one('fr-root.html')
+      check('真浏览器 DSH 外框：槽位本身加了 class、style（调样式改内边距），插件里用了同名的 .dsh-head 改高度，都不报', sl.length === 0, JSON.stringify(sl))
+      check('真浏览器 DSH 外框：外框根节点 .dsh-app 的字号被盖也报', rt.length === 1 && rt[0].what === 'style' && rt[0].prop === 'font-size', JSON.stringify(rt))
+      const tp = (await measureAll(b, { screens: [{ key: 'fr-tap.html', url: `${entry.origin}/fr-tap.html`, label: 'tap' }], sizes: [[1280, 800]], kind: 'dshplugin' }))[0].issues.filter((x) => x.type === 'tap')
+      check('真浏览器 DSH 外框：插件里 12px 的按钮报点击区太小（外框自己的小按钮不报）', tp.length === 1 && tp[0].w === 12, JSON.stringify(tp))
+    }
     // 图表：四张样图在自己的画幅下零问题（深浅色都量）；写错的那张报得出结构问题
     {
       const dgSize = { 'dg-mindmap.html': [1600, 1000], 'dg-route.html': [1400, 1500], 'dg-roadmap.html': [1600, 900], 'dg-arch.html': [1600, 1000], 'dg-long.html': [1600, 1000], 'dg-ms.html': [1600, 900], 'dg-color.html': [1400, 1500], 'dg-fx.html': [1600, 1400] }

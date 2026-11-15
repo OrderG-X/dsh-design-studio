@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>右侧栏面板</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<!-- 外框（DSH 插件 · 右侧栏面板）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/panel">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-iconbtn on"><span data-slot="button-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/></svg></span></div><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab on">对话</div><div class="dsh-tab">轨迹</div></div>
+    </header>
+    <div class="dsh-chat">
+      <div class="dsh-msg-me">帮我把这周的会议记录整理成一页</div>
+      <div class="dsh-msg-ai"><p>好的，我先读一下会议记录，再按议题归类。</p><p>整理好了，放在「会议纪要.md」。</p></div>
+    </div>
+    <div class="dsh-composer">
+      <div class="dsh-ph">描述你想要构建的内容，/ 调用指令，@ 文件或对话</div>
+      <div class="dsh-cbar"><div class="dsh-cl"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="dsh-mode"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg>工作区内修改<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div><div class="dsh-cr">DeepSeek V4.1 Flash<div class="dsh-send"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></div></div></div>
+    </div>
+  </main>
+  <aside class="dsh-right">
+    <div class="dsh-rtabs"><div class="dsh-rtab"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg>开始</div><div class="dsh-rtab on"><span data-slot="panel-title">我的插件</span></div></div>
+    <div data-slot="main">
+      <!-- 插件面板：点会话顶栏按钮后右侧栏显示的内容 -->
+    </div>
+  </aside>
+</div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+/* DSH 桌面端外框（照 DSH 0.2.2 网页版 1280×800 量的）。原样复制、原样引用，别改这个文件——体检会报「外框被改动」。
+   插件只写在 data-slot 里面；插件里想跟 DSH 一个样子，就用下面这些 --dsh-* 变量。
+   深色：<html data-theme="dark">。 */
+:root {
+  --dsh-bg: #ffffff;          /* 主区底色 */
+  --dsh-side: #f9fafb;        /* 左侧栏底色 */
+  --dsh-card: #ffffff;        /* 卡片 / 弹窗底色 */
+  --dsh-fg: #0f1115;          /* 正文 */
+  --dsh-muted: #81858c;       /* 次要字 */
+  --dsh-line: rgba(0, 0, 0, 0.12);
+  --dsh-hover: #ebeef2;       /* 选中行 / 悬停 */
+  --dsh-accent: #4176e6;      /* 选中标签、链接 */
+  --dsh-btn: #0f1115;         /* 主按钮（黑底白字） */
+  --dsh-btn-fg: #ffffff;
+  --dsh-folder: #4176e6;
+  --dsh-scrim: rgba(15, 17, 21, 0.24);
+  --dsh-radius-sm: 8px;
+  --dsh-radius-md: 12px;
+  --dsh-radius-lg: 16px;
+  --dsh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --dsh-font-brand: "Montserrat", var(--dsh-font);
+  --dsh-font-code: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
+}
+[data-theme="dark"] {
+  --dsh-bg: #151517;
+  --dsh-side: #1b1b1c;
+  --dsh-card: #1f1f22;
+  --dsh-fg: #f9fafb;
+  --dsh-muted: #adb2b8;
+  --dsh-line: rgba(255, 255, 255, 0.16);
+  --dsh-hover: #2c2c2f;
+  --dsh-accent: #7aaaff;
+  --dsh-btn: #f9fafb;
+  --dsh-btn-fg: #0f1115;
+  --dsh-folder: #7aaaff;
+  --dsh-scrim: rgba(0, 0, 0, 0.56);
+  color-scheme: dark;
+}
+html, body { margin: 0; padding: 0; background: var(--dsh-bg); }
+
+/* ── 整个窗口 ── */
+.dsh-app {
+  position: relative; display: flex; width: 1280px; height: 800px; overflow: hidden; box-sizing: border-box;
+  background: var(--dsh-bg); color: var(--dsh-fg); font: 400 14px/1.5 var(--dsh-font); text-align: left; letter-spacing: 0;
+}
+.dsh-app .dsh-i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+/* ── 左侧栏 ── */
+.dsh-app .dsh-side {
+  position: relative; flex: none; width: 280px; height: 800px; box-sizing: border-box; padding: 0 8px;
+  background: var(--dsh-side); border-right: 1px solid var(--dsh-line); display: flex; flex-direction: column;
+}
+.dsh-app .dsh-brand { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; box-sizing: border-box; }
+.dsh-app .dsh-logo { display: flex; align-items: center; gap: 8px; font: 700 21px/1 var(--dsh-font-brand); letter-spacing: -0.02em; color: var(--dsh-fg); }
+.dsh-app .dsh-logo-tag { font: 700 10px/1 var(--dsh-font); letter-spacing: 0.06em; padding: 3px 5px; border-radius: 3px; background: var(--dsh-fg); color: var(--dsh-side); }
+.dsh-app .dsh-iconbtn { width: 28px; height: 28px; border-radius: var(--dsh-radius-sm); display: flex; align-items: center; justify-content: center; color: var(--dsh-muted); box-sizing: border-box; }
+.dsh-app .dsh-iconbtn.on { background: var(--dsh-hover); color: var(--dsh-fg); }
+.dsh-app .dsh-new {
+  margin: 0 4px; height: 38px; box-sizing: border-box; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-md);
+  display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; font-weight: 500; background: var(--dsh-bg); color: var(--dsh-fg);
+}
+[data-theme="dark"] .dsh-app .dsh-new { background: #3a3a3e; }
+.dsh-app .dsh-nav { margin-top: 10px; display: flex; flex-direction: column; }
+.dsh-app .dsh-row {
+  height: 38px; box-sizing: border-box; padding: 0 12px; border-radius: var(--dsh-radius-md); display: flex; align-items: center; gap: 8px;
+  font-size: 15px; color: var(--dsh-fg); white-space: nowrap; overflow: hidden;
+}
+.dsh-app .dsh-row.on { background: var(--dsh-hover); }
+.dsh-app .dsh-sec { margin-top: 10px; height: 36px; padding: 0 4px 0 12px; display: flex; align-items: center; justify-content: space-between; color: var(--dsh-muted); font-size: 15px; }
+.dsh-app .dsh-sec-acts { display: flex; gap: 4px; }
+.dsh-app .dsh-folder { color: var(--dsh-folder); }
+.dsh-app .dsh-sess { height: 34px; padding: 0 12px 0 34px; border-radius: var(--dsh-radius-md); display: flex; align-items: center; justify-content: space-between; font-size: 15px; color: var(--dsh-fg); white-space: nowrap; }
+.dsh-app .dsh-sess.on { background: var(--dsh-hover); }
+.dsh-app .dsh-time { font-size: 12px; color: var(--dsh-muted); }
+.dsh-app .dsh-acct { margin-top: auto; height: 48px; padding: 0 8px; display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--dsh-fg); }
+.dsh-app .dsh-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--dsh-hover); color: var(--dsh-muted); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+/* ── 主区 ── */
+.dsh-app .dsh-main { position: relative; flex: 1 1 auto; min-width: 0; height: 800px; display: flex; flex-direction: column; background: var(--dsh-bg); }
+.dsh-app .dsh-bar { flex: none; height: 40px; position: relative; }
+.dsh-app .dsh-corner { position: absolute; top: 6px; right: 12px; }
+/* 会话顶栏：标题一行 + 标签一行 */
+.dsh-app .dsh-head { flex: none; height: 76px; box-sizing: border-box; border-bottom: 1px solid var(--dsh-line); position: relative; padding: 0 20px; }
+.dsh-app .dsh-crumbs { position: absolute; top: 11px; left: 20px; height: 28px; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 500; white-space: nowrap; }
+.dsh-app .dsh-mode { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 400; color: var(--dsh-muted); }
+.dsh-app .dsh-utils { position: absolute; top: 11px; right: 48px; height: 28px; display: flex; align-items: center; gap: 4px; }
+.dsh-app .dsh-split { height: 28px; display: flex; align-items: center; border-radius: var(--dsh-radius-sm); background: var(--dsh-accent); color: #fff; font-size: 13px; padding: 0 8px; gap: 4px; }
+.dsh-app .dsh-tabs { position: absolute; left: 18px; bottom: 0; height: 35px; display: flex; gap: 12px; }
+.dsh-app .dsh-tab { height: 35px; padding: 0 8px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: var(--dsh-muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.dsh-app .dsh-tab.on { color: var(--dsh-accent); border-bottom-color: var(--dsh-accent); }
+/* 会话正文（占位） */
+.dsh-app .dsh-chat { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 28px 24px 0; box-sizing: border-box; gap: 16px; overflow: hidden; }
+.dsh-app .dsh-msg-me { align-self: flex-end; max-width: 70%; padding: 8px 14px; border-radius: var(--dsh-radius-lg); background: var(--dsh-hover); font-size: 14px; }
+.dsh-app .dsh-msg-ai { align-self: stretch; font-size: 14px; color: var(--dsh-fg); }
+.dsh-app .dsh-msg-ai p { margin: 0 0 8px; }
+.dsh-app .dsh-composer {
+  flex: none; margin: 0 24px 20px; height: 112px; box-sizing: border-box; border: 1px solid var(--dsh-line); border-radius: 20px; background: var(--dsh-card);
+  display: flex; flex-direction: column; justify-content: space-between; padding: 14px 12px 10px 14px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+.dsh-app .dsh-ph { font-size: 14px; color: var(--dsh-muted); }
+.dsh-app .dsh-cbar { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--dsh-muted); }
+.dsh-app .dsh-cl, .dsh-app .dsh-cr { display: flex; align-items: center; gap: 12px; }
+.dsh-app .dsh-send { width: 32px; height: 32px; border-radius: 50%; background: var(--dsh-accent); opacity: 0.5; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+/* ── 右侧栏 ── */
+.dsh-app .dsh-right { flex: none; width: 575px; height: 800px; box-sizing: border-box; border-left: 1px solid var(--dsh-line); display: flex; flex-direction: column; background: var(--dsh-bg); }
+.dsh-app .dsh-rtabs { flex: none; height: 38px; display: flex; align-items: flex-end; padding: 0 10px; gap: 4px; border-bottom: 1px solid var(--dsh-line); }
+.dsh-app .dsh-rtab { height: 28px; max-width: 160px; box-sizing: border-box; padding: 0 10px; border-radius: var(--dsh-radius-sm) var(--dsh-radius-sm) 0 0; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dsh-muted); white-space: nowrap; overflow: hidden; }
+.dsh-app .dsh-rtab.on { background: var(--dsh-hover); color: var(--dsh-fg); }
+
+/* ── 设置弹窗 ── */
+.dsh-app .dsh-scrim { position: absolute; inset: 0; background: var(--dsh-scrim); }
+.dsh-app .dsh-modal {
+  position: absolute; left: 240px; top: 24px; width: 800px; height: 752px; box-sizing: border-box; border-radius: 24px; background: var(--dsh-card);
+  border: 1px solid var(--dsh-line); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18); display: flex; overflow: hidden;
+}
+.dsh-app .dsh-snav { flex: none; width: 188px; display: flex; flex-direction: column; }
+.dsh-app .dsh-stitle { height: 54px; padding: 0 24px; display: flex; align-items: center; font-size: 16px; font-weight: 500; }
+.dsh-app .dsh-slist { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.dsh-app .dsh-scell { height: 40px; box-sizing: border-box; padding: 0 12px; border-radius: var(--dsh-radius-md); display: flex; align-items: center; gap: 8px; font-size: 14px; white-space: nowrap; overflow: hidden; }
+.dsh-app .dsh-scell.on { background: var(--dsh-hover); }
+.dsh-app .dsh-sbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.dsh-app .dsh-stop { flex: none; height: 62px; padding: 0 16px 0 24px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.dsh-app .dsh-ghost { height: 28px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-sm); display: flex; align-items: center; font-size: 13px; }
+
+/* ── 槽位：插件写在这里面 ── */
+.dsh-app [data-slot] { box-sizing: border-box; min-width: 0; }
+.dsh-app [data-slot="main"] { flex: 1 1 auto; min-height: 0; overflow: auto; position: relative; color: var(--dsh-fg); font: 400 14px/1.5 var(--dsh-font); }
+.dsh-app .dsh-main > [data-slot="main"] { background: var(--dsh-bg); }
+.dsh-app .dsh-sbody > [data-slot="main"] { padding: 0 24px 24px; }
+.dsh-app [data-slot$="-icon"] { width: 16px; height: 16px; flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.dsh-app [data-slot$="-label"], .dsh-app [data-slot$="-title"] { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -31,6 +31,7 @@ const en = pickStyleText('A habit tracker app for runners', 'app')
 check('英文题目：整段英文', en.startsWith('Sport:') && en.includes('tokens.css') && !/[一-鿿]/.test(en), en)
 check('工具：subject 必填', /不能空/.test((await styleTool.execute({})).text) && /不能空/.test((await styleTool.execute({ subject: '  ' })).text))
 check('工具：返回挑好的卡', (await styleTool.execute({ subject: '奶茶店点单小程序', kind: 'miniprogram' })).text.startsWith('活泼年轻——'))
+check('DSH 插件：首页不自动挑风格卡（默认用 DSH 的样子）；模型自己调 pick_style 照样给卡、几张都不报错', autoStyle('做一个番茄钟插件', 'dshplugin') === null && [undefined, 1, 2, 3].every((c) => pickStyleText('做一个番茄钟插件', 'dshplugin', c).length > 100))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)
