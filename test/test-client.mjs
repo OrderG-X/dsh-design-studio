@@ -594,6 +594,25 @@ const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, for
   check('问后台状态的间隔：在跑 0.7 秒、有设计或开着面板 1.5 秒、只挂着按钮 5 秒', pollGap({ state: { turn: 1 } }) === 700 && pollGap({ heavy: 1, state: {} }) === 1500 && pollGap({ state: { target: 'x' } }) === 1500 && pollGap({ state: { screens: [1] } }) === 1500 && pollGap({ state: { screens: [] } }) === 5000 && pollGap({}) === 5000)
   check('网页按画幅显示：切过听用户的，没切过看写没写画幅，别的类型不管', webFitOf('web', '', true) && !webFitOf('web', '', false) && webFitOf('web', 'fit', false) && !webFitOf('web', 'fill', true) && !webFitOf('app', 'fit', true))
 }
+{
+  // 演示跳屏（makeDemoNav）：前进压栈、点回上一屏算返回、返回 / 从头来、页面自己改地址只改记下的那屏
+  let d = { stack: ['a.html'], layers: [{ id: 1, key: 'a.html', dir: 0, shown: true }] }
+  const seq = { current: 1 }
+  const nav = mod._test.makeDemoNav({ setDemo: (f) => { d = typeof f === 'function' ? f(d) : f }, demoSeq: seq, fileTarget: true })
+  nav.demoTo('b.html')
+  const fwd = d.stack.join() === 'a.html,b.html' && d.layers.length === 2 && d.layers[1].dir === 1 && d.layers[1].id === 2
+  nav.demoShown(2)
+  nav.demoTo('c.html'); nav.demoTo('b.html')
+  const back = d.stack.join() === 'a.html,b.html' && d.layers[1].dir === -1
+  nav.demoBack()
+  const back2 = d.stack.join() === 'a.html' && d.layers[1].key === 'a.html'
+  nav.demoTo('b.html'); nav.demoTo('c.html'); nav.demoRestart()
+  const restart = d.stack.join() === 'a.html' && d.layers[1].dir === -1
+  const top = d.layers[d.layers.length - 1].id
+  nav.demoHref(top, 'http://127.0.0.1:1/x.html')
+  const href = d.stack[d.stack.length - 1] === 'x.html' && d.layers[d.layers.length - 1].key === 'x.html'
+  check('演示跳屏：前进、点回上一屏算返回、返回、从头来、页面自己跳了只改记下的那屏', fwd && back && back2 && restart && href, JSON.stringify(d))
+}
 const tZ = makeT({})
 const tE = makeT({ locale: { bind: () => (k) => LE[k] } })
 check('翻译：填进去的内容里有「{notes}」也原样保留', tZ('mkAsk', { path: '/d/project-{notes}/refs/m.png', where: 'home', notes: '' }).startsWith('〔标注〕/d/project-{notes}/refs/m.png\n这是'))
