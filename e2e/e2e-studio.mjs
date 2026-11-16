@@ -789,6 +789,15 @@ try {
     check('点选标签：接着打的字在标签后面', typed.indexOf('1 个元素') >= 0 && typed.indexOf('改成红色') > typed.indexOf('1 个元素'), JSON.stringify({ chip: typed.indexOf('1 个元素'), typed: typed.indexOf('改成红色'), len: typed.length, head: typed.slice(0, 30), active: await page(`(() => { const a = document.activeElement; return a ? a.tagName + (a.getAttribute('data-lexical-editor') ? '[lexical]' : '') + (a.tagName === 'IFRAME' ? a.src : '') : null })()`) }))
   }
 
+  // 在某个 iframe 里算（frameExpr 是在 DSH 页面里找到那个 iframe 的表达式）
+  const inPage = async (frameExpr, expression) => {
+    await chrome.cdp('Runtime.enable', {}, sessionId)
+    const { result } = await chrome.cdp('Runtime.evaluate', { expression: frameExpr }, sessionId)
+    const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
+    const c = chrome.events.filter((m) => m.sessionId === sessionId && m.method === 'Runtime.executionContextCreated' && m.params.context.auxData && m.params.context.auxData.frameId === node.frameId && m.params.context.auxData.isDefault).pop()
+    const r = await chrome.cdp('Runtime.evaluate', { expression, contextId: c.params.context.id, returnByValue: true }, sessionId)
+    return r.result && r.result.value
+  }
   // ⑦c 业务标注：开关关着没有按钮；开着：按钮带条数、面板和编号、卡片和编号互相定位、点选时编号收起
   const anBtn = `[...document.querySelectorAll('.ddp-btn.lab')].find((b) => (b.querySelector('.lb') || {}).textContent === '业务标注')`
   if (!ANNOT) check('业务标注：开关关着时没有按钮', await page(`!${anBtn}`))
@@ -827,14 +836,6 @@ try {
     await realClick(await dotAt('menu.html', '.go'))
     check('业务标注：画布上点编号，右边对应的卡片选中', await until(`${selCard} === 'menu-02'`, 3000), await page(selCard))
     // 页面里现在画着哪几条（编号在 closed shadow 里，问页面自己；点选模式没有挡板，按屏名找 iframe）
-    const inPage = async (frameExpr, expression) => {
-      await chrome.cdp('Runtime.enable', {}, sessionId)
-      const { result } = await chrome.cdp('Runtime.evaluate', { expression: frameExpr }, sessionId)
-      const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
-      const c = chrome.events.filter((m) => m.sessionId === sessionId && m.method === 'Runtime.executionContextCreated' && m.params.context.auxData && m.params.context.auxData.frameId === node.frameId && m.params.context.auxData.isDefault).pop()
-      const r = await chrome.cdp('Runtime.evaluate', { expression, contextId: c.params.context.id, returnByValue: true }, sessionId)
-      return r.result && r.result.value
-    }
     const cellFrame = (key) => `document.querySelector('.ddp-lab[data-key="${key}"]').closest('.ddp-cell').querySelector('iframe')`
     const marksIn = async (key) => (await inPage(cellFrame(key), 'window.__dshDesign.annotMarks()')) || []
     check('业务标注：页面上画着编号（定位不到的不画）', (await marksIn('menu.html')).join() === 'menu-01,menu-02', JSON.stringify(await marksIn('menu.html')))
@@ -1411,19 +1412,42 @@ try {
 
   // ⑨ze 网页铺满单看、右边开着面板（issue #22）：页面按原来的宽度定住、整体缩到面板左边——不重排，贴右边的内容也不被面板挡住
   fs.mkdirSync(WEBD, { recursive: true })
-  fs.writeFileSync(path.join(WEBD, 'index.html'), '<!doctype html><html><head><meta charset="utf-8"><title>首页</title><meta name="dsh-design" content="web"><style>body{margin:0;font:16px sans-serif}.r{position:absolute;right:0;top:0;width:200px;height:120px;background:#c33}</style></head><body><h1>网页</h1><div class="r">贴右边</div></body></html>')
+  const webHtml = (h1) => `<!doctype html><html><head><meta charset="utf-8"><title>首页</title><meta name="dsh-design" content="web"><style>body{margin:0;font:16px sans-serif}.r{position:absolute;right:0;top:0;width:200px;height:120px;background:#c33}.tall{height:3000px}</style></head><body><h1>${h1}</h1><div class="r">贴右边</div><div class="tall"></div></body></html>`
+  fs.writeFileSync(path.join(WEBD, 'index.html'), webHtml('网页'))
   await say('OPEN-WEB 打开网页')
   const webCur = `document.querySelector('iframe.ddp-frame.cur[src*="index.html"]')`
   await until(`!!${webCur}`, 30000)
   await sleep(1000)
+  await inPage(webCur, 'scrollTo(0, 900), scrollY')
   const webW0 = await page(`${webCur}.clientWidth`), webH0 = await page(`${webCur}.clientHeight`)
   await page(`document.querySelector('.ddp-top button[data-tip="外观"]').click()`)
   await until(`!!document.querySelector('.ddp-look')`, 5000)
   await sleep(800) // 面板淡入、缩放过渡
   const webGeo = await page(`(() => { const f = ${webCur}, r = f.getBoundingClientRect(), p = document.querySelector('.ddp-look').getBoundingClientRect(); return { w: f.clientWidth, h: f.clientHeight, right: Math.round(r.right), panel: Math.round(p.left) } })()`)
-  check('网页铺满单看、右边开着面板（#22）：页面宽高不变（不重排），整个在面板左边（不被挡）', webGeo.w === webW0 && webGeo.h === webH0 && webGeo.right <= webGeo.panel, JSON.stringify({ webW0, webH0, ...webGeo }))
+  const webY = await inPage(webCur, 'scrollY')
+  check('网页铺满单看、右边开着面板（#22）：页面宽高不变（不重排）、滚动位置不丢，整个在面板左边（不被挡）', webGeo.w === webW0 && webGeo.h === webH0 && webY === 900 && webGeo.right <= webGeo.panel, JSON.stringify({ webW0, webH0, webY, ...webGeo }))
   await shot('10-web-panel')
   await page(`document.querySelector('.ddp-top button[data-tip="外观"]').click()`)
+  await sleep(300)
+  // 对比（#22）：开版本面板、点上一版、对比；版本面板开 / 关时页面宽高一样，开着时整个在面板左边
+  await page(`document.querySelector('.ddp-more > .ddp-btn').click()`)
+  await sleep(250)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /版本/.test(x.textContent)).click()`)
+  const webVers = await until(`document.querySelectorAll('.ddp-hist .ddp-ver').length >= 2 && document.querySelectorAll('.ddp-hist .ddp-ver').length`, 8000)
+  // 点上一版对比：版本记在这个会话最早那套设计上，上一版里没有这一屏（左边是「这一版里没有」）；右边是现在的网页，量它
+  await page(`document.querySelectorAll('.ddp-hist .ddp-ver')[1].click()`)
+  await until(`!!document.querySelector('.ddp-banner .ddp-go.sec')`, 8000)
+  await page(`(() => { const b = document.querySelector('.ddp-banner .ddp-go.sec'); if (b) b.click() })()`)
+  await until(`document.querySelectorAll('.ddp-cmp iframe').length >= 1`, 8000)
+  await sleep(800)
+  const cmpGeo = () => page(`(() => { const fr = [...document.querySelectorAll('.ddp-cmp iframe')], c = document.querySelector('.ddp-cmp'), p = document.querySelector('.ddp-hist'); return { n: fr.length, w: fr.map((f) => f.clientWidth), h: fr.map((f) => f.clientHeight), right: c ? Math.round(c.getBoundingClientRect().right) : null, panel: p ? Math.round(p.getBoundingClientRect().left) : null } })()`)
+  const cmpOn = await cmpGeo()
+  await shot('10-web-compare')
+  await page(`document.querySelector('.ddp-hist header .ddp-btn').click()`)
+  await sleep(800)
+  const cmpOff = await cmpGeo()
+  check('网页对比、开着版本面板（#22）：页面宽高和不开面板时一样（不重排），整个在面板左边', !!webVers && cmpOn.n >= 1 && cmpOff.n === cmpOn.n && cmpOff.panel === null && JSON.stringify([cmpOn.w, cmpOn.h]) === JSON.stringify([cmpOff.w, cmpOff.h]) && cmpOn.right <= cmpOn.panel, JSON.stringify({ webVers, cmpOn, cmpOff }))
+  await page(`[...document.querySelectorAll('.ddp-banner .ddp-btn')].pop().click()`)
   await sleep(300)
 
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
