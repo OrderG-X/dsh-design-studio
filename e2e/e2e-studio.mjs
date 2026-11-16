@@ -80,6 +80,7 @@ function seedWelcome(cliDir) {
 const DESIGN = path.join(tmp, 'work', 'coffee-app')
 const DECK = path.join(tmp, 'work', 'deck') // 幻灯片写死 1500×800，meta 没写尺寸（issue #10）
 const DIAG = path.join(tmp, 'work', 'diagram') // 图表（思维导图）：用技能里的 diagram.css
+const WEBD = path.join(tmp, 'work', 'web') // 网页、meta 没写画幅（单看铺满右侧栏）：开右边面板时整体缩到面板左边（#22）
 const HEAD = (title) => `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="tokens.css">`
 const BASE = 'body{margin:0;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg)}header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}h1{font-size:24px;margin:0}main{padding:0 20px}.go{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:#fff;font-size:16px;text-decoration:none}'
 const HOME_BAD = `${HEAD('首页')}<style>${BASE}
@@ -218,6 +219,7 @@ const llm = http.createServer((req, res) => {
       return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_look', name: 'look_design', input: { screens: ['home.html'], size: '375x667' } }], 'tool_use')
     }
     if (said.includes('DRAFT-FIRST')) return slowWrite(res, FIRST_DRAFT, `${HEAD('第一屏')}<meta name="dsh-design" content="app"></head><body><main><h1>第一屏草稿</h1><p>${'边写边看的内容。'.repeat(80)}</p></main></body></html>`, 8000)
+    if (said.includes('OPEN-WEB')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(WEBD, 'index.html') } }], 'tool_use')
     if (said.includes('OPEN-DIAGRAM')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DIAG, 'map.html') } }], 'tool_use')
     if (said.includes('OPEN-DECK')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DECK, 's1.html') } }], 'tool_use')
     if (said.includes('DESIGN-OPEN')) {
@@ -1406,6 +1408,23 @@ try {
   const dgWide = await until(`((f) => f && f.clientWidth > 1700 && f.clientWidth + 'x' + f.clientHeight)(document.querySelector('iframe.ddp-frame.cur[src*="map.html"]'))`, 20000)
   check('图表：meta 不写尺寸、图比 1600 宽 → 画幅跟着图变宽', !!dgWide, await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(document.querySelector('iframe.ddp-frame.cur'))`))
   await shot('10-diagram-wide')
+
+  // ⑨ze 网页铺满单看、右边开着面板（issue #22）：页面按原来的宽度定住、整体缩到面板左边——不重排，贴右边的内容也不被面板挡住
+  fs.mkdirSync(WEBD, { recursive: true })
+  fs.writeFileSync(path.join(WEBD, 'index.html'), '<!doctype html><html><head><meta charset="utf-8"><title>首页</title><meta name="dsh-design" content="web"><style>body{margin:0;font:16px sans-serif}.r{position:absolute;right:0;top:0;width:200px;height:120px;background:#c33}</style></head><body><h1>网页</h1><div class="r">贴右边</div></body></html>')
+  await say('OPEN-WEB 打开网页')
+  const webCur = `document.querySelector('iframe.ddp-frame.cur[src*="index.html"]')`
+  await until(`!!${webCur}`, 30000)
+  await sleep(1000)
+  const webW0 = await page(`${webCur}.clientWidth`), webH0 = await page(`${webCur}.clientHeight`)
+  await page(`document.querySelector('.ddp-top button[data-tip="外观"]').click()`)
+  await until(`!!document.querySelector('.ddp-look')`, 5000)
+  await sleep(800) // 面板淡入、缩放过渡
+  const webGeo = await page(`(() => { const f = ${webCur}, r = f.getBoundingClientRect(), p = document.querySelector('.ddp-look').getBoundingClientRect(); return { w: f.clientWidth, h: f.clientHeight, right: Math.round(r.right), panel: Math.round(p.left) } })()`)
+  check('网页铺满单看、右边开着面板（#22）：页面宽高不变（不重排），整个在面板左边（不被挡）', webGeo.w === webW0 && webGeo.h === webH0 && webGeo.right <= webGeo.panel, JSON.stringify({ webW0, webH0, ...webGeo }))
+  await shot('10-web-panel')
+  await page(`document.querySelector('.ddp-top button[data-tip="外观"]').click()`)
+  await sleep(300)
 
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
   const OTHER = path.join(tmp, 'work', 'other-site')
