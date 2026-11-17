@@ -1522,6 +1522,25 @@ try {
   check('自定义画幅（#23）：恢复默认 → 网页回到铺满（不改记住的「按画幅显示」），本机记的也清掉', fitBack === 'false' && !!webFill && !/1000x700/.test(fitLeft), JSON.stringify({ fitBack, fitLeft, frame: await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(${webCur})`) }))
   await sleep(300)
 
+  // ⑨zg 分享到设计市场（gallery PR #33）：表单多了分类（必选 1–2 个，从市场词表里选）、标签（可选）、设计里的文字；没选分类点不了「检查」
+  await page(`(async () => { const b = [...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((x) => /^(导出|Export)$/.test(x.dataset.tip || '')); b.click(); await new Promise((r) => setTimeout(r, 150)); [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /分享到设计市场/.test(x.textContent)).click(); return 1 })()`)
+  const shChips = await until(`document.querySelectorAll('.ddp-share .chips[aria-label^="分类"] button').length`, 10000)
+  await page(`(() => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; const ins = document.querySelectorAll('.ddp-share input.who'); for (const [i, v] of [[0, '街角网页'], [1, '一屏的街角小店网页']]) { set.call(ins[i], v); ins[i].dispatchEvent(new Event('input', { bubbles: true })) } ; for (const c of document.querySelectorAll('.ddp-share .agree input')) if (!c.checked) c.click() })()`)
+  await sleep(300)
+  const shGo = `document.querySelector('.ddp-share footer .go')`
+  const shOff = await page(`${shGo}.disabled`)
+  await page(`document.querySelector('.ddp-share .chips[aria-label^="分类"] button').click()`)
+  await page(`[...document.querySelectorAll('.ddp-share .chips[aria-label^="标签"] button')].slice(0, 2).forEach((b) => b.click())`)
+  await sleep(300)
+  const shOn = await page(`!${shGo}.disabled`)
+  const shPicked = await page(`({ c: document.querySelectorAll('.ddp-share .chips[aria-label^="分类"] button.on').length, t: document.querySelectorAll('.ddp-share .chips[aria-label^="标签"] button.on').length, lang: (document.querySelector('.ddp-share [role=radiogroup] [aria-checked=true]') || {}).textContent })`)
+  check('分享到设计市场（gallery PR #33）：表单有分类 / 标签 / 设计里的文字；没选分类点不了「检查」，选了就能点', shChips >= 10 && shOff === true && shOn === true && shPicked.c === 1 && shPicked.t === 2 && shPicked.lang === '中文', JSON.stringify({ shChips, shOff, shOn, shPicked }))
+  await page(`document.querySelector('.ddp-share .chips[aria-label^="分类"]').scrollIntoView({ block: 'center' })`)
+  await sleep(300)
+  await shot('10-share-form')
+  await page(`document.querySelector('.ddp-share header .ddp-btn').click()`)
+  await sleep(300)
+
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
   const OTHER = path.join(tmp, 'work', 'other-site')
   fs.mkdirSync(OTHER, { recursive: true })

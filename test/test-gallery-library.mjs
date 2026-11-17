@@ -796,6 +796,31 @@ check('作品库：重新定位后信任记号跟着走', library.get(path.join(
   check('分享过：预填带上次的名字和短号', info1.body.title === '晨光咖啡馆' && info1.body.description === '小咖啡馆两屏' && info1.body.share.ref === sh1.body.share.ref)
   check('分享过：作品卡片认得出', describeWork(library.get(r1.dir)).share.ref === sh1.body.share.ref)
   {
+    // 分类、标签、语言（gallery PR #33：一键投稿交上去的 design.json 没有这几项）：只收词表里有的，带进包和自己的 design.json，下次预填
+    const seedMeta = JSON.parse(fs.readFileSync(new URL('../gallery-seed/index.json', import.meta.url), 'utf8')).metadata
+    const vr = createLibraryRoutes({
+      admit: () => true, readBody: async (req) => req.body, json: (res, code, obj) => { res.code = code; res.body = obj },
+      tracker: { snapshot: () => null, cwdOf: () => '' }, library, inspiration: null, studio: {}, open: () => {}, storeLoad: () => ({}), version: '0.11.0', exported: new Set(), downloads: dl,
+      vocab: () => ({ categories: seedMeta.categories, tags: seedMeta.tags }),
+    })
+    const vcall = async (body) => { const res = {}; await vr.pack({ method: 'POST', body: { dir: r1.dir, ...body } }, res); return res }
+    const vi0 = await vcall({ info: true })
+    check('分享预填：带上市场词表（分类、标签），还没选过', vi0.body.vocab.categories.length === seedMeta.categories.length && vi0.body.vocab.tags.length === seedMeta.tags.length && vi0.body.categories.length === 0 && vi0.body.designLang === '', JSON.stringify(vi0.body).slice(0, 200))
+    const vs = await vcall({ share: true, title: '晨光咖啡馆', description: '小咖啡馆两屏', categories: ['food', 'nope', 'food', 'retail', 'travel'], tags: ['menu', 'xx'], designLang: 'both', agree })
+    const vm = vs.body.path ? zipMan(vs.body.path) : {}
+    const vocab = { categories: seedMeta.categories.map((x) => x.id), tags: seedMeta.tags.map((x) => x.id) }
+    const ci = checkPack(readZip(fs.readFileSync(vs.body.path)).files, { mode: 'ci', vocab })
+    check('分享：分类、标签只留词表里有的（去重、分类最多 2 个），语言照选的；包按机器人那套（带词表）查得过', vs.body.ok && JSON.stringify(vm.categories) === '["food","retail"]' && JSON.stringify(vm.tags) === '["menu"]' && vm.lang === 'both' && !ci.errors.some((e) => /categories|tags|lang/.test(e.code + (e.x || ''))), JSON.stringify({ c: vm.categories, t: vm.tags, l: vm.lang, e: ci.errors.map((e) => e.code + ':' + (e.x || '')) }))
+    const vi1 = await vcall({ info: true })
+    check('分享过：下次预填带上选过的分类、标签、语言', JSON.stringify(vi1.body.categories) === '["food","retail"]' && JSON.stringify(vi1.body.tags) === '["menu"]' && vi1.body.designLang === 'both')
+    const nv = await call({ share: true, title: '晨光咖啡馆', description: '小咖啡馆两屏', categories: [], agree })
+    const kept = JSON.parse(fs.readFileSync(path.join(r1.dir, 'design.json'), 'utf8'))
+    check('拿不到词表（没联网也没种子）：表单不显示这两栏，原来选的分类、标签留着', nv.body.ok && JSON.stringify(kept.categories) === '["food","retail"]' && JSON.stringify(kept.tags) === '["menu"]' && kept.lang === 'both', JSON.stringify({ c: kept.categories, t: kept.tags, l: kept.lang }))
+    const cl = await vcall({ share: true, title: '晨光咖啡馆', description: '小咖啡馆两屏', categories: ['saas'], tags: [], agree })
+    const cm = cl.body.path ? zipMan(cl.body.path) : {}
+    check('再分享改了选择：分类换成新的，标签全取消就不带', cl.body.ok && JSON.stringify(cm.categories) === '["saas"]' && !('tags' in cm) && cm.lang === 'both', JSON.stringify({ c: cm.categories, t: cm.tags }))
+  }
+  {
     // 原来中英都有：预填没改就两种都留着；改了中文就只留新中文
     const man = JSON.parse(fs.readFileSync(path.join(r1.dir, 'design.json'), 'utf8'))
     fs.writeFileSync(path.join(r1.dir, 'design.json'), JSON.stringify({ ...man, title: { zh: '晨光咖啡馆', en: 'Morning Cafe' } }))
