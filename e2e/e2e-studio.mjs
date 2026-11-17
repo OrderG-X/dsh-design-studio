@@ -49,6 +49,13 @@ const failed = () => results.filter((r) => !r.ok)
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-studio-')))
 const HOME = path.join(tmp, 'home')
 fs.mkdirSync(HOME, { recursive: true })
+// 外框库里先放一个外框：首页选「套外框」时下面列出来
+{
+  const fd = path.join(HOME, '.dsh', 'design-frames', 'demo-popup')
+  fs.mkdirSync(fd, { recursive: true })
+  fs.writeFileSync(path.join(fd, 'frame.json'), JSON.stringify({ id: 'demo-popup', name: '示例弹窗', size: [460, 640], css: [], frames: [{ id: 'popup', file: 'popup.html', name: '弹窗', slots: { main: '弹窗内容' } }] }))
+  fs.writeFileSync(path.join(fd, 'popup.html'), '<!doctype html><html><head><meta charset="utf-8"><meta name="dsh-design" content="framed 460x640"></head><body><div data-frame="demo-popup/popup"><div data-slot="main"></div></div></body></html>')
+}
 const env = { ...process.env, HOME, USERPROFILE: HOME, DSH_HOME: path.join(tmp, 'dsh-home'), npm_config_registry: REGISTRY, DEEPSEEK_API_KEY: 'sk-e2e-fake' }
 env.PATH = `${path.join(tmp, 'cli', 'node_modules', '.bin')}${path.delimiter}${env.PATH}`
 const run = (cmd, args, opts = {}) => {
@@ -1718,6 +1725,15 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     const covered = popUp ? await page(`(() => { const p = document.querySelector('.ddp-askpop'); const r = p.getBoundingClientRect(); let bad = 0; for (const x of [.15, .5, .85]) for (const y of [.15, .5, .85]) { const e = document.elementFromPoint(r.left + r.width * x, r.top + r.height * y); if (!e || !p.contains(e)) bad++ } return bad })()`) : -1
     check('首页风格面板：九个点都点得到面板（没被下面盖住）', covered === 0, `被盖住 ${covered} 个点`)
     await shot('11-home-pop')
+    // 套外框（#19 第 2 步）：选了这个类型，下面列出外框库里的外框，能挑一个
+    await page(`document.querySelector('.ddp-askpop') && document.querySelector('.ddp-ask button.chip[aria-haspopup=dialog]').click(), 1`)
+    await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
+    const frRow = await until(`(() => { const r = document.querySelector('.ddp-askframes'); return r ? [...r.querySelectorAll('button')].map((b) => b.textContent.trim()) : null })()`, 8000)
+    await page(`[...document.querySelectorAll('.ddp-askframes button')].find((b) => b.textContent.trim() === '示例弹窗')?.click(), 1`)
+    const frOn = await page(`(() => { const b = [...document.querySelectorAll('.ddp-askframes button')].find((x) => x.textContent.trim() === '示例弹窗'); return !!b && b.getAttribute('aria-checked') === 'true' })()`)
+    check('首页「套外框」：下面列出外框库里的外框（新外框 + 示例弹窗），点了选上', JSON.stringify(frRow) === JSON.stringify(['新外框', '示例弹窗']) && frOn, JSON.stringify({ frRow, frOn }))
+    await shot('11-home-frames')
+    await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
   }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
   await modeCheck()

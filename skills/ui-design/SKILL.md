@@ -32,6 +32,7 @@
    | `email` | 600 宽 | 卡片 | `references/email.md` |
    | `diagram` | 1600×1000 起，图多大画幅跟着多大 | 卡片 | `references/diagram.md`（思维导图、技术路线图、产品路线图、架构图；连线自动排，先读） |
    | `dshplugin` | 1280×800（DSH 桌面端） | 卡片（外框是页面自己带的） | `references/dshplugin.md`（DSH 插件：4 个位置的外框，只写槽位，先读） |
+   | `framed` | 跟外框走（如 400×600） | 卡片（外框是页面自己带的） | `references/frames.md`（套外框库里用户自己的外框，或照截图先做一个外框；只写槽位，先读） |
 
    细则只在做那一类时再读。
 
@@ -40,7 +41,7 @@
 3. **一屏一个 HTML 文件，放同一个目录**。新做一套设计时先建这套设计自己的文件夹（英文短名，如 `murmur-landing/`；工作区里已有项目就放在 `design/` 下），`tokens.css`、每一屏都放进去。**不要把文件直接写在工作区最外层**——用户的项目里很可能已经有 `index.html`、`style.css`，会被覆盖。按用户会看的顺序一屏一屏写（画布按创建顺序排：登录 → 首页 → 详情 → …）。文件名用英文小写（`login.html`、`home.html`），`<title>` 写「屏名 · 产品名」，用界面的语言（如「首页 · 梅林练」「Home · Pedal」，每屏的产品名写成一样的）：画布上只显示屏名，导出整套展示图时产品名做大标题。临时试验的页面用 `_` 开头（`_test.html`），不会上画布。每屏 `<head>` 里写：
 
    ```html
-   <meta name="dsh-design" content="app">          <!-- 类型；小程序写 miniprogram；Windows 软件写 desktop windows；海报可带尺寸：poster 1080x1920；图表写 diagram 1600x1000；DSH 插件写 dshplugin 1280x800 -->
+   <meta name="dsh-design" content="app">          <!-- 类型；小程序写 miniprogram；Windows 软件写 desktop windows；海报可带尺寸：poster 1080x1920；图表写 diagram 1600x1000；DSH 插件写 dshplugin 1280x800；套外框照外框里写好的那行，别改 -->
    ```
 
    **几屏共用的东西只写一份**：样式放 `tokens.css` 和一个公共的 `app.css`；图标、书封这类 SVG 放进一个 `icons.svg`（每个图标一个 `<symbol id="…">`），页面里用 `<svg><use href="icons.svg#cart"></use></svg>` 引用——换风格时改一处所有屏一起变，不会漏改。状态栏、标签栏这种 HTML 结构每屏照抄一份，保持一模一样。

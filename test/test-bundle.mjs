@@ -57,7 +57,7 @@ check('外网 url() 原样留着', out.includes('url("https://cdn.example/x.png"
 check('图标 <link href> 换成 data:', out.includes(`<link rel="icon" href="data:image/png;base64,${b64}">`))
 check('外网样式表原样留着', out.includes('<link rel="stylesheet" href="https://fonts.example/f.css">'))
 check('页面 <style> 里的 url() 内联', out.includes(`.y{background-image:url("data:image/png;base64,${b64}")}`))
-check('img src 内联', out.includes(`<img src="data:image/png;base64,${b64}"`))
+check('img src 内联（原地址留在 data-dsh-src、data-dsh-srcset）', /<img data-dsh-src="[^"]+"( data-dsh-srcset="[^"]+")? src="data:image\/png;base64,/.test(out) && out.includes('data-dsh-srcset="img/a.png 1x, img/a@2x.png 2x"'))
 check('srcset 每一项都内联', out.includes(`srcset="data:image/png;base64,${b64} 1x, data:image/png;base64,${b64} 2x"`))
 check('找不到的原样留着', out.includes('<img src="missing.png">'))
 check('越界的原样留着', out.includes('<img src="../secret.png">'))
@@ -82,7 +82,7 @@ check('读过的文件都记着（含没找到的）', ['css/app.css', 'tokens.c
 {
   const big = Buffer.alloc(1024 * 1024)
   const o = bundle('<img src="a.png">'.repeat(24), { key: 'a.html', read: () => big })
-  check('同一张 1MB 图引用 24 次：按内联次数算，总量不超上限', o.length < 13 * 1024 * 1024 && o.includes('<img src="a.png">') && o.includes('<img src="data:'), String(o.length))
+  check('同一张 1MB 图引用 24 次：按内联次数算，总量不超上限', o.length < 13 * 1024 * 1024 && o.includes('<img src="a.png">') && o.includes('<img data-dsh-src="a.png" src="data:'), String(o.length))
   const d = bundle('<head><script defer src="app.js"></script></head><body><button>x</button></body>', { key: 'a.html', read: (r) => (r === 'app.js' ? Buffer.from('document.querySelector("button").onclick=1') : null) })
   check('defer 脚本：还是外链（data:），defer 留着', /<script defer src="data:text\/javascript;charset=utf-8;base64,[^"]+"><\/script>/.test(d), d)
   const mf = { 'js/app.js': 'import { x } from "./dep.js";\nexport * from \'../lib/util.js\';\nimport("./lazy.js")', 'js/dep.js': 'export const x = 1', 'lib/util.js': 'export const u = 2', 'js/lazy.js': 'export default 3', 'js/inline.js': 'export const i = 4' }
@@ -102,12 +102,19 @@ check('读过的文件都记着（含没找到的）', ['css/app.css', 'tokens.c
   const own = bundle('<script type="importmap">{"imports":{}}</script><script type="module" src="js/app.js"></script>', { key: 'menu.html', read: mread, base: 'http://127.0.0.1:5000/menu.html' })
   check('页面自己有 importmap：模块不动', own.includes('<script type="module" src="js/app.js"></script>') && (own.match(/type="importmap"/g) || []).length === 1)
   const sq = bundle(`<div style='background:url(img/bg.png)'></div><p style="background:url('img/bg.png')"></p><i style="background:url(&quot;img/bg.png&quot;)"></i>`, { key: 'a.html', read })
-  check('单引号、双引号、&quot; 包着的行内 style 都内联成合法属性', sq.includes(`<div style='background:url(data:image/png;base64,${b64})'>`) && sq.includes(`<p style="background:url(data:image/png;base64,${b64})">`) && sq.includes(`<i style="background:url(data:image/png;base64,${b64})">`), sq)
+  check('单引号、双引号、&quot; 包着的行内 style 都内联成合法属性', sq.includes(`<div style='background:url(data:image/png;base64,${b64})' data-dsh-style='`) && sq.includes(`<p style="background:url(data:image/png;base64,${b64})" data-dsh-style="`) && sq.includes(`<i style="background:url(data:image/png;base64,${b64})" data-dsh-style="`), sq)
+  const bom = bundle('<link rel="stylesheet" href="b.css"><i style="background:url(&quot;img/a (1).png&quot;)"></i>', { key: 'a.html', read: (r) => (r === 'b.css' ? Buffer.from('\ufeff.x{color:red;background:url("img/a (1).png")}') : r === 'img/a (1).png' ? Buffer.from([1, 2, 3]) : null) })
+  check('样式文件开头带 BOM：内联时去掉（不然第一条规则失效）；url("a (1).png") 带括号的文件名也内联', bom.includes('">.x{color:red') && !bom.includes('\ufeff') && !bom.includes('img/a (1).png")') && (bom.match(/data:image\/png;base64,AQID/g) || []).length === 2, bom)
+  const ent = bundle('<img src="https://x.test/a.png?a=1&amp;b=2"><img src="img/a.png?v=1&amp;w=2"><img srcset="data:image/gif;base64,R0lG,AA 1x, img/a.png 2x">', { key: 'a.html', read })
+  check('图片地址带 &amp;：外网的原样不动（不二次转义），本地的解了实体找到文件；srcset 里 data: 带逗号不拆坏', ent.includes('<img src="https://x.test/a.png?a=1&amp;b=2">') && ent.includes('data-dsh-src="img/a.png?v=1&amp;w=2" src="data:image/png;base64,') && ent.includes('srcset="data:image/gif;base64,R0lG,AA 1x, data:image/png;base64,'), ent)
+  const big5 = Buffer.alloc(5 * 1024 * 1024, 7)
+  const bs = bundle('<img srcset="big.png 1x">', { key: 'a.html', read: (r) => (r === 'big.png' ? big5 : null) })
+  check('srcset 里一张 5 MB 的图：只换一次（不重复扣总量），换成 data:', /srcset="data:image\/png;base64,/.test(bs), bs.slice(0, 120))
   const ICONS = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><style>path{fill:red}</style><script>alert(1)</script><symbol id="check" onload="x()"><path d="M0 0" fill="url(#g)"/></symbol><linearGradient id="g"/><symbol id="x"/><use href="#x"/></svg>'
   const OTHER = '<svg xmlns="http://www.w3.org/2000/svg"><symbol id="check"><circle r="1"/></symbol></svg>'
   const sv = bundle('<body><svg><use href="icons.svg#check"></use></svg><svg><use xlink:href="icons.svg#x"/></svg><svg><use href="other.svg#check"/></svg></body>', { key: 'a.html', read: (r) => (r === 'icons.svg' ? Buffer.from(ICONS) : r === 'other.svg' ? Buffer.from(OTHER) : null) })
-  check('<use href="icons.svg#check">：SVG 放进页面，href 改成带文件前缀的 #id', sv.includes('<use href="#dsh1-check">') && sv.includes('<use xlink:href="#dsh1-x"/>') && /<div aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><svg [^>]*>/.test(sv) && (sv.match(/<symbol id="dsh1-check"/g) || []).length === 1 && !sv.includes('<?xml'), sv)
-  check('两份 SVG 都有 #check：各用各的，不串图', sv.includes('<use href="#dsh2-check"/>') && sv.includes('<symbol id="dsh2-check">'), sv)
+  check('<use href="icons.svg#check">：SVG 放进页面，href 改成带文件前缀的 #id', sv.includes('<use data-dsh-href="icons.svg#check" href="#dsh1-check">') && sv.includes('<use data-dsh-href="icons.svg#x" xlink:href="#dsh1-x"/>') && /<div aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><svg [^>]*>/.test(sv) && (sv.match(/<symbol id="dsh1-check"/g) || []).length === 1 && !sv.includes('<?xml'), sv)
+  check('两份 SVG 都有 #check：各用各的，不串图', sv.includes('<use data-dsh-href="other.svg#check" href="#dsh2-check"/>') && sv.includes('<symbol id="dsh2-check">'), sv)
   check('雪碧图里的脚本、事件、<style> 去掉，内部引用跟着改名', !sv.includes('alert(1)') && !sv.includes('onload=') && !sv.includes('fill:red') && sv.includes('url(#dsh1-g)') && sv.includes('<use href="#dsh1-x"/>'), sv)
 }
 
