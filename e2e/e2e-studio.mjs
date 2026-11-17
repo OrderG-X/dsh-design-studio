@@ -1298,6 +1298,32 @@ try {
   check('画幅探测：幻灯片写死 1500×800、meta 没写尺寸 → 画幅跟着变', deckSize === '1500x800', await page(`(() => { const f = document.querySelector('iframe.ddp-frame.cur'); return f ? f.src + ' ' + f.clientWidth + 'x' + f.clientHeight : '没有 iframe' })()`))
   await sleep(1500)
   await shot('10-deck')
+
+  // ⑨z2 自定义画幅（#23）：屏名菜单「画幅」一行 → 自定义… 填 1200×700 → 画布照这个；再恢复默认
+  const menuOpen = `(async () => { const b = document.querySelector('.ddp-top .ddp-addr'); if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') b.click(); await new Promise((r) => setTimeout(r, 200)); return !!document.querySelector('.ddp-szrow') })()`
+  const szRow0 = (await page(menuOpen)) && (await page(`document.querySelector('.ddp-szrow').innerText`))
+  check('自定义画幅：屏名菜单里有「画幅」一行，写着现在的 1500×800（默认）', /1500×800/.test(szRow0 || '') && /默认/.test(szRow0 || ''), szRow0)
+  // 菜单已开：点「自定义…」、填宽高、（截图）、点「好」
+  const setCustomSize = async (w, hh, shotName) => {
+    await page(`[...document.querySelectorAll('.ddp-szrow button')].find((x) => /自定义/.test(x.textContent)).click()`)
+    await sleep(200)
+    await page(`(() => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; const [w, hh] = document.querySelectorAll('.ddp-szrow input'); set.call(w, '${w}'); w.dispatchEvent(new Event('input', { bubbles: true })); set.call(hh, '${hh}'); hh.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+    await sleep(200)
+    if (shotName) await shot(shotName)
+    await page(`document.querySelector('.ddp-szrow button[type="submit"]').click()`)
+  }
+  await setCustomSize(1200, 700, '10-deck-size-edit')
+  const custom = await until(`((f) => f && f.clientWidth === 1200 && f.clientHeight === 700)(document.querySelector('iframe.ddp-frame.cur'))`, 8000)
+  check('自定义画幅：填 1200×700 点「好」→ 画布变成 1200×700', !!custom, await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(document.querySelector('iframe.ddp-frame.cur'))`))
+  await sleep(600)
+  await shot('10-deck-size-custom')
+  const szRow1 = (await page(menuOpen)) && (await page(`document.querySelector('.ddp-szrow').innerText`))
+  check('自定义画幅：菜单里写着 1200×700（自定义），有「恢复默认」', /1200×700/.test(szRow1 || '') && /自定义/.test(szRow1 || '') && /恢复默认/.test(szRow1 || ''), szRow1)
+  await shot('10-deck-size-menu')
+  await page(`[...document.querySelectorAll('.ddp-szrow button')].find((x) => /恢复默认/.test(x.textContent)).click()`)
+  const back = await until(`((f) => f && f.clientWidth === 1500 && f.clientHeight === 800)(document.querySelector('iframe.ddp-frame.cur'))`, 8000)
+  check('自定义画幅：恢复默认 → 回到 1500×800', !!back, await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(document.querySelector('iframe.ddp-frame.cur'))`))
+  await sleep(600)
   await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
   await sleep(300)
   await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /PDF/.test(x.textContent)).click()`)
@@ -1455,6 +1481,45 @@ try {
   const cmpOff = await cmpGeo()
   check('网页对比、开着版本面板（#22）：页面宽高和不开面板时一样（不重排），整个在面板左边', !!webVers && cmpOn.n >= 1 && cmpOff.n === cmpOn.n && cmpOff.panel === null && JSON.stringify([cmpOn.w, cmpOn.h]) === JSON.stringify([cmpOff.w, cmpOff.h]) && cmpOn.right <= cmpOn.panel, JSON.stringify({ webVers, cmpOn, cmpOff }))
   await page(`[...document.querySelectorAll('.ddp-banner .ddp-btn')].pop().click()`)
+  await sleep(300)
+
+  // ⑨zf 自定义画幅 + 多尺寸（#23）：网页自定义成 1000×700 → 多尺寸并排的手机 / 平板 / 电脑后面多一档「自定义 · 1000」；关掉、恢复默认
+  // 先在菜单里把「按画幅显示」关掉（铺满）：填了画幅要自动换回按画幅显示，单看就是 1000×700
+  const fitItem = `[...document.querySelectorAll('.ddp-menu [role=menuitemcheckbox]')].find((x) => /按画幅/.test(x.textContent))`
+  for (let i = 0; i < 2; i++) { await page(menuOpen); await page(`${fitItem}.click()`); await sleep(300) }
+  await page(menuOpen)
+  const fillOff = await page(`${fitItem}.getAttribute('aria-checked')`)
+  await setCustomSize(1000, 700)
+  const webSized = await until(`((f) => f && f.clientWidth === 1000 && f.clientHeight === 700)(${webCur})`, 8000)
+  await page(menuOpen)
+  const fitOn = await page(`${fitItem}.getAttribute('aria-checked')`)
+  await page(`document.querySelector('.ddp-top .ddp-addr').click()`)
+  const fitStored = await page(`localStorage.getItem('ddp-fit-for') || ''`)
+  check('自定义画幅（#23）：网页之前切成铺满，填 1000×700 → 换回按画幅显示，单看就是 1000×700（记在本机，重开也在）', fillOff === 'false' && !!webSized && fitOn === 'true' && /"1000x700"/.test(fitStored), JSON.stringify({ fillOff, fitOn, fitStored, frame: await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(${webCur})`) }))
+  await sleep(500)
+  await page(menuOpen)
+  await page(`document.querySelector('.ddp-menu [role=menuitemcheckbox]').click()`)
+  const multiLabs = await until(`((ls) => ls.length >= 4 && ls.join('|'))([...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent.trim()))`, 10000)
+  const multiFr = await page(`[...document.querySelectorAll('.ddp-cell iframe')].map((f) => f.clientWidth + 'x' + f.clientHeight).join(' ')`)
+  check('多尺寸（#23）：自定义了 1000×700 → 并排多出一档「自定义 · 1000」，那块就是 1000×700', /自定义 · 1000/.test(multiLabs || '') && /\b1000x700\b/.test(multiFr || ''), `${multiLabs} / ${multiFr}`)
+  await sleep(800)
+  await shot('10-web-sizes-custom')
+  await page(menuOpen)
+  await page(`document.querySelector('.ddp-menu [role=menuitemcheckbox]').click()`)
+  await sleep(300)
+  await page(menuOpen)
+  await page(`[...document.querySelectorAll('.ddp-szrow button')].find((x) => /恢复默认/.test(x.textContent)).click()`)
+  await sleep(500)
+  check('多尺寸（#23）：恢复默认后菜单写回「默认」', await until(`(async () => { ${''}const b = document.querySelector('.ddp-top .ddp-addr'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); await new Promise((r) => setTimeout(r, 150)); const r = document.querySelector('.ddp-szrow'); return !!r && /默认/.test(r.innerText) && !/恢复默认/.test(r.innerText) })()`, 5000))
+  await page(`(() => { const b = document.querySelector('.ddp-top .ddp-addr'); if (b && b.getAttribute('aria-expanded') === 'true') b.click() })()`)
+  await sleep(300)
+  // 恢复默认：回到之前选的铺满（不改记住的偏好；后面的拖放也要单页铺满）
+  await page(menuOpen)
+  const fitBack = await page(`${fitItem}.getAttribute('aria-checked')`)
+  await page(`document.querySelector('.ddp-top .ddp-addr').click()`)
+  const webFill = await page(`((f) => f && f.clientWidth !== 1000 && f.clientWidth !== 1440)(${webCur})`)
+  const fitLeft = await page(`localStorage.getItem('ddp-fit-for') || ''`)
+  check('自定义画幅（#23）：恢复默认 → 网页回到铺满（不改记住的「按画幅显示」），本机记的也清掉', fitBack === 'false' && !!webFill && !/1000x700/.test(fitLeft), JSON.stringify({ fitBack, fitLeft, frame: await page(`((f) => f ? f.clientWidth + 'x' + f.clientHeight : '没有 iframe')(${webCur})`) }))
   await sleep(300)
 
   // ⑩ 打开已有的 HTML（#8）：网页版没有桌面版的桥 → 不显示「浏览…」、拖进来提示输路径；装上假桥（和桌面版一样的接口）→ 选文件、拖进来、选文件夹都能用
