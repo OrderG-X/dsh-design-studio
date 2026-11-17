@@ -486,7 +486,7 @@ const { STYLES, formatStyle, accentUse } = mod._test
   const clientSrc = fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
   const server = await import('../lib/styles.js')
   check('风格卡：服务端（pick_style）那份和右侧栏一字不差', JSON.stringify(server.STYLES) === JSON.stringify(STYLES))
-  check('自动风格：服务端的题材规则和右侧栏一样', server.AUTO_STYLE.every(([k, re]) => clientSrc.includes(`['${k}', /${re.source}/`)) && [server.SAID_STYLE, server.NOT_STYLE_FENG].every((re) => clientSrc.includes(re.source)))
+  check('自动风格：服务端的题材规则和右侧栏一样', server.AUTO_STYLE.every(([k, re]) => clientSrc.includes(`['${k}', /${re.source}/`)) && [server.SAID_STYLE, server.NOT_STYLE_FENG, server.PROPOSAL, server.DIAGRAM_WORD].every((re) => clientSrc.includes(re.source)))
   check('自动风格：服务端的兜底和右侧栏一样', clientSrc.includes(`const AUTO_SPREAD = ${JSON.stringify(server.AUTO_SPREAD).replace(/"/g, "'").replace(/,/g, ', ')}`) && Object.entries(server.AUTO_BY_KIND).every(([k, v]) => new RegExp(`const AUTO_BY_KIND = \\{[^}]*\\b${k}: '${v}'`).test(clientSrc)))
 }
 {
@@ -495,6 +495,8 @@ const { STYLES, formatStyle, accentUse } = mod._test
   check('自动风格：按题材挑卡', id('做一个城市民宿预订 App：首页推荐、房源详情、下单确认，三屏', 'app') === 'fresh' && id('奶茶店点单小程序：菜单、购物车、取餐码', 'miniprogram') === 'playful' && id('A landing page for an AI meeting-notes SaaS called Murmur', 'web') === 'tech' && id('A habit tracker app for runners: today, weekly stats, profile', 'app') === 'sport' && id('社区咖啡馆小程序', 'miniprogram') === 'retro',
     [id('做一个城市民宿预订 App', 'app'), id('奶茶店点单小程序', 'miniprogram'), id('SaaS', 'web'), id('runners', 'app'), id('社区咖啡馆小程序', 'miniprogram')].join())
   check('自动风格：用户说了风格就不挑', id('周末城市音乐节海报，霓虹夜色风', 'poster') === null && id('健身 App，配色用蓝白', 'app') === null && id('跑步 App，赛博朋克', 'app') === null && id('A fitness app in a dark luxury style', 'app') === null)
+  check('自动风格：像申报书那种图（图表或没选类型）首页不附卡，别的类型照挑', id('帮我画课题申报书的技术路线图，课题是《三环联动社区阅读推广模式研究》', 'diagram') === null && id('帮我画课题申报书的技术路线图，课题是《三环联动社区阅读推广模式研究》', '') === null && id('结题报告里的研究框架图', undefined) === null && id('A research proposal framework diagram', 'diagram') === null && id('做一张零基础学 Python 的思维导图', 'diagram') === 'tech' && id('社区读书会的海报', 'poster') === 'editorial' && id('课题申报管理系统后台', 'web') === 'tech' && id('课题组周会幻灯片', 'slides') !== null && id('课题组招新海报', 'poster') !== null,
+    [id('帮我画课题申报书的技术路线图，课题是《三环联动社区阅读推广模式研究》', 'diagram'), id('帮我画课题申报书的技术路线图，课题是《三环联动社区阅读推广模式研究》', ''), id('结题报告里的研究框架图', undefined), id('A research proposal framework diagram', 'diagram'), id('做一张零基础学 Python 的思维导图', 'diagram'), id('社区读书会的海报', 'poster'), id('课题申报管理系统后台', 'web'), id('课题组周会幻灯片', 'slides'), id('课题组招新海报', 'poster')].join())
   check('自动风格：「风景」「通风」不算说了风格', id('风景摄影分享 App', 'app') !== null && id('新风系统控制面板', 'desktop') !== null)
   check('自动风格：审查 A 的误判都改了', id('A Black Friday sale landing page', 'web') === 'sale' && id('智能家居面板：支持照明、通风、安防', 'app') !== null && id('健身 App，风格你定', 'app') === null && id('跑步 App，用北欧风：首页、训练、我的', 'app') === null && id('北欧风的界面，做个记账 App', 'app') === null && id('I run a coffee shop', 'web') === 'retro' && id('waterpark tickets', 'web') !== 'tech' && id('A fitness app, any style', 'app') === null,
     [id('A Black Friday sale landing page', 'web'), id('智能家居面板：支持照明、通风、安防', 'app'), id('健身 App，风格你定', 'app'), id('跑步 App，用北欧风：首页、训练、我的', 'app'), id('北欧风的界面，做个记账 App', 'app'), id('I run a coffee shop', 'web'), id('waterpark tickets', 'web'), id('A fitness app, any style', 'app')].join())
