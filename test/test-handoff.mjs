@@ -11,7 +11,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import http from 'node:http'
-import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, implUrl, handoffMd, buildHandoff, compareScreens, diffIn, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
+import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, slotHtml, isFramed, implUrl, handoffMd, buildHandoff, compareScreens, diffIn, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
 import { createHub } from '../lib/serve.js'
 import { findBrowser, createBrowser } from '../lib/browser.js'
 
@@ -84,6 +84,17 @@ check('路由：index / home → /，别的 /名字', routeOf('index.html') === 
     ['me.html', '<nav class="tabbar"></nav><span class="topbar">x</span>'],
   ]))
   check('共用：几屏都有的外层 class 列出来（里面的 topbar-logo、状态 class 不算）', parts.map((p) => `${p.cls}:${p.n}`).join() === 'tabbar:3,topbar:2', JSON.stringify(parts))
+}
+{
+  // #25 套了外框：外框是宿主画的，几屏都有的外框 class 不算「共用部分」，只看槽位里的
+  const shell = (main) => `<div class="dsh-app" data-frame="dsh/view"><aside class="dsh-side"><div class="dsh-row on">会话</div></aside><div class="dsh-tabs"><div class="dsh-tab on"><span data-slot="tab-label">书稿</span></div></div><div data-slot="main">${main}</div></div>`
+  const fp = sharedParts(new Map([
+    ['write.html', shell('<div class="toolbar"><div class="toolbar-btn">a</div></div><section class="editor"><div>x</div></section>')],
+    ['flow.html', shell('<div class="toolbar"></div><ul class="steps"></ul>')],
+  ]))
+  check('共用：套了外框的页面只看槽位里的（dsh-app / dsh-side 这些外框 class 不列，toolbar 照列）', fp.map((p) => `${p.cls}:${p.n}`).join() === 'toolbar:2', JSON.stringify(fp))
+  check('外框认法和体检一样：DSH 自带的 / 带外框库那段 template 的才算；普通页面里写了 data-frame="phone" 的手机示意框不算', isFramed(shell('')) && isFramed('<template id="dsh-frame">{}</template><div data-frame="pop/main"><div data-slot="main"></div></div>') && !isFramed('<div class="mock" data-frame="phone"><div data-slot="main"><header class="topbar"></header></div></div>') && !isFramed('<div data-frame="dsh/view"></div>'))
+  check('槽位：嵌套同名标签配对对、自闭合不算层；没套外框原样给', slotHtml(shell('<div class="a"><div class="b"><img src="x"/></div></div><br/>')) === '书稿\n<div class="a"><div class="b"><img src="x"/></div></div><br/>' && slotHtml('<div class="x">plain</div>') === '<div class="x">plain</div>', JSON.stringify(slotHtml(shell('<div class="a"><div class="b"><img src="x"/></div></div><br/>'))))
 }
 check('地址：端口 → localhost；本机地址原样；本地文件 → file://', implUrl('5173') === 'http://localhost:5173/' && implUrl('http://127.0.0.1:3000/login') === 'http://127.0.0.1:3000/login' && implUrl('localhost:8080/a') === 'http://localhost:8080/a')
 {
@@ -308,6 +319,22 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   const skR = sk('react')
   check('交接说明：小程序骨架（状态栏 / 导航栏 / 标签栏）照微信的做法，不做成组件；别的共用部分照旧', skU.includes('`.mp-status`：预览手机的状态栏，不做') && skU.includes('`.mp-tabbar`：底部标签栏：写进 `src/pages.json` 的 `tabBar`') && skU.includes('`.mp-nav`：导航栏：纯色底就用默认导航栏') && !skU.includes('MpStatus') && skU.includes('→ `Card` 组件') && skR.includes('`.mp-status`：预览手机的状态栏，网页里不做') && skR.includes('`.mp-tabbar`：→ 固定在底部的导航组件'), skU)
   check('交接说明：网页设计不多小程序那几节', !md.includes('小程序') && !same.includes('## 做成'))
+  // #25 DSH 插件 / 外框库的设计：外框不用做，只做槽位；compare_design 只比 main
+  const fd = path.join(tmp, 'framed-design')
+  fs.mkdirSync(fd)
+  fs.writeFileSync(path.join(fd, 'dsh-shell.css'), '.dsh-app{display:flex}')
+  const fHtml = new Map([['write.html', '<div class="dsh-app" data-frame="dsh/sidebar"><aside class="dsh-side"><input class="dsh-search"></aside><div data-slot="main"><div class="toolbar"><input class="title"></div></div></div><script>go()</script>']])
+  const fMd = handoffMd({ root: fd, rows: [], kind: 'dshplugin', size: [1280, 800], framework: 'react', dest: path.join(tmp, 'fd-app'), project: null, system: '', htmlByKey: fHtml })
+  check('交接说明：DSH 插件的设计 → 外框要点：外框是 DSH 画的不用做、compare_design 只比 main、整屏比才传 whole', fMd.includes('## 外框要点') && /DSH 桌面端自己画的，\*\*不用做\*\*/.test(fMd) && fMd.includes('只截设计稿里 `main` 那块') && fMd.includes('whole: true') && !/DshApp|DshSide/.test(fMd), fMd)
+  check('交接说明：套了外框的屏，输入控件只数槽位里的（外框上的搜索框不算），页尾脚本照数', fMd.includes('write.html：1 段脚本（改成框架里的状态和事件）；1 个输入控件'), fMd)
+  check('交接说明：dsh-shell.css 不算公共样式；外框部件不搬，但变量（浅色、深色两段）和槽位基础样式要带上；没有 tokens.css 时说变量在它里面', fMd.includes('外框的样式表（`dsh-shell.css`）：外框部件的样式') && fMd.includes('浅色、深色两段') && fMd.includes('没有 tokens.css：套外框的屏用的是外框样式表（`dsh-shell.css`）里的变量') && !/别的样式表：.*dsh-shell/.test(fMd) && !fMd.includes('把 tokens.css') && fMd.includes('外框样式表（`dsh-shell.css`）里的变量和槽位基础样式照「外框要点」带进去'), fMd)
+  const libMd = handoffMd({ root: fd, rows: [], kind: 'framed', size: [400, 600], framework: 'react', dest: path.join(tmp, 'fd-app'), project: null, system: '', htmlByKey: new Map([['pop.html', '<template id="dsh-frame">{}</template><div class="pop" data-frame="chrome-popup/main"><div data-slot="main"></div></div>']]) })
+  check('交接说明：外框库的外框 → 说「那个软件 / 浏览器」画的，照它的插件清单填小槽位', libMd.includes('## 外框要点') && libMd.includes('那个软件 / 浏览器自己画的') && libMd.includes('插件清单'), libMd)
+  const mixMd = handoffMd({ root: fd, rows: [], kind: 'dshplugin', size: [1280, 800], framework: 'react', dest: path.join(tmp, 'fd-app'), project: null, system: '', htmlByKey: new Map([...fHtml, ['welcome.html', '<main class="hero"><h1>欢迎</h1></main>']]) })
+  check('交接说明：套外框的屏和普通屏混着 → 点名哪几屏套了外框，别的屏照常整页做；没套外框那几屏自己的变量照旧收', mixMd.includes('write 这几屏套了 DSH 插件的外框') && mixMd.includes('别的屏（welcome）没套外框，照常整页做') && !fMd.includes('别的屏') && mixMd.includes('先把没套外框那几屏 `<style>`') && !fMd.includes('先把没套外框'), mixMd)
+  const onlyPlain = handoffMd({ root: fd, rows: [], kind: 'dshplugin', size: [1280, 800], framework: 'react', dest: path.join(tmp, 'fd-app'), project: null, system: '', htmlByKey: new Map([['welcome.html', '<main class="hero"><h1>欢迎</h1></main>']]) })
+  check('交接说明：DSH 插件设计里只交接没套外框的屏 → 不写外框要点', !onlyPlain.includes('外框要点'), onlyPlain)
+  check('交接说明：没套外框的不多外框要点', !md.includes('外框要点') && !same.includes('外框要点'))
   const t2 = path.join(tmp, 'empty-tokens')
   fs.mkdirSync(t2)
   fs.writeFileSync(path.join(t2, 'tokens.css'), '.x { color: red }')
@@ -335,6 +362,12 @@ else {
     'dk-order.html': '<!doctype html><html><head><meta charset="utf-8"><style>@media (prefers-color-scheme: dark){body{background:#000;color:#fff}} body{background:#fff;color:#000;margin:0}</style></head><body><p>Hi</p></body></html>',
   }
   for (const [f, html] of Object.entries(darkCases)) fs.writeFileSync(path.join(design, f), html)
+  // #25 套了外框的一屏：800×600，左边 200 宽的侧栏和顶上 60 高的标题栏是外框，main 槽位 600×540
+  const slotBody = (card) => `<h1 style="margin:20px;font:24px sans-serif;color:#123">书稿</h1><div class="card" style="margin:20px;height:120px;background:${card}"></div>`
+  // 槽位自己带内边距（像 DSH 设置分区左右留 24px）：那是宿主留的白，只截内容那块
+  fs.writeFileSync(path.join(design, 'framed-pad.html'), `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0}.app{display:grid;grid-template-columns:200px 1fr;grid-template-rows:60px 1fr;width:800px;height:600px}.side{grid-row:1/3;background:#2b2f36}.bar{background:#e4e7ec}[data-slot=main]{background:#fff;overflow:auto;padding:0 24px 24px}</style><template id="dsh-frame">{}</template></head><body><div class="app" data-frame="t/main"><aside class="side"></aside><div class="bar"></div><div data-slot="main">${slotBody('#4d6bfe')}</div></div></body></html>`)
+  fs.writeFileSync(path.join(design, 'mock.html'), `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#eee}.mock{width:300px;height:500px;margin:20px;background:#fff}</style></head><body><div class="mock" data-frame="phone"><div data-slot="main"><p>Hi</p></div></div></body></html>`)
+  fs.writeFileSync(path.join(design, 'framed.html'), `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0}.app{display:grid;grid-template-columns:200px 1fr;grid-template-rows:60px 1fr;width:800px;height:600px}.side{grid-row:1/3;background:#2b2f36;color:#fff}.bar{background:#e4e7ec}[data-slot=main]{background:#fff;overflow:hidden}</style><template id="dsh-frame">{}</template></head><body><div class="app" data-frame="t/main"><aside class="side">侧栏</aside><div class="bar">标题栏</div><div data-slot="main">${slotBody('#4d6bfe')}</div></div></body></html>`)
   const hub = createHub({ parents: () => [] })
   const entry = await hub.open({ kind: 'file', root: design })
   const b = createBrowser({ bin })
@@ -396,6 +429,27 @@ else {
       const r = await compareScreens(b, { design: { key: f, url: `${entry.origin}/${f}`, label: f }, impl: pathToFileURL(path.join(impl, f)).href, size: [600, 400], dark: true })
       check(`比对：深色两边准备得一样（${f}：输入框、媒体查询、规则先后），同一份文件差异 < 1%`, r.pct < 1, r.text)
     }
+
+    // #25 套了外框：只截 main 槽位，做出来的页面（只有槽位那块）按槽位尺寸开
+    const plainSlot = (card) => `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff}</style></head><body>${slotBody(card)}</body></html>`
+    fs.writeFileSync(path.join(impl, 'slot.html'), plainSlot('#4d6bfe'))
+    fs.writeFileSync(path.join(impl, 'slot-red.html'), plainSlot('#c0392b'))
+    const fDesign = { key: 'framed.html', url: `${entry.origin}/framed.html`, label: 'framed' }
+    const fr = await compareScreens(b, { design: fDesign, impl: pathToFileURL(path.join(impl, 'slot.html')).href, size: [800, 600] })
+    check('比对：设计稿套了外框 → 只比 main 槽位 600×540，做出来的同样内容差异 < 1%', fr.pct < 1 && fr.text.includes('只比外框里的 main 槽位 600×540') && /基本一致/.test(fr.text), fr.text)
+    const frRed = await compareScreens(b, { design: fDesign, impl: pathToFileURL(path.join(impl, 'slot-red.html')).href, size: [800, 600] })
+    check('比对：槽位里卡片颜色不一样 → 差异块认出是卡片，位置按槽位算（不带外框的 200 / 60 偏移）', frRed.pct > 1 && frRed.boxes.length >= 1 && frRed.boxes.some((x) => x.design && /card/.test(x.design.d) && x.x < 60 && x.y < 120), JSON.stringify(frRed.boxes))
+    const frPad = await compareScreens(b, { design: { key: 'framed-pad.html', url: `${entry.origin}/framed-pad.html`, label: 'framed-pad' }, impl: pathToFileURL(path.join(impl, 'slot.html')).href, size: [800, 600] })
+    check('比对：槽位带内边距（宿主留的白）→ 只截内容那块 552×516，同样内容差异 < 1%', frPad.pct < 1 && frPad.text.includes('main 槽位 552×516'), frPad.text)
+    fs.copyFileSync(path.join(design, 'mock.html'), path.join(impl, 'mock.html'))
+    const mock = await compareScreens(b, { design: { key: 'mock.html', url: `${entry.origin}/mock.html`, label: 'mock' }, impl: pathToFileURL(path.join(impl, 'mock.html')).href, size: [800, 600] })
+    check('比对：普通页面里的 data-frame="phone"（没登记的）照整屏比', !mock.text.includes('槽位') && mock.text.includes('800×600') && mock.pct < 1, mock.text)
+    const frSmall = await compareScreens(b, { design: fDesign, impl: pathToFileURL(path.join(impl, 'slot.html')).href, size: [500, 400] })
+    check('比对：开的尺寸装不下外框 → 说一声槽位只露出一部分、不填 size 按外框尺寸比', /装不下整个外框，槽位只露出 300×340.*size 填外框自己的尺寸 800x600/.test(frSmall.text), frSmall.text)
+    const frHidden = await compareScreens(b, { design: fDesign, impl: pathToFileURL(path.join(impl, 'slot.html')).href, size: [190, 300] })
+    check('比对：开的尺寸里槽位完全露不出来 → 不退回整屏比，停下说去掉 size', frHidden.pct === null && !frHidden.jpg && /露不出来。size 填外框自己的尺寸 800x600 再比/.test(frHidden.text), frHidden.text)
+    const frWhole = await compareScreens(b, { design: fDesign, impl: pathToFileURL(path.join(impl, 'slot.html')).href, size: [800, 600], whole: true })
+    check('比对：whole 整屏比 → 外框算进差异（原来 #25 的样子）', frWhole.pct > 10 && !frWhole.text.includes('main 槽位'), frWhole.text)
 
     // 本机地址 302 跳到外网：拦下，不开
     const srv = http.createServer((req, res) => {

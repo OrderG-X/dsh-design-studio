@@ -745,8 +745,22 @@ try {
   await clickIn('menu.html', 'a.go')
   // 头部给人看的是「按钮「加入购物车」」，选择器在 title 里；变量显示中文名，原名在 title 里
   const who = await until(`(document.querySelector('.ddp-style .who')?.title || '').split(' · ')[0]`, 5000)
-  const bgVar = await page(`[...document.querySelectorAll('.ddp-style .row')].find((x) => x.querySelector('label span')?.textContent === '背景')?.querySelector('em.v')?.title || ''`)
+  const bgVar = await page(`[...document.querySelectorAll('.ddp-style .row')].find((x) => x.querySelector('.lbl>span')?.textContent === '背景')?.querySelector('em.v')?.title || ''`)
   check('调样式：点页面里的按钮 → 面板认出它、背景用的是设计变量 --brand', who === 'a.go' && /--brand\b/.test(bgVar), `${who} / ${bgVar}`)
+  // #24 复制色值：背景用的是变量 --brand，复制出去的是它的值 #6B3E26；按钮字先变「已复制」再换回来
+  const colGo = await page(`(() => {
+    window.__ddpCp = null
+    try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: (x) => { window.__ddpCp = x; return Promise.resolve() } } }) } catch { return 'no-stub' }
+    const b = [...document.querySelectorAll('.ddp-style .row')].find((x) => x.querySelector('.lbl>span')?.textContent === '背景')?.querySelector('.lbl .cp')
+    if (!b) return 'no-button'
+    b.click()
+    return 'ok'
+  })()`)
+  const colTxt = await until(`window.__ddpCp || ''`, 3000)
+  const colSaid = await until(`[...document.querySelectorAll('.ddp-style .lbl .cp')].some((x) => x.textContent === '已复制')`, 3000)
+  const colBack = await until(`![...document.querySelectorAll('.ddp-style .lbl .cp')].some((x) => x.textContent === '已复制')`, 4000)
+  check('调样式：背景旁点「复制」→ 复制出变量的色值 #6B3E26，按钮先说「已复制」再换回「复制」', colGo === 'ok' && colTxt === '#6B3E26' && colSaid && colBack, `${colGo} / ${colTxt} / ${colSaid} / ${colBack}`)
+  await page(`delete navigator.clipboard`) // 换回真的剪贴板，后面复制图片还要用
   await slide('圆角', 24)
   await sleep(400)
   const live = await styleAttr('menu.html', 'a.go')
