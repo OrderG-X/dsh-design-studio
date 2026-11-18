@@ -898,5 +898,34 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   check('占位的鼠标只在模型真有动静时动：同一件事不动，换了事 / 又写了 15 行才动一下，停了就不动', JSON.stringify(seq) === '[1,1,2,2,3,3,3,4]', JSON.stringify(seq))
 }
 
+
+// ── 和做出来的比（#25）：真页面摆在哪、红框标不标 ──
+{
+  const { implLayout: L, implAwayUrl: A } = mod._test
+  check('和做出来的比：真页面跳到别的页 → 「比这一页」换回本机地址；本地 HTML 预览根提过几层也对得上',
+    A({ url: 'http://localhost:5173/a?x=1', live: 'http://127.0.0.1:9/a' }, '/b#c') === 'http://localhost:5173/b#c' &&
+    A({ url: 'file:///p/site/a.html', live: 'http://127.0.0.1:9/a.html' }, '/b.html') === 'file:///p/site/b.html' &&
+    A({ url: 'file:///p/site/pages/login.html#/x', live: 'http://127.0.0.1:9/pages/login.html' }, '/css/other.html') === 'file:///p/site/css/other.html' &&
+    A({ url: 'file:///p/site/a.html', live: '' }, '/sub/b.html') === 'file:///p/site/sub/b.html')
+  const slot = { vx: 224, vy: 60, w: 552, h: 516, fw: 800, fh: 600 }
+  const rec = { boxes: [{ x: 1, y: 2, w: 3, h: 4 }], cmp: [552, 516], slot: true, at: 'top' }
+  const a = L(slot, rec, [800, 600], false, true)
+  check('和做出来的比：套了外框 → 真页面盖在槽位那块，比的是槽位就标红框', a.framed && !a.hidden && a.rect.left === 224 && a.rect.top === 60 && a.rect.width === 552 && a.rect.height === 516 && a.boxOk, JSON.stringify(a))
+  const w = L(slot, { ...rec, whole: true }, [800, 600], false, true)
+  check('和做出来的比：整屏比（whole）→ 铺满，槽位的红框不标', !w.framed && w.rect.left === 0 && w.rect.right === 0 && !w.boxOk, JSON.stringify(w))
+  const hd = L({ hidden: true, fw: 1280, fh: 800 }, rec, [375, 667], false, true)
+  check('和做出来的比：槽位露不出来 → 不放真页面、不标', hd.hidden && !hd.framed && !hd.boxOk)
+  const plain = L(null, { boxes: rec.boxes, cmp: [390, 844], slot: false, at: 'top' }, [390, 844], false, true)
+  check('和做出来的比：没套外框 → 铺满；同样画幅比的标红框', !plain.framed && plain.rect.bottom === 0 && plain.boxOk)
+  check('和做出来的比：画幅变了 / 比的是滚到底 / 网页铺满 / 关了红框 → 不标',
+    !L(null, { ...rec, cmp: [390, 844], slot: false }, [375, 667], false, true).boxOk &&
+    !L(null, { ...rec, cmp: [390, 844], slot: false, at: 'bottom' }, [390, 844], false, true).boxOk &&
+    !L(null, { ...rec, cmp: [390, 844], slot: false }, [390, 844], true, true).boxOk &&
+    !L(slot, rec, [800, 600], false, false).boxOk &&
+    !L(null, rec, [552, 516], false, true).boxOk) // 记的是槽位比的，现在没套外框：对不上
+  check('和做出来的比：浅色比的、现在看深色 → 不标；深色比的看深色 → 标',
+    !L(slot, rec, [800, 600], false, true, true).boxOk && L(slot, { ...rec, dark: true }, [800, 600], false, true, true).boxOk)
+}
+
 console.log(`\n${pass} 通过，${fail} 失败`)
 process.exit(fail ? 1 : 0)

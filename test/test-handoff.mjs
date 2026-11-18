@@ -11,7 +11,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import http from 'node:http'
-import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, slotHtml, isFramed, implUrl, handoffMd, buildHandoff, compareScreens, diffIn, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
+import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, slotHtml, isFramed, implUrl, implServe, handoffMd, buildHandoff, compareScreens, diffIn, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
 import { createHub } from '../lib/serve.js'
 import { findBrowser, createBrowser } from '../lib/browser.js'
 
@@ -104,6 +104,40 @@ check('地址：端口 → localhost；本机地址原样；本地文件 → fil
   msg = ''
   try { implUrl('nope.html', tmp) } catch (e) { msg = e.message }
   check('地址：本地文件不存在说清楚', /找不到/.test(msg))
+  // 记下来的 file:// 地址再拿来比（右侧栏「重新比」）、文件夹用里面的 index.html、不是网页不比
+  const site = path.join(tmp, 'impl-site')
+  fs.mkdirSync(site, { recursive: true })
+  fs.writeFileSync(path.join(site, 'index.html'), '<p>hi</p>')
+  fs.writeFileSync(path.join(site, 'a.html'), '<p>a</p>')
+  fs.writeFileSync(path.join(site, 'notes.txt'), 'x')
+  const fileA = implUrl('a.html', site)
+  check('地址：本地 HTML → file://，记下来的 file:// 再给一次还认', fileA.startsWith('file://') && implUrl(fileA) === fileA, fileA)
+  check('地址：给文件夹用里面的 index.html', implUrl(site) === implUrl(path.join(site, 'index.html')))
+  msg = ''
+  try { implUrl('notes.txt', site) } catch (e) { msg = e.message }
+  check('地址：不是 .html 的文件不比', /只比网页/.test(msg), msg)
+  msg = ''
+  try { implUrl(tmp) } catch (e) { msg = e.message }
+  check('地址：没有 index.html 的文件夹不比', /index\.html/.test(msg), msg)
+  check('地址：本地 HTML 带 #路由 / ?参数 原样留着（file:// 再给一次也留着）', implUrl('a.html#/login', site).endsWith('a.html#/login') && implUrl(implUrl('a.html?x=1#/y', site)).endsWith('a.html?x=1#/y'))
+  check('地址：网络共享里的文件不比', ['//srv/share/a.html', '\\\\srv\\share\\a.html', 'file://srv/share/a.html'].every((x) => { try { implUrl(x, site); return false } catch (e) { return /网络共享/.test(e.message) } }))
+  // 预览服务器的根：默认 HTML 所在文件夹（Vite 的 /assets）；引用了 ../ 就往上提，最多 3 层
+  fs.mkdirSync(path.join(site, 'pages', 'deep'), { recursive: true })
+  fs.writeFileSync(path.join(site, 'pages', 'login.html'), '<link href="../css/app.css"><img src="x.png">')
+  fs.writeFileSync(path.join(site, 'pages', 'deep', '我 的.html'), '<style>@import url("../../../../../../a.css")</style>')
+  const sv0 = implServe(path.join(site, 'a.html'))
+  const sv1 = implServe(path.join(site, 'pages', 'login.html'), site)
+  const sv3 = implServe(path.join(site, 'pages', 'deep', '我 的.html'), tmp)
+  check('预览根：没引用上级 → HTML 所在文件夹', sv0.root === site && sv0.rel === '/a.html', JSON.stringify(sv0))
+  check('预览根：引用了 ../css → 提一层，地址带子文件夹', sv1.root === site && sv1.rel === '/pages/login.html', JSON.stringify(sv1))
+  let linked = false
+  try { fs.symlinkSync(path.join(site, 'pages', 'login.html'), path.join(site, 'pages', 'link.html')); linked = true } catch { /* Windows 没权限建软链接：跳过这项 */ }
+  if (linked) check('预览根：软链接不读、不往上提', implServe(path.join(site, 'pages', 'link.html'), site).root === path.join(site, 'pages'))
+  check('预览根：会话目录外的 HTML 不往上提', implServe(path.join(site, 'pages', 'login.html'), path.join(tmp, 'elsewhere')).root === path.join(site, 'pages'))
+  check('预览根：在会话目录里就不提出会话目录', implServe(path.join(site, 'pages', 'deep', '我 的.html'), path.join(site, 'pages')).root === path.join(site, 'pages'))
+  check('预览根：不提到家目录', (() => { const d = path.join(os.homedir(), 'dsh-impl-no-such', 'x.html'); return implServe(d).root === path.dirname(d) })())
+  check('预览根：../ 再多也最多提 3 层，文件名按段编码', sv3.root === path.dirname(site) && sv3.rel.endsWith('/impl-site/pages/deep/' + encodeURIComponent('我 的.html')), JSON.stringify(sv3))
+  check('地址：~/ 按家目录算', (() => { try { implUrl('~/dsh-impl-no-such-file.html') } catch (e) { return e.message.includes(os.homedir()) } return false })())
 }
 check('本机：localhost / 127.0.0.1 / ::1、本地文件算；外网、别的协议不算', localOnly('http://localhost:5173/a') && localOnly('https://127.0.0.1/') && localOnly('http://[::1]:3000/') && localOnly('file:///tmp/a.html') && localOnly('about:blank') && !localOnly('http://example.com/') && !localOnly('http://localhost.evil.com/') && !localOnly('ftp://localhost/') && !localOnly('不是地址'))
 
@@ -414,6 +448,16 @@ else {
     fs.writeFileSync(path.join(impl, 'grey.html'), plain('#e8e8e8'))
     const grey = await compareScreens(b, { design: { key: 'white.html', url: `${entry.origin}/white.html`, label: 'white' }, impl: pathToFileURL(path.join(impl, 'grey.html')).href, size: [800, 600] })
     check('比对：整屏 #fff 对 #e8e8e8 算差异，不算基本一致', grey.pct > 50 && !/基本一致/.test(grey.text), grey.text)
+    // 本地 HTML 在子文件夹、样式在上级（../css）：经预览服务器（根往上提）截，样式载得到；结果里写原来的 file:// 地址
+    fs.mkdirSync(path.join(impl, 'site', 'pages'), { recursive: true })
+    fs.mkdirSync(path.join(impl, 'site', 'css'), { recursive: true })
+    fs.writeFileSync(path.join(impl, 'site', 'css', 'w.css'), 'html,body{background:#fff!important}')
+    fs.writeFileSync(path.join(impl, 'site', 'pages', 'p.html'), plain('#e8e8e8').replace('</head>', '<link rel="stylesheet" href="../css/w.css"></head>'))
+    const pFile = path.join(impl, 'site', 'pages', 'p.html')
+    const sv = implServe(pFile, impl)
+    const svEntry = await hub.open({ kind: 'file', root: sv.root })
+    const up = await compareScreens(b, { design: { key: 'white.html', url: `${entry.origin}/white.html`, label: 'white' }, impl: `${svEntry.origin}${sv.rel}`, shown: pathToFileURL(pFile).href, size: [800, 600] })
+    check('比对：子文件夹里的本地 HTML 引用 ../css → 经预览服务器样式也载得到；结果写 file:// 地址', up.pct < 1 && up.text.includes(pathToFileURL(pFile).href) && !up.text.includes(svEntry.origin), `${up.pct} ${up.text.split('\n')[0]}`)
 
     // 内容在能滚的 main 里：滚到底要滚 main
     fs.writeFileSync(path.join(impl, 'inner.html'), inner('#00e'))

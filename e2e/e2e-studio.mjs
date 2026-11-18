@@ -87,6 +87,9 @@ function seedWelcome(cliDir) {
 const DESIGN = path.join(tmp, 'work', 'coffee-app')
 const DECK = path.join(tmp, 'work', 'deck') // 幻灯片写死 1500×800，meta 没写尺寸（issue #10）
 const DIAG = path.join(tmp, 'work', 'diagram') // 图表（思维导图）：用技能里的 diagram.css
+const IMPL = path.join(tmp, 'work', 'impl') // 「做出来的」菜单屏（#25 和做出来的比）：少一行菜单，本机的小服务器出
+let IMPL_PORT = 0
+const cmpResults = [] // 模型调 compare_design 拿回来的文字
 const WEBD = path.join(tmp, 'work', 'web') // 网页、meta 没写画幅（单看铺满右侧栏）：开右边面板时整体缩到面板左边（#22）
 const HEAD = (title) => `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="tokens.css">`
 const BASE = 'body{margin:0;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg)}header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}h1{font-size:24px;margin:0}main{padding:0 20px}.go{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:#fff;font-size:16px;text-decoration:none}'
@@ -202,6 +205,7 @@ const llm = http.createServer((req, res) => {
         selfCheckImgs.push(Array.isArray(ck.content) ? ck.content.filter((c) => c.type === 'image' && c.source && /jpe?g/.test(c.source.media_type || '') && (c.source.data || '').length > 1000).length : 0)
         selfChecks.push(resultOf(last))
       }
+      if ((last.content || []).some((c) => c.type === 'tool_result' && c.tool_use_id === 'toolu_e2e_cmp')) cmpResults.push(resultOf(last))
       const look = (last.content || []).find((c) => c.type === 'tool_result' && c.tool_use_id === 'toolu_e2e_look')
       if (look) looks.push(look.content)
       return sse(res, [{ type: 'text', text: '好了。' }], 'end_turn')
@@ -225,6 +229,7 @@ const llm = http.createServer((req, res) => {
       if (!(body.tools || []).some((t) => t.name === 'look_design')) return sse(res, [{ type: 'text', text: '没有 look_design。' }], 'end_turn')
       return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_look', name: 'look_design', input: { screens: ['home.html'], size: '375x667' } }], 'tool_use')
     }
+    if (said.includes('IMPL-CMP')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_cmp', name: 'compare_design', input: { url: `http://localhost:${IMPL_PORT}/menu.html`, screen: 'menu.html' } }], 'tool_use')
     if (said.includes('DRAFT-FIRST')) return slowWrite(res, FIRST_DRAFT, `${HEAD('第一屏')}<meta name="dsh-design" content="app"></head><body><main><h1>第一屏草稿</h1><p>${'边写边看的内容。'.repeat(80)}</p></main></body></html>`, 8000)
     if (said.includes('OPEN-WEB')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(WEBD, 'index.html') } }], 'tool_use')
     if (said.includes('OPEN-DIAGRAM')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DIAG, 'map.html') } }], 'tool_use')
@@ -1303,6 +1308,105 @@ try {
   await sleep(200)
   await page(`document.querySelector('.ddp-hist header .ddp-btn').click()`)
   await sleep(300)
+
+  // ⑨y2 和做出来的比（#25）：模型调 compare_design 比菜单屏 → 提示「看对比」→ 真页面经预览服务器嵌进来；
+  //   拖线 / 叠加（透明度、反色）/ 并排；「重新比」照现在的画幅比一次；分数点开看拼图；地址不对说清楚；导出菜单里也能进；退出回到原来的工具
+  fs.mkdirSync(IMPL, { recursive: true })
+  fs.copyFileSync(path.join(DESIGN, 'tokens.css'), path.join(IMPL, 'tokens.css'))
+  fs.writeFileSync(path.join(IMPL, 'menu.html'), fs.readFileSync(path.join(DESIGN, 'menu.html'), 'utf8').replace('<li>桂花燕麦拿铁 ¥26</li>', ''))
+  const implSrv = http.createServer((q, r) => {
+    const f = path.join(IMPL, path.basename(new URL(q.url, 'http://x').pathname))
+    fs.readFile(f, (e, b) => { if (e) { r.writeHead(404); return r.end() } r.writeHead(200, { 'Content-Type': f.endsWith('.css') ? 'text/css' : 'text/html; charset=utf-8' }); r.end(b) })
+  })
+  await new Promise((r) => implSrv.listen(0, '127.0.0.1', r))
+  IMPL_PORT = implSrv.address().port
+  await say('IMPL-CMP 比一下菜单')
+  const implToast = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /模型刚和做出来的比过/.test(x)) || ''`, 60000)
+  await waitFor(() => cmpResults.length > 0, 10000)
+  check('和做出来的比：模型比完（拿到差异）→ 右侧栏提示「看对比」', /差异 \d/.test(cmpResults[0] || '') && /菜单/.test(implToast) && /看对比/.test(implToast), `${implToast} / ${(cmpResults[0] || '').slice(0, 120)}`)
+  await page(`[...document.querySelectorAll('.ddp-toast button')].find((x) => x.textContent === '看对比').click()`)
+  const implSrc = await until(`(() => { const f = document.querySelector('.ddp-icmp .im iframe'); return f && f.getAttribute('src') })()`, 15000)
+  await sleep(1500)
+  // 嵌进来的是做出来的那页（少一行菜单），走的是设计台的预览服务器（端口不是开发服务器自己的）
+  const implLis = async () => {
+    const { root } = await chrome.cdp('DOM.getDocument', { depth: -1, pierce: true }, sessionId)
+    let doc = null
+    const walk = (n) => {
+      if (doc || !n) return
+      if (n.nodeName === 'IFRAME' && n.contentDocument && (n.attributes || []).some((x) => String(x) === implSrc)) doc = n.contentDocument
+      for (const c of n.children || []) walk(c)
+      if (n.contentDocument) walk(n.contentDocument)
+    }
+    walk(root)
+    if (!doc) return -1
+    const { nodeIds } = await chrome.cdp('DOM.querySelectorAll', { nodeId: doc.nodeId, selector: 'li' }, sessionId)
+    return nodeIds.length
+  }
+  const implView = await page(`(() => {
+    const b = document.querySelector('.ddp-ibn'), dock = document.querySelector('.ddp-ibar')
+    return { url: b && b.querySelector('.ddp-iurl') ? b.querySelector('.ddp-iurl').textContent : '', score: b && b.querySelector('.ddp-iscore') ? b.querySelector('.ddp-iscore').textContent : '',
+      knob: !!document.querySelector('.ddp-icmp .ddp-knob'), tags: [...document.querySelectorAll('.ddp-icmp .tag')].map((x) => x.textContent).join('|'),
+      tools: dock ? [...dock.querySelectorAll('.ddp-tool')].map((x) => x.textContent + (x.classList.contains('on') ? '*' : '')).join('|') : '', pick: !!document.querySelector('.ddp-dock button.pick') }
+  })()`)
+  const lis = await implLis()
+  await shot('impl-split')
+  check('和做出来的比：横幅写着地址和差异，拖线把手、两边标签，底下换成拖线 / 叠加 / 并排', implView.url === `localhost:${IMPL_PORT}/menu.html` && /^差异 \d+(\.\d)?%$/.test(implView.score) && implView.knob && implView.tags === '设计稿|做出来的' && /^拖线\*\|叠加\|并排/.test(implView.tools) && !implView.pick, JSON.stringify(implView))
+  check('和做出来的比：嵌进来的是做出来的那页（少一行菜单），经设计台的预览服务器', /^http:\/\/127\.0\.0\.1:\d+\/menu\.html$/.test(implSrc || '') && !(implSrc || '').includes(':' + IMPL_PORT + '/') && lis === 2, `${implSrc} / li=${lis}`)
+  const ibar = (name) => page(`[...document.querySelectorAll('.ddp-ibar .ddp-tool')].find((x) => x.textContent === '${name}').click()`)
+  await ibar('叠加')
+  await sleep(400)
+  const ov1 = await page(`(() => { const im = document.querySelector('.ddp-icmp.ov > .im'); return im ? { op: im.style.opacity, range: document.querySelector('.ddp-iop input').value } : null })()`)
+  await page(`(() => { const i = document.querySelector('.ddp-iop input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '80'); i.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+  await sleep(300)
+  const ov2 = await page(`document.querySelector('.ddp-icmp.ov > .im').style.opacity`)
+  await ibar('反色')
+  await sleep(300)
+  const ov3 = await page(`(() => { const im = document.querySelector('.ddp-icmp.ov > .im'); return { blend: im.style.mixBlendMode, op: im.style.opacity, off: document.querySelector('.ddp-iop input').disabled } })()`)
+  await shot('impl-overlay')
+  check('和做出来的比：叠加 → 真页面半透明（默认 50%，拖到 80%）；反色 → 差值混合、透明度条停用', ov1 && ov1.op === '0.5' && ov1.range === '50' && ov2 === '0.8' && ov3.blend === 'difference' && ov3.off, JSON.stringify({ ov1, ov2, ov3 }))
+  await ibar('反色')
+  await ibar('并排')
+  await sleep(1500)
+  const side = await page(`(() => { const s = [...document.querySelectorAll('.ddp-iside')]; return { n: s.length, impl: s[1] ? !!s[1].querySelector('.im iframe') : false, design: s[0] ? !!s[0].querySelector('.ly iframe') : false, gap: s[1] && s[0] ? Math.round(s[1].getBoundingClientRect().left - s[0].getBoundingClientRect().right) : -1 } })()`)
+  await shot('impl-side')
+  check('和做出来的比：并排 → 左设计稿、右做出来的，中间留空', side.n === 2 && side.impl && side.design && side.gap > 0, JSON.stringify(side))
+  await ibar('拖线')
+  await page(`document.querySelector('.ddp-ibn .ddp-go.sec').click()`)
+  const reSaid = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /比完了：差异/.test(x)) || ''`, 60000)
+  const reTip = await until(`(() => { const s = document.querySelector('.ddp-ibn .ddp-iscore'); return s && /你点的/.test(s.getAttribute('data-tip-d') || '') && s.getAttribute('data-tip-d') })()`, 8000)
+  check('和做出来的比：「重新比」→ 照现在的画幅比一次，提示差异，分数记成你点的', !!reSaid && !!reTip, `${reSaid} / ${reTip}`)
+  await page(`document.querySelector('.ddp-ibn .ddp-iscore').click()`)
+  const shotOk = await until(`(() => { const i = document.querySelector('.ddp-ishot img'); return i && i.complete && i.naturalWidth > 300 && i.naturalWidth })()`, 8000)
+  await page(`document.querySelector('.ddp-ishot').click()`)
+  await sleep(200)
+  check('和做出来的比：点分数看拼图（设计稿 | 做出来的 | 差异），点一下关掉', !!shotOk && !(await page(`!!document.querySelector('.ddp-ishot')`)), String(shotOk))
+  await page(`document.querySelector('.ddp-ibn .ddp-iurl').click()`)
+  await until(`!!document.querySelector('.ddp-iform input')`, 3000)
+  await page(`(() => { const i = document.querySelector('.ddp-iform input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'https://example.com/'); i.dispatchEvent(new Event('input', { bubbles: true })); i.form.requestSubmit() })()`)
+  const badSaid = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /地址不对/.test(x)) || ''`, 8000)
+  await page(`document.querySelector('.ddp-iform input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+  await sleep(300)
+  const badBack = await page(`({ url: !!document.querySelector('.ddp-ibn .ddp-iurl'), cmp: !!document.querySelector('.ddp-icmp') })`)
+  check('和做出来的比：填了外网地址 → 说只认本机的；Esc 收起输入框，还在对比', !!badSaid && badBack.url && badBack.cmp, `${badSaid} / ${JSON.stringify(badBack)}`)
+  await page(`[...document.querySelectorAll('.ddp-ibn .ddp-btn')].pop().click()`)
+  await sleep(500)
+  const implGone = await page(`({ cmp: !!document.querySelector('.ddp-icmp'), banner: !!document.querySelector('.ddp-ibn'), pick: !!document.querySelector('.ddp-dock button.pick') })`)
+  await page(`[...document.querySelectorAll('.ddp-top .ddp-btn')].find((x) => /导出/.test(x.textContent)).click()`)
+  await sleep(250)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /和做出来的比/.test(x.textContent)).click()`)
+  const menuBack = await until(`(() => { const f = document.querySelector('.ddp-icmp .im iframe'); return f && f.getAttribute('src') })()`, 10000)
+  // 对比开着导出这一屏：导出的就是比的那屏（设计稿那边登记给了右侧栏）
+  await sleep(800)
+  const pngB = pngs().length
+  await page(`[...document.querySelectorAll('.ddp-top .ddp-btn')].find((x) => /导出/.test(x.textContent)).click()`)
+  await sleep(250)
+  const exLabel = await page(`(() => { const b = [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => x.textContent.trim().endsWith(' · 纯画面')); if (!b) return ''; const s = b.textContent; b.click(); return s })()`)
+  const exSaid = await until(`(document.body.innerText.match(/(已导出|导出失败)[^\\n]*/) || [''])[0]`, 30000)
+  check('和做出来的比：对比开着也能导出这一屏（菜单写的是比的那屏）', /已导出/.test(exSaid || '') && (pngs().length > pngB || pngs().some((f) => Date.now() - fs.statSync(path.join(DESIGN, 'exports', f)).mtimeMs < 30000)) && /菜单|menu/i.test(exLabel), `${exLabel} / ${exSaid}`)
+  await page(`[...document.querySelectorAll('.ddp-ibn .ddp-btn')].pop().click()`)
+  await sleep(400)
+  check('和做出来的比：× 退出 → 回到原来的工具；导出菜单里「和做出来的比」再进来，记着的地址直接打开', !implGone.cmp && !implGone.banner && implGone.pick && !!menuBack, JSON.stringify({ implGone, menuBack }))
+  implSrv.close()
 
   // ⑨z 幻灯片比默认画幅大、meta 没写尺寸（issue #10）：画幅跟页面走，导出不裁。这时是单看模式，同一个组件换到别的设计目录（导出的消息要发对地址）
   fs.mkdirSync(DECK, { recursive: true })
