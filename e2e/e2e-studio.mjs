@@ -480,6 +480,44 @@ try {
     check(`设计模式：Office 工具和标准模式一样（这版 DSH ${hasOffice ? '有' : '没有'} Office）`, JSON.stringify(officeOf(std)) === want && JSON.stringify(officeOf(des)) === want, why)
     check(`设计模式：DSH 自带的技能（dsh-doc）和标准模式一样（这版 DSH ${hasDoc ? '有' : '没有'}）`, !!std && !!des && std.doc === hasDoc && des.doc === hasDoc, why)
   }
+  // 公网链接开着时在左边栏归档这个会话：链接马上失效（插件听 DSH 的归档事件）。要真通道，E2E_REAL_TUNNEL=1 才跑
+  const archiveCheck = async () => {
+    const sid = await page(`(() => { const n = performance.getEntriesByType('resource').map((e) => e.name).filter((x) => /\\/dsh-design-studio\\/api\\/state\\?/.test(x)).pop(); return n ? new URL(n).searchParams.get('session') : '' })()`)
+    if (!check('归档：拿到当前会话', !!sid, sid)) return
+    const api = (name, body) => page(`fetch('/dsh-design-studio/api/${name}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then((r) => r.json())`)
+    const screens = fs.readdirSync(DESIGN).filter((f) => f.endsWith('.html')).sort().slice(0, 3).map((key) => ({ key, label: key }))
+    await api('open', { session: sid, target: path.join(DESIGN, screens[0].key) })
+    const st = await api('pubshare', { session: sid, on: true, target: `file|${DESIGN}`, title: 'archive', kind: 'app', w: 390, h: 844, screens })
+    let link = ''
+    for (let i = 0; i < 90 && !link; i++) { const x = await api('pubshare', { session: sid, peek: true }); if (x.on && x.state === 'ready') link = x.url; else await sleep(1000) }
+    if (!check('归档：先开一条真公网链接', /trycloudflare\.com\//.test(link), JSON.stringify(st))) return
+    let ok = 0
+    for (let i = 0; i < 10 && ok !== 200; i++) { ok = await fetch(link).then((r) => r.status).catch(() => 0); if (ok !== 200) await sleep(1500) }
+    check('归档：链接先是打得开的', ok === 200, String(ok))
+    // 左边栏这个会话那一行的「归档」按钮（悬停才显示，直接点）：从带着会话 id 的元素往上找到有归档按钮的那一行
+    const clicked = await page(`(() => {
+      const sid = ${JSON.stringify(sid)}
+      const marks = [...document.querySelectorAll('*')].filter((e) => !e.closest('.ddp') && [...e.attributes].some((a) => a.value.includes(sid)))
+      for (const m of marks) {
+        for (let e = m; e && e !== document.body; e = e.parentElement) {
+          const b = [...e.querySelectorAll('button[aria-label]')].filter((x) => /归档|Archive/i.test(x.getAttribute('aria-label')) && !/取消|Unarchive/i.test(x.getAttribute('aria-label')))
+          if (b.length === 1) { b[0].click(); return b[0].getAttribute('aria-label') }
+          if (b.length > 1) break
+        }
+      }
+      return 'marks=' + marks.length + ' btns=' + [...document.querySelectorAll('button[aria-label]')].map((x) => x.getAttribute('aria-label')).filter((l) => /归档|Archive/i.test(l)).join('|')
+    })()`)
+    // 会话还有活儿在跑时 DSH 会先问一句：点确认
+    await sleep(800)
+    await page(`(() => { const d = document.querySelector('[role=dialog], [role=alertdialog]'); const b = d && [...d.querySelectorAll('button')].filter((x) => /归档|Archive|停止|Stop/i.test(x.textContent)).pop(); if (b) b.click(); return !!b })()`)
+    let after = 200
+    for (let i = 0; i < 8 && after === 200; i++) { await sleep(1000); after = await fetch(link).then((r) => r.status).catch(() => 0) }
+    const peek = await api('pubshare', { session: sid, peek: true })
+    // 点的得是「归档」按钮；关掉的原因不能是「换了设计 / 到点 / 断了」（归档走的是 stop，不留原因）
+    check('归档会话：公网链接马上失效、插件里也关了', /^(归档|Archive)/i.test(clicked || '') && after !== 200 && !peek.on && !peek.ended && !peek.error, JSON.stringify({ clicked, after, peek: { on: peek.on, ended: peek.ended, error: peek.error } }))
+    console.log(`  （归档点的是：${clicked}）`)
+    await shot('13-archived')
+  }
   const logCheck = () => {
     const errs = webLog.split('\n').filter((l) => /dsh-design-studio/i.test(l) && /error|fail|失败/i.test(l))
     check('DSH 日志里没有设计台的报错', !errs.length, errs.slice(0, 5).join('\n'))
@@ -660,6 +698,35 @@ try {
     fs.copyFileSync(demo, path.join(SHOTS, '5-demo.html')) // 跟截图一起留着：之后从 file:// 打开看真导出的样子
     check('HTML 演示：三屏都在，没有本机地址', [0, 1, 2].every((i) => s.includes(`id="ddp-s-${i}"`)) && !s.includes('id="ddp-s-3"') && !/127\.0\.0\.1|localhost|__dsh_design__/.test(s), `${s.length} 字`)
   }
+  // 公网链接（#27，实验）：导出菜单进去，先说清楚是公网可见（有没有 cloudflared 给「生成链接」或「下载」）。
+  // E2E_REAL_TUNNEL=1 时真开一条 Cloudflare 临时通道：链接打得开、是这套演示、关了马上失效（要联网，CI 不跑）
+  await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+  await sleep(300)
+  const pubItem = await page(`(() => { const b = [...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /公网链接|Public link/.test(x.textContent)); if (b) b.click(); return !!b })()`)
+  check('导出菜单有「发公网链接（实验）」', pubItem)
+  const pubIntro = await until(`(() => { const p = document.querySelector('.ddp-pub'); return p && /不在身边|not nearby/.test(p.innerText) && [...p.querySelectorAll('.ddp-go')].map((b) => b.textContent).join('|') })()`, 8000)
+  check('公网链接面板：先说清楚公网可见，给「生成链接」或「下载 cloudflared」', /生成链接|Create link|下载|Download/.test(pubIntro || ''), pubIntro)
+  await shot('5-publink')
+  // 要测真通道却没有「生成链接」（本机找不到 cloudflared）：明说没测，别悄悄跳过
+  if (process.env.E2E_REAL_TUNNEL === '1') check('真通道：本机找得到 cloudflared（有「生成链接」）', /生成链接|Create link/.test(pubIntro || ''), pubIntro)
+  if (process.env.E2E_REAL_TUNNEL === '1' && /生成链接|Create link/.test(pubIntro || '')) {
+    await page(`[...document.querySelectorAll('.ddp-pub .ddp-go')].find((b) => /生成链接|Create link/.test(b.textContent)).click()`)
+    const link = await until(`(() => { const i = document.querySelector('.ddp-pub .ddp-publink'); return i && i.value })()`, 90000)
+    check('真通道：连上了，给出 trycloudflare 链接和二维码', /^https:\/\/[a-z0-9-]+\.trycloudflare\.com\/[\w-]{20,}$/.test(link || '') && !!(await page(`!!document.querySelector('.ddp-pub .qr path')`)), link)
+    await shot('5-publink-on')
+    if (link) {
+      let got = null
+      for (let i = 0; i < 10 && !(got && got.status === 200); i++) { got = await fetch(link).then(async (r) => ({ status: r.status, text: await r.text() })).catch((e) => ({ status: 0, text: e.message })); if (got.status !== 200) await sleep(1500) }
+      check('真通道：从公网打开是这套演示（三屏都在）', got && got.status === 200 && [0, 1, 2].every((i) => got.text.includes(`id="ddp-s-${i}"`)), got && got.status)
+      const root = await fetch(link.replace(/\/[^/]+$/, '/')).then((r) => r.status).catch(() => 0)
+      check('真通道：不带口令的根地址 404', root === 404, String(root))
+      await page(`[...document.querySelectorAll('.ddp-pub .ddp-go')].find((b) => /停止分享|Stop sharing/.test(b.textContent)).click()`)
+      await sleep(3000)
+      const after = await fetch(link).then((r) => r.status).catch(() => 0)
+      check('真通道：停止分享后链接马上失效', after !== 200, String(after))
+    }
+  }
+  await page(`(() => { const b = document.querySelector('.ddp-pub header .ddp-btn'); if (b) b.click() })()`)
   await sleep(1500)
   const stray = await page(`(document.body.innerText.match(/(已更新|Updated) coffee-app[^\\n]*/) || [''])[0]`)
   check('导出的 PDF / PPT / HTML 不算设计改动（不报「已更新」）', !stray, stray)
@@ -1957,6 +2024,7 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
   await modeCheck()
+  if (process.env.E2E_REAL_TUNNEL === '1') await archiveCheck()
   logCheck()
 } catch (e) {
   if (e !== MODE_DONE) check('没有异常', false, (e && e.stack) || e)

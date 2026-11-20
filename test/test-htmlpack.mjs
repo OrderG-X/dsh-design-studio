@@ -141,11 +141,15 @@ const ctx = {
   effect: (fn) => { try { return fn() } catch { return () => {} } },
   webServer: { register: (r) => { handlers[r.path] = r.handler; return () => {} }, getOrigin: () => 'http://127.0.0.1:1' },
   tools: { register: () => {} },
-  on: () => () => {},
+  on: (name, fn) => { ons[name] = fn; return () => {} },
   get: () => null,
   inject: () => {},
 }
+const ons = {}
 apply(ctx)
+let archiveOk = typeof ons['workspace/session-archived'] === 'function'
+try { ons['workspace/session-archived']({ sessionId: 'nobody' }); ons['workspace/session-archived'](undefined) } catch { archiveOk = false }
+check('会话归档时关掉它的公网链接（听 DSH 的归档事件，收到怪参数不出错）', archiveOk)
 const srv = http.createServer((req, res) => {
   const h = handlers[new URL(req.url, 'http://x').pathname]
   if (h) h(req, res); else { res.writeHead(404); res.end() }
