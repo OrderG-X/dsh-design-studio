@@ -6,7 +6,7 @@
  *     模型用提问卡问用户时，右侧栏提示「在等你回答」，答完就没了
  *   ③ 设计体检：首屏埋了四类问题（点击区、对比度、截断、小字），另两屏干净；点一条会定位；「发到对话」把清单放进输入框，发出去模型收得到
  *   ④ 改好首屏后「再查一次」→ 没问题
- *   ⑤ 导出 PDF / PPT → 设计目录 exports/ 里各一份，三页
+ *   ⑤ 导出 PDF / PPT / HTML 演示 → 设计目录 exports/ 里各一份，三页
  *   ⑥ 首页再出一版 home-b → 紧挨着首页；点它的「用这版」→ 输入框里是〔选定方向〕
  *   ⑦ 调样式：单看菜单屏，点「加入购物车」→ 面板认出它用的设计变量；拖圆角页面上先变，直接保存 → 源码里那个元素带上 style；
  *     再拖字号「发到对话」→ 输入框里是〔调样式〕；退出 → 没写回的改动撤掉
@@ -652,9 +652,17 @@ try {
     const jumps = spawnSync('python3', ['-c', 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); print(" ".join(str(z.read(f"ppt/slides/slide{i}.xml").decode().count("hlinksldjump")) for i in (1, 2, 3)))', pptx], { encoding: 'utf8' })
     check('PPT 里按钮能点（放映时跳到下一张）', jumps.stdout.trim() === '1 1 0', jumps.stdout.trim() || jumps.stderr)
   }
+  await sleep(500)
+  // 整套 HTML 演示（#26）：一个文件、三屏都在、没有本机地址；导出时不算设计改了
+  const demo = await exportAs('/HTML/', 'html')
+  if (demo) {
+    const s = fs.readFileSync(demo, 'utf8')
+    fs.copyFileSync(demo, path.join(SHOTS, '5-demo.html')) // 跟截图一起留着：之后从 file:// 打开看真导出的样子
+    check('HTML 演示：三屏都在，没有本机地址', [0, 1, 2].every((i) => s.includes(`id="ddp-s-${i}"`)) && !s.includes('id="ddp-s-3"') && !/127\.0\.0\.1|localhost|__dsh_design__/.test(s), `${s.length} 字`)
+  }
   await sleep(1500)
   const stray = await page(`(document.body.innerText.match(/(已更新|Updated) coffee-app[^\\n]*/) || [''])[0]`)
-  check('导出的 PDF / PPT 不算设计改动（不报「已更新」）', !stray, stray)
+  check('导出的 PDF / PPT / HTML 不算设计改动（不报「已更新」）', !stray, stray)
   await shot('5-exported')
 
   // ⑥ 首页再出一版 → home-b 紧挨着首页；点它的「用这版」→ 输入框里是〔选定方向〕
@@ -1304,6 +1312,14 @@ try {
   const navs = []
   for (const w of [320, 380, 441, 460, 480, 500, 520, 540, 560, 600, 640]) for (const en of [false, true]) navs.push(await navFit(w, en))
   check('窄侧栏：顶部两组按钮不互相压（中英文，320 到 640）', navs.every((x) => x.gap >= 0), JSON.stringify(navs.filter((x) => x.gap < 0)))
+  // 看旧版本时导出整套 HTML 演示（#26）：导的是那一版的屏，文件名带 v 几
+  const htmlBefore = new Set(fs.existsSync(EXPORTS) ? fs.readdirSync(EXPORTS) : [])
+  await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+  await sleep(300)
+  await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => /HTML/.test(x.textContent)).click()`)
+  const verHtml = await waitFor(() => (fs.existsSync(EXPORTS) ? fs.readdirSync(EXPORTS) : []).find((x) => x.endsWith('.html') && !htmlBefore.has(x)), 20000)
+  const verToast = await until(`(() => { const t = document.querySelector('.ddp-toast'); return t && t.innerText })()`, 3000)
+  check('看旧版本时导出 HTML 演示：导的是那一版（文件名带 v 几）', !!verHtml && /^v\d+-/.test(verHtml) && fs.readFileSync(path.join(EXPORTS, verHtml), 'utf8').includes('id="ddp-s-0"'), `${verHtml} / ${verToast}`)
   await page(`[...document.querySelectorAll('.ddp-banner .ddp-btn')].pop().click()`)
   await sleep(200)
   await page(`document.querySelector('.ddp-hist header .ddp-btn').click()`)
@@ -1618,7 +1634,9 @@ try {
   await page(menuOpen)
   await page(`document.querySelector('.ddp-menu [role=menuitemcheckbox]').click()`)
   const multiLabs = await until(`((ls) => ls.length >= 4 && ls.join('|'))([...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => x.textContent.trim()))`, 10000)
-  const multiFr = await page(`[...document.querySelectorAll('.ddp-cell iframe')].map((f) => f.clientWidth + 'x' + f.clientHeight).join(' ')`)
+  // 标签先出来、iframe 晚一点才挂上：等到那一档的 iframe 量得到
+  const frs = `[...document.querySelectorAll('.ddp-cell iframe')].map((f) => f.clientWidth + 'x' + f.clientHeight).join(' ')`
+  const multiFr = (await until(`((s) => /\\b1000x700\\b/.test(s) && s)(${frs})`, 10000)) || (await page(frs))
   check('多尺寸（#23）：自定义了 1000×700 → 并排多出一档「自定义 · 1000」，那块就是 1000×700', /自定义 · 1000/.test(multiLabs || '') && /\b1000x700\b/.test(multiFr || ''), `${multiLabs} / ${multiFr}`)
   await sleep(800)
   await shot('10-web-sizes-custom')
