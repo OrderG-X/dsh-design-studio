@@ -12,6 +12,7 @@ import path from 'node:path'
 import http from 'node:http'
 import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
 
 let pass = 0
 let fail = 0
@@ -22,6 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // frameEval 在 iframe 的隔离环境里跑：DOM 是同一份，页面的 JS 变量看不到——页面里的结果写在 DOM 上
 const here = path.dirname(fileURLToPath(import.meta.url))
 const realHome = os.homedir()
+const realProfile = process.env.USERPROFILE
 
 // HOME 换成临时目录：接口会记会话状态（~/.dsh/cache），别碰真的
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ddp-htmlpack-'))
@@ -194,7 +196,8 @@ else {
   const file = path.join(outDir, 'demo.html')
   fs.writeFileSync(file, pack.html)
   const url = 'file://' + (process.platform === 'win32' ? '/' : '') + file.replace(/\\/g, '/')
-  const b = createBrowser({ bin })
+  // 浏览器用真的 HOME / USERPROFILE：Windows 上 Chrome 在改成临时目录的 USERPROFILE 下起不来（管道一直没回应）
+  const b = createBrowser({ bin, launch: (cmd, args, opts) => spawn(cmd, args, { ...opts, env: { ...process.env, HOME: realHome, ...(realProfile ? { USERPROFILE: realProfile } : {}) } }) })
   try {
     await b.withPage({ url, w: 1280, h: 900 }, async (p) => {
       const until = async (expr, ms = 4000, inFrame = false) => {
