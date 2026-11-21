@@ -901,7 +901,7 @@ check('调样式：它干完又能写', tE.editStyle('sE', { key: 'c.html', loc:
   {
     const pick = fs.readFileSync(new URL('../lib/picker.js', import.meta.url), 'utf8')
     const core = fs.readFileSync(new URL('../lib/core.js', import.meta.url), 'utf8')
-    const re = (src) => (/const STATE_CLS = (\/.*\/)\n/.exec(src) || [])[1]
+    const re = (src) => (/const STATE_CLS = (\/.*\/)\r?\n/.exec(src) || [])[1]
     check('像状态的 class：服务端和 picker 一字不差（不然各屏核对和页面上算的对不上）', re(pick) && re(pick) === re(core), `${re(pick)} | ${re(core)}`)
   }
   const r8 = setRuleProps('.btn { padding: 12px 20px !important; font: 600 14px/1 a !important; color: red; }', '.btn', 0, { 'padding-left': '30px', 'font-size': '18px', color: 'blue' })
