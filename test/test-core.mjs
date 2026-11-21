@@ -6,7 +6,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, setStyle, mergeStyle, cleanCss, urlFor, labelOf, parseKind, parseSize, listScreens, allScreens, findRule } from '../lib/core.js'
+import { createTracker, parseTarget, fromBashPath, serverUrlIn, devServerIn, replaceText, setStyle, mergeStyle, cleanCss, urlFor, labelOf, parseKind, parseSize, listScreens, allScreens, findRule, setRuleProps, inlineOverrides, clearInline, exportOrder } from '../lib/core.js'
+import { editsNotice, noticeMessage, langOf } from '../lib/edits.js'
 
 let pass = 0
 let fail = 0
@@ -870,6 +871,107 @@ check('调样式：它干完又能写', tE.editStyle('sE', { key: 'c.html', loc:
   check('找行号：HTML 里脚本、正文中像 CSS 的字不算', findRule('<script>const s = ".go { x }"</script>\n<p>.go { }</p>\n<style>\n.go { }\n</style>', '.go', 0) === 4)
   check('找行号：字符串里的大括号不打断', findRule('.a::after { content: "{" }\n.b { }', '.b', 0) === 2 && findRule('.a::after { content: "{" }', '.a::after', 0) === 1)
   check('找行号：HTML 里 <style> 里的规则', findRule(html, '.go', 0) === 3 && findRule(html, 'main .go', 0) === 4, `${findRule(html, '.go', 0)} ${findRule(html, 'main .go', 0)}`)
+}
+
+
+// ── 调样式「各屏一起改」：写进共用的样式规则（#28） ──
+{
+  const css = '.a { color: red; }\n.voicebtn {\n  background: var(--accent);\n  color: #fff;\n  &:hover { background: blue; }\n}\n.b{x:1}\n'
+  const r = setRuleProps(css, '.voicebtn', 0, { background: '#e8843c' })
+  check('写规则：同名的删掉、新的放最后，嵌套的子规则不动、别的规则不动', r.ok && r.text === '.a { color: red; }\n.voicebtn {\n  color: #fff;\n  &:hover { background: blue; }\n  background: #e8843c;\n}\n.b{x:1}\n', JSON.stringify(r.text))
+  const r2 = setRuleProps('.x{color:red}', '.x', 0, { color: '#000', 'font-size': '14px' })
+  check('写规则：一行写的规则、最后一条没分号', r2.ok && r2.text === '.x{ color: #000; font-size: 14px; }', JSON.stringify(r2.text))
+  const r3 = setRuleProps('.x {\r\n  background-color: red;\r\n  background-image: url(a.png);\r\n  padding: 4px\r\n}\r\n', '.x', 0, { background: '#fff' })
+  check('写规则：写 background 时连 background-color / -image 一起去掉；CRLF 照原样', r3.ok && r3.text === '.x {\r\n  padding: 4px;\r\n  background: #fff;\r\n}\r\n', JSON.stringify(r3.text))
+  const r4 = setRuleProps('.x { color: red !important; }', '.x', 0, { color: 'blue' })
+  check('写规则：原来带 !important 的新的也带', r4.ok && /color: blue !important;/.test(r4.text) && !/red/.test(r4.text), r4.text)
+  const r5 = setRuleProps('/* .x { color: red } */\n.x { content: "a;b}"; color: red; }\n@media (max-width:1px){ .x { color: green } }', '.x', 1, { color: 'blue' })
+  check('写规则：第 n 条（媒体查询里的）、注释和字符串里的 ; } 不算', r5.ok && r5.text.includes('content: "a;b}"; color: red;') && /\.x \{ color: blue; \}/.test(r5.text), r5.text)
+  check('写规则：找不到 / 没有能写的给原因', setRuleProps('.x{}', '.y', 0, { color: 'red' }).reason === 'not-found' && setRuleProps('.x{}', '.x', 0, { foo: 'bar' }).reason === 'empty')
+  const r6 = setRuleProps('.x { background: url("data:image/png;base64,AA;BB"); color: red; }', '.x', 0, { color: 'blue' })
+  check('写规则：括号里的分号不拆（url(data:…;base64)）', r6.ok && r6.text.includes('url("data:image/png;base64,AA;BB");') && /color: blue;/.test(r6.text) && !/red/.test(r6.text), r6.text)
+  const nest = '.dark {\n  .btn { color: white; }\n}\n@media (min-width: 1px) { .btn { color: gray } }\n.btn { color: red; }\n'
+  const r7 = setRuleProps(nest, '.btn', 1, { color: 'blue' })
+  check('写规则：嵌在样式规则里的（.dark { .btn {} }）不数（和右侧栏一样），@media 里的照数', r7.ok && r7.text.includes('.btn { color: white; }') && r7.text.includes('.btn { color: gray }') && /\n\.btn \{ color: blue; \}/.test(r7.text) && findRule(nest, '.btn', 0) === 4 && findRule(nest, '.btn', 1) === 5, r7.text)
+  check('行内盖过规则的：数带这个 class、行内写了这几项的', inlineOverrides('<a class="voicebtn on" style="background-color: red">x</a><a class="voicebtn">y</a><b class="voicebtn" style="color:red">z</b>', 'voicebtn', ['background']) === 1)
+  check('行内盖过规则的：简写、分写都算（padding 盖 padding-left、font 盖字号、四个角盖圆角、row-gap 盖 gap）',
+    inlineOverrides('<a class="k" style="padding: 4px">x</a>', 'k', ['padding-left']) === 1 && inlineOverrides('<a class="k" style="font: 12px a">x</a>', 'k', ['font-size']) === 1 &&
+    inlineOverrides('<a class="k" style="border-top-left-radius: 0">x</a>', 'k', ['border-radius']) === 1 && inlineOverrides('<a class="k" style="row-gap: 0">x</a>', 'k', ['gap']) === 1 &&
+    inlineOverrides('<a class="k" style="padding-top: 4px">x</a>', 'k', ['padding-left']) === 0)
+  {
+    const pick = fs.readFileSync(new URL('../lib/picker.js', import.meta.url), 'utf8')
+    const core = fs.readFileSync(new URL('../lib/core.js', import.meta.url), 'utf8')
+    const re = (src) => (/const STATE_CLS = (\/.*\/)\n/.exec(src) || [])[1]
+    check('像状态的 class：服务端和 picker 一字不差（不然各屏核对和页面上算的对不上）', re(pick) && re(pick) === re(core), `${re(pick)} | ${re(core)}`)
+  }
+  const r8 = setRuleProps('.btn { padding: 12px 20px !important; font: 600 14px/1 a !important; color: red; }', '.btn', 0, { 'padding-left': '30px', 'font-size': '18px', color: 'blue' })
+  check('写规则：带了 !important 的几项报回去（右侧栏下一次照这个算）', r8.ok && r8.imp.sort().join() === 'font-size,padding-left', JSON.stringify(r8.imp))
+  check('写规则：规则里的简写带 !important（padding、font）→ 新写的分写也带，不然白写；别的项不带', r8.ok && r8.text.includes('padding: 12px 20px !important;') && /padding-left: 30px !important;/.test(r8.text) && /font-size: 18px !important;/.test(r8.text) && /color: blue;/.test(r8.text) && !/color: blue !important/.test(r8.text), r8.text)
+  check('导出顺序：打开的最早那屏（index）还排第一，收起来的插回原位', exportOrder(['index.html', 'c.html', 'd.html'], ['a.html', 'b.html'], ['index.html', 'a.html', 'b.html', 'c.html', 'd.html']).join() === 'index.html,a.html,b.html,c.html,d.html')
+  check('导出顺序：显示的是最新几屏 → 收起来的在前；拖过顺序的显示屏之间照拖的', exportOrder(['c.html', 'd.html'], ['a.html', 'b.html'], ['a.html', 'b.html', 'c.html', 'd.html']).join() === 'a.html,b.html,c.html,d.html' && exportOrder(['d.html', 'c.html'], ['a.html'], ['a.html', 'c.html', 'd.html']).join() === 'a.html,d.html,c.html')
+  check('导出顺序：不知道全部顺序 → 收起来的接在最后；同一屏只出一次', exportOrder(['c.html'], ['a.html'], []).join() === 'c.html,a.html' && exportOrder(['a.html', 'c.html'], ['a.html', 'b.html'], ['a.html', 'b.html', 'c.html']).join() === 'a.html,b.html,c.html')
+  const L = { tag: 'a', n: 0, total: 1, cls: ['k'] }
+  const c1 = clearInline('<a class="k" style="padding: 4px 8px; color: red">x</a>', L, ['padding-left'])
+  check('清行内：padding 简写拆成四边，只去掉改了的那边，别的照旧', c1.ok && c1.html === '<a class="k" style="color: red; padding-top: 4px; padding-right: 8px; padding-bottom: 4px">x</a>', c1.html)
+  const c2 = clearInline('<a class="k" style="padding: 1px 2px 3px; padding-top: 9px">x</a>', L, ['padding-left', 'padding-right'])
+  check('清行内：简写后面的分写照先后算（后写的赢）', c2.ok && c2.html === '<a class="k" style="padding-top: 9px; padding-bottom: 3px">x</a>', c2.html)
+  const c3 = clearInline('<a class="k" style="padding: calc(1px + 2px) 4px !important">x</a>', L, ['padding-top'])
+  check('清行内：括号里的空格不拆、!important 跟着每一边', c3.ok && c3.html.includes('padding-right: 4px !important') && c3.html.includes('padding-bottom: calc(1px + 2px) !important') && !c3.html.includes('padding-top'), c3.html)
+  const c6 = clearInline('<a class="k" style="padding: 8px 12px !important; padding-top: 2px">x</a>', L, ['padding-left', 'padding-right'])
+  check('清行内：带 !important 的简写不让后面不带的分写盖掉（上边还是 8px）', c6.ok && c6.html.includes('padding-top: 8px !important') && c6.html.includes('padding-bottom: 8px !important') && !c6.html.includes('2px') && !/padding-(left|right)/.test(c6.html), c6.html)
+  check('清行内：行内写了逻辑内边距（padding-inline）又改左右 → inline；inlineOverrides 也算它', clearInline('<a class="k" style="padding-inline: 20px">x</a>', L, ['padding-left']).reason === 'inline' && clearInline('<a class="k" style="padding-block: 2px">x</a>', L, ['color']).ok && inlineOverrides('<a class="k" style="padding-inline-start: 2px">x</a>', 'k', ['padding-left']) === 1)
+  const s9 = setStyle('<a class="k" style="color: red">x</a>', L, { 'padding-left': '30px', color: 'blue' }, ['padding-left'])
+  check('行内保存：盖着它的规则带 !important 的那几项，行内也带（别的不带）', s9.ok && s9.html.includes('padding-left: 30px !important') && s9.html.includes('color: blue') && !s9.html.includes('blue !important'), s9.html)
+  const s10 = setStyle('<a class="k" style="padding-left: 30px !important">x</a>', L, { 'padding-left': '35px' }, ['padding-left'])
+  check('行内保存：第二次调同一项（行内已经带 !important）→ 新值照样带', s10.ok && s10.html === '<a class="k" style="padding-left: 35px !important">x</a>', s10.html)
+  check('清行内：简写里用了 var() 拆不准 → inline（共用规则不改）', clearInline('<a class="k" style="padding: var(--p)">x</a>', L, ['padding-left']).reason === 'inline')
+  check('清行内：行内写了 font 简写又改字号 → inline', clearInline('<a class="k" style="font: 600 12px/1 a">x</a>', L, ['font-size']).reason === 'inline' && clearInline('<a class="k" style="font: 600 12px/1 a">x</a>', L, ['color']).ok)
+  const c4 = clearInline('<a class="k" style="border-top-left-radius: 0; row-gap: 2px; background-image: none; width: 3px">x</a>', L, ['border-radius', 'gap', 'background'])
+  check('清行内：四个角、row-gap、background-image 一起去掉，别的留着', c4.ok && c4.html === '<a class="k" style="width: 3px">x</a>', c4.html)
+  const c5 = clearInline('<a class="k" style="padding: 4px">x</a>', L, ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'])
+  check('清行内：四边都改了 → style 整个去掉', c5.ok && c5.html === '<a class="k">x</a>', c5.html)
+  const same = '<a class="k" style="color: red">x</a>'
+  check('清行内：没写会盖过的 → 原样', clearInline(same, L, ['padding-left']).html === same && clearInline('<b>x</b>', L, ['color']).html === '<b>x</b>')
+
+  const dir = fs.mkdtempSync(path.join(tmp, 'rule-'))
+  fs.writeFileSync(path.join(dir, 'app.css'), '.voicebtn {\n  background: #3366ff;\n}\n')
+  fs.writeFileSync(path.join(dir, 'home.html'), '<link rel="stylesheet" href="app.css"><a class="voicebtn" style="background: #111; font-size: 12px">说话</a>')
+  fs.writeFileSync(path.join(dir, 'talk.html'), '<link rel="stylesheet" href="app.css"><a class="voicebtn" style="background-color: #222">说话</a>')
+  fs.writeFileSync(path.join(dir, 'list.html'), '<link rel="stylesheet" href="app.css"><a class="voicebtn">说话</a>')
+  const tk = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:42300' }) })
+  await tk.setTarget('rule', { kind: 'file', file: path.join(dir, 'home.html'), root: dir }, { source: 'tool' })
+  const w = tk.editRule('rule', { key: 'home.html', loc: { tag: 'a', n: 0, total: 1, cls: ['voicebtn'] }, file: path.join(dir, 'app.css'), sel: '.voicebtn', n: 0, css: { background: '#e8843c' }, name: 'a.voicebtn', cls: 'voicebtn' })
+  const cssNow = fs.readFileSync(path.join(dir, 'app.css'), 'utf8')
+  const homeNow = fs.readFileSync(path.join(dir, 'home.html'), 'utf8')
+  check('各屏一起改：写进 app.css，这一屏行内同名的去掉（别的留着），数出另有 1 屏行内写着自己的值', w.ok && w.file === 'app.css' && w.others === 1 && cssNow === '.voicebtn {\n  background: #e8843c;\n}\n' && homeNow.includes('style="font-size: 12px"') && !homeNow.includes('#111'), JSON.stringify({ w, cssNow, homeNow }))
+  check('各屏一起改：设计目录外的、不是 .css 的不写', tk.editRule('rule', { key: 'home.html', file: path.join(dir, 'home.html'), sel: '.voicebtn', css: { color: 'red' } }).reason === 'no-rule' && tk.editRule('rule', { key: 'home.html', file: path.join(tmp, 'x.css'), sel: '.voicebtn', css: { color: 'red' } }).reason === 'no-rule')
+  check('各屏一起改：规则找不到给 not-found（右侧栏退回只改这一处）', tk.editRule('rule', { key: 'home.html', file: path.join(dir, 'app.css'), sel: '.nope', css: { color: 'red' } }).reason === 'not-found')
+  // 手改记录：调样式（规则 / 行内）、改字都记下，取一次就清
+  tk.editStyle('rule', { key: 'list.html', loc: { tag: 'a', n: 0, total: 1, cls: ['voicebtn'] }, css: { color: '#fff' }, name: 'a.voicebtn' })
+  tk.editText('rule', { key: 'list.html', before: '说话', after: '按住说话' })
+  const got = tk.takeEdits('rule')
+  check('手改记录：规则、行内、改字三条，带文件和目录', got.length === 3 && got[0].kind === 'rule' && got[0].files.includes('app.css') && got[1].kind === 'style' && got[1].files[0] === 'list.html' && got[2].kind === 'text' && got[2].after === '按住说话' && got.every((e) => e.root === dir), JSON.stringify(got))
+  check('手改记录：取过就清', tk.takeEdits('rule').length === 0 && tk.takeEdits('nobody').length === 0)
+  const fail = tk.editText('rule', { key: 'list.html', before: '没有这句', after: 'x' })
+  check('手改记录：没改成的不记', !fail.ok && tk.takeEdits('rule').length === 0)
+
+  const note = editsNotice(got, 'zh')
+  check('给模型的说明：每条一行、叫它先重读文件、别改回去', note && /app\.css 的 \.voicebtn 规则：background: #e8843c/.test(note.text) && /list\.html：调样式「a\.voicebtn」→ color: #fff（写在这个元素的行内 style 上）/.test(note.text) && /改字「说话」→「按住说话」/.test(note.text) && /先重新读/.test(note.text) && /别把这些改回去/.test(note.text) && note.summary === '用户在设计工作台里手改了 3 处', note && note.text)
+  const en = editsNotice(got, 'en')
+  check('给模型的说明：英文', en && /re-read the files above/.test(en.text) && /3 edits/.test(en.summary))
+  fs.writeFileSync(path.join(dir, 'pad.html'), '<link rel="stylesheet" href="app.css"><a class="voicebtn" style="padding: 4px 8px">说话</a><b class="voicebtn" style="font: 600 12px a">x</b>')
+  const pw = tk.editRule('rule', { key: 'pad.html', loc: { tag: 'a', n: 0, total: 1, cls: ['voicebtn'] }, file: path.join(dir, 'app.css'), sel: '.voicebtn', n: 0, css: { 'padding-left': '20px' }, name: 'a.voicebtn', cls: 'voicebtn' })
+  const padNow = fs.readFileSync(path.join(dir, 'pad.html'), 'utf8')
+  check('各屏一起改：行内 padding 简写拆开、只去掉左边，规则里的 padding-left 才生效', pw.ok && padNow.includes('style="padding-top: 4px; padding-right: 8px; padding-bottom: 4px"') && /padding-left: 20px/.test(fs.readFileSync(path.join(dir, 'app.css'), 'utf8')), padNow)
+  const cssBefore = fs.readFileSync(path.join(dir, 'app.css'), 'utf8')
+  const fw = tk.editRule('rule', { key: 'pad.html', loc: { tag: 'b', n: 0, total: 1, cls: ['voicebtn'] }, file: path.join(dir, 'app.css'), sel: '.voicebtn', n: 0, css: { 'font-size': '18px' }, name: 'b.voicebtn', cls: 'voicebtn' })
+  check('各屏一起改：行内 font 简写盖着字号 → inline，样式表一个字都不动（右侧栏退回只改这一处）', fw.reason === 'inline' && fs.readFileSync(path.join(dir, 'app.css'), 'utf8') === cssBefore)
+  fs.unlinkSync(path.join(dir, 'pad.html'))
+  tk.takeEdits('rule')
+  check('给模型的说明：没有手改就不说', editsNotice([], 'zh') === null)
+  const msg = noticeMessage(note, 'id-1')
+  check('通知消息：和 DSH 的通知一样的形状，冻住', msg.id === 'id-1' && msg.role === 'user' && msg.source.kind === 'design-studio' && msg.source.form === 'notice' && msg.source.summary === note.summary && msg.content[0].text === note.text && Object.isFrozen(msg) && Object.isFrozen(msg.content[0]))
+  check('说明的语言：看用户这一轮说的话', langOf([{ source: { kind: 'user' }, content: [{ type: 'text', text: 'build it into the app' }] }]) === 'en' && langOf([{ source: { kind: 'user' }, content: '做进项目' }]) === 'zh' && langOf([]) === 'zh')
 }
 
 fs.rmSync(tmp, { recursive: true, force: true })

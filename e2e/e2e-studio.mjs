@@ -33,6 +33,7 @@ const argv = process.argv.slice(2)
 const DSH_SPEC = argv.includes('--dsh') ? argv[argv.indexOf('--dsh') + 1] : 'latest'
 const KEEP = argv.includes('--keep')
 const MODE_ONLY = argv.includes('--mode-only') // 只跑「设计模式」那段（改 cordis.patch.yml 时用）
+const ONLY_28 = argv.includes('--only-28') // 只跑 #28 调样式通知 + #29 屏多导出那两段（再加设计模式里的通知）
 const ANNOT = process.env.E2E_ANNOT === '1' // 业务标注的试验开关打开跑一遍（平时关着跑，看有没有带出别的变化）
 const REGISTRY = 'https://registry.npmjs.org/'
 const WIN = process.platform === 'win32'
@@ -91,6 +92,11 @@ const IMPL = path.join(tmp, 'work', 'impl') // 「做出来的」菜单屏（#25
 let IMPL_PORT = 0
 const cmpResults = [] // 模型调 compare_design 拿回来的文字
 const WEBD = path.join(tmp, 'work', 'web') // 网页、meta 没写画幅（单看铺满右侧栏）：开右边面板时整体缩到面板左边（#22）
+const TUNE = path.join(tmp, 'work', 'tune') // 调样式「各屏一起改」+ 手改后模型下一步收到通知（#28）
+const BIG = path.join(tmp, 'work', 'big') // 70 屏的设计：右侧栏只显示 60 屏，导出要连收起来的 10 屏一起（#29）
+const BIG_N = Math.max(70, Math.min(1000, Number(process.env.E2E_BIG_N) || 70)) // E2E_BIG_N=400：照 #29 那位的屏数量一量要多久
+let tunePort = '' // 模型那一轮收到的整个请求
+let tuneDesign = '' // 设计模式会话里同样那一轮
 const HEAD = (title) => `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="tokens.css">`
 const BASE = 'body{margin:0;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg)}header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}h1{font-size:24px;margin:0}main{padding:0 20px}.go{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border:0;border-radius:12px;background:var(--brand);color:#fff;font-size:16px;text-decoration:none}'
 const HOME_BAD = `${HEAD('首页')}<style>${BASE}
@@ -231,6 +237,10 @@ const llm = http.createServer((req, res) => {
     }
     if (said.includes('IMPL-CMP')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_cmp', name: 'compare_design', input: { url: `http://localhost:${IMPL_PORT}/menu.html`, screen: 'menu.html' } }], 'tool_use')
     if (said.includes('DRAFT-FIRST')) return slowWrite(res, FIRST_DRAFT, `${HEAD('第一屏')}<meta name="dsh-design" content="app"></head><body><main><h1>第一屏草稿</h1><p>${'边写边看的内容。'.repeat(80)}</p></main></body></html>`, 8000)
+    if (said.includes('OPEN-BIG')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(BIG, `s${BIG_N}.html`) } }], 'tool_use')
+    if (said.includes('OPEN-TUNE')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(TUNE, 'a.html') } }], 'tool_use')
+    if (raw.includes('TUNE-PORT') && !tunePort) { tunePort = raw; return sse(res, [{ type: 'text', text: '好，我先重读文件。' }], 'end_turn') }
+    if (raw.includes('TUNE-DESIGN') && !tuneDesign) { tuneDesign = raw; return sse(res, [{ type: 'text', text: '好，我先重读文件。' }], 'end_turn') }
     if (said.includes('OPEN-WEB')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(WEBD, 'index.html') } }], 'tool_use')
     if (said.includes('OPEN-DIAGRAM')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DIAG, 'map.html') } }], 'tool_use')
     if (said.includes('OPEN-DECK')) return sse(res, [{ type: 'tool_use', id: 'toolu_e2e_open', name: 'preview_page', input: { target: path.join(DECK, 's1.html') } }], 'tool_use')
@@ -441,6 +451,123 @@ try {
     await enter()
   }
 
+  // ⑭ 调样式「各屏一起改」（#28）：按钮的样式在共用的 app.css 里 → 面板默认勾「各屏一起改」，保存写进 app.css 的 .pill（两屏一起变）；
+  // 然后发一句话 → 模型这一步的请求里带着插件补的通知（改了什么、先重读文件），对话里显示一行
+  // design：在设计模式的新会话里再来一次（换个颜色），看通知在设计模式里也到得了模型
+  const tuneCheck = async (design = false) => {
+    const tag = design ? '设计模式' : '#28'
+    const color = design ? '#2a9d8f' : '#e8843c'
+    const rgb = design ? 'rgb(42, 157, 143)' : 'rgb(232, 132, 60)'
+    const word = design ? 'TUNE-DESIGN' : 'TUNE-PORT'
+    const got = () => (design ? tuneDesign : tunePort)
+    if (!design) {
+      fs.mkdirSync(TUNE, { recursive: true })
+      fs.writeFileSync(path.join(TUNE, 'app.css'), 'body{margin:0;font:16px sans-serif}\n.pill {\n  display: inline-block;\n  padding: 8px 14px;\n  border-radius: 999px;\n  background: #3366ff;\n  color: #fff;\n}\n')
+      const scr = (t) => `<!doctype html><html><head><meta charset="utf-8"><title>${t}</title><meta name="dsh-design" content="app"><link rel="stylesheet" href="app.css"></head><body><main><h1>${t}</h1><a class="pill" href="#">按住说话</a></main></body></html>`
+      fs.writeFileSync(path.join(TUNE, 'a.html'), scr('遥控'))
+      fs.writeFileSync(path.join(TUNE, 'b.html'), scr('说话中'))
+    }
+    await say('OPEN-TUNE 打开')
+    const up = await until(`!!document.querySelector('iframe.ddp-frame[src*="a.html"]') && !!document.querySelector('iframe.ddp-frame[src*="b.html"]')`, 30000)
+    if (!check(`调样式（${tag}）：打开两屏的设计`, up, await page(`[...document.querySelectorAll('iframe.ddp-frame')].map((f) => f.getAttribute('src')).join(' ')`))) return
+    // 上一步停在首页：回到设计
+    // 开过别的会话时页面里还留着那个会话藏起来的设计台：只认看得见的（V）
+    const V = (js) => `(() => { const V = (sel) => [...document.querySelectorAll(sel)].find((x) => x.getClientRects().length) || null; return ${js} })()`
+    await page(V(`(V('.ddp-homeback') || { click() {} }).click(), 1`))
+    await until(V(`!V('.ddp-home')`), 5000)
+    await sleep(1500)
+    await page(V(`V('.ddp-dock button[data-tip="样式"]').click()`))
+    await until(V(`!!V('.ddp-style')`), 5000)
+    await sleep(500)
+    await clickIn('a.html', 'a.pill')
+    await until(V(`(V('.ddp-style .who')?.title || '').startsWith('a.pill')`), 5000)
+    const setBg = await page(`(() => {
+      const row = [...document.querySelectorAll('.ddp-style .row')].find((x) => x.getClientRects().length && x.querySelector('.lbl>span')?.textContent === '背景')
+      const inp = row && row.querySelector('input[type=color]')
+      if (!inp) return false
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, '${color}')
+      inp.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    // 默认勾不勾要等服务端核对完各屏（sharecheck）：等到勾上，等不到就照实拿现在的
+    await until(V(`!!V('.ddp-style label.share input:checked')`), 5000)
+    const share = await until(V(`((l) => l && { text: l.innerText, on: l.querySelector('input').checked })(V('.ddp-style label.share'))`), 3000)
+    if (!setBg || !share) {
+      await shot(`14-tune-fail-${design ? 'design' : 'std'}`)
+      console.log('  （调样式面板：' + JSON.stringify(await page(V(`({ style: (V('.ddp-style') || {}).innerText || '没有面板', who: (V('.ddp-style .who') || {}).title || '', frames: [...document.querySelectorAll('iframe.ddp-frame')].map((f) => f.className + ' ' + f.getAttribute('src')).join(' | '), home: !!V('.ddp-home') })`))) + '）')
+    }
+    check(`调样式（${tag}）：样式来自共用的 app.css → 面板有「各屏一起改」、默认勾上、写着 app.css 的 .pill`, setBg && share && share.on && /各屏一起改/.test(share.text) && /app\.css/.test(share.text) && /\.pill/.test(share.text), JSON.stringify({ setBg, share }))
+    if (!design) await shot('14-tune-share')
+    await page(V(`V('.ddp-style footer .go').click()`))
+    const cssOk = await waitFor(() => fs.readFileSync(path.join(TUNE, 'app.css'), 'utf8').includes(`background: ${color};`), 8000)
+    const toast = await until(`/已写进 app\.css 的 \.pill/.test(document.body.innerText)`, 5000)
+    check(`调样式（${tag}）：保存 → 写进 app.css 的 .pill，两屏的 HTML 都没加行内 style，提示「各屏一起变」`, cssOk && toast && !/style=/.test(fs.readFileSync(path.join(TUNE, 'a.html'), 'utf8')) && !/style=/.test(fs.readFileSync(path.join(TUNE, 'b.html'), 'utf8')), fs.readFileSync(path.join(TUNE, 'app.css'), 'utf8'))
+    await sleep(2500) // 文件变了，两屏在后台换一帧
+    const bBg = await inPage(`document.querySelector('iframe.ddp-frame[src*="b.html"]')`, `getComputedStyle(document.querySelector('a.pill')).backgroundColor`)
+    check(`调样式（${tag}）：没点的那一屏也跟着变了`, bBg === rgb, String(bBg))
+    await page(V(`V('.ddp-dock button[data-tip="样式"]').click()`))
+    await sleep(300)
+    await say(`${word} 把设计做进项目里`)
+    const req = await waitFor(() => got(), 20000)
+    const r = req || ''
+    check(`手改通知（${tag}）：模型这一步的请求里有插件补的通知：改了 app.css 的 .pill、先重读文件`, r.includes('〔设计工作台〕') && r.includes('app.css 的 .pill 规则') && r.includes(color) && r.includes('先重新读'), r ? r.slice(Math.max(0, r.indexOf('〔设计工作台〕') - 20), r.indexOf('〔设计工作台〕') + 600) : '没收到')
+    const row = await until(`(() => { const t = [...document.querySelectorAll('body *')].filter((e) => !e.closest('.ddp') && e.children.length === 0 && e.getClientRects().length && /用户在设计工作台里手改了 1 处/.test(e.textContent)); return t.length ? t[0].textContent : '' })()`, 10000)
+    // 通知在对话里那一步显示成一行：DSH 0.2.2 起才有（0.2.1 模型照样收到，界面不显示）
+    if (/^0\.([01]\.|2\.[01]\b)/.test(dshVersion)) console.log(`  （DSH ${dshVersion} 不显示通知那一行：${row ? '这次显示了' : '没显示'}）`)
+    else check(`手改通知（${tag}）：对话里显示一行「用户在设计工作台里手改了 1 处」`, !!row, await page(`document.body.innerText.slice(-600)`))
+    await shot(design ? '14-tune-notice-design' : '14-tune-notice')
+  }
+
+  // ⑮ 屏多（#29）：70 屏的设计，右侧栏只显示最新的 60 屏；导出 PDF / 整套 HTML 要 70 屏都在，截图时说到第几屏，
+  // 收起来的那屏（s01）和显示的那屏（s70）互相跳的链接 PDF 里也能点
+  const bigCheck = async () => {
+    fs.mkdirSync(BIG, { recursive: true })
+    const pad = (i) => String(i).padStart(String(BIG_N).length, '0')
+    const last = `s${pad(BIG_N)}.html`
+    fs.writeFileSync(path.join(BIG, 'app.css'), 'body{margin:0;font:16px sans-serif}main{height:667px;box-sizing:border-box;padding:24px;overflow:hidden}h1{margin:0 0 12px}.r{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #0001}.r i{width:20px;height:20px;border-radius:6px;background:#e8843c}\n')
+    for (let i = 1; i <= BIG_N; i++) {
+      const link = i === 1 ? `<a href="${last}">去最后一屏</a>` : i === BIG_N ? `<a href="s${pad(1)}.html">回第一屏</a>` : ''
+      const rows = Array.from({ length: 14 }, (_, j) => `<div class="r"><i></i><span>第 ${i} 屏 · 第 ${j + 1} 行 遥控按钮</span></div>`).join('')
+      fs.writeFileSync(path.join(BIG, `s${pad(i)}.html`), `<!doctype html><html><head><meta charset="utf-8"><title>第${i}屏</title><meta name="dsh-design" content="app 375x667"><link rel="stylesheet" href="app.css"></head><body><main style="background:hsl(${i * 5 % 360},60%,92%)"><h1>第${i}屏</h1>${link}${rows}</main></body></html>`)
+    }
+    await say('OPEN-BIG 打开')
+    const up = await until(`!!document.querySelector('iframe.ddp-frame[src*="${last}"]')`, 30000)
+    if (!check(`屏多（#29）：打开 ${BIG_N} 屏的设计`, up)) return
+    await page(`(document.querySelector('.ddp-homeback') || { click() {} }).click(), 1`)
+    await until(`!document.querySelector('.ddp-home')`, 5000)
+    await sleep(3000)
+    const files = (ext) => (fs.existsSync(path.join(BIG, 'exports')) ? fs.readdirSync(path.join(BIG, 'exports')) : []).filter((x) => x.endsWith('.' + ext))
+    const run = async (re, ext, ms) => {
+      await page(`[...document.querySelectorAll('.ddp-kind > .ddp-btn')].find((b) => /^(导出|Export)$/.test(b.dataset.tip || '')).click()`)
+      await sleep(300)
+      await page(`[...document.querySelectorAll('.ddp-menu [role=menuitem]')].find((x) => ${re}.test(x.textContent)).click()`)
+      const end = Date.now() + ms
+      const toasts = new Set()
+      let xo = ''
+      while (Date.now() < end && !files(ext).length) {
+        toasts.add(await page(`(document.querySelector('.ddp-toast') || {}).innerText || ''`).catch(() => ''))
+        // 预检拦下来了（有内容被裁）：不会导出，别干等
+        if ((xo = await page(`(document.querySelector('.ddp-xo') || {}).innerText || ''`).catch(() => ''))) break
+        await sleep(400)
+      }
+      return { f: files(ext)[0] ? path.join(BIG, 'exports', files(ext)[0]) : '', toasts: [...toasts].filter(Boolean), xo }
+    }
+    const t0 = Date.now()
+    const pdf = await run('/PDF/', 'pdf', 300000 + BIG_N * 3000)
+    const s = pdf.f ? fs.readFileSync(pdf.f, 'latin1') : ''
+    const pages = (s.match(/\/Type \/Page\b/g) || []).length
+    check(`屏多（#29）：导出 PDF 是 ${BIG_N} 页（收起来的 ${BIG_N - 60} 屏也在），截图时说到第几屏`, pages === BIG_N && pdf.toasts.some((x) => new RegExp(`正在截图 \\d+/${BIG_N}`).test(x)), JSON.stringify({ pages, secs: Math.round((Date.now() - t0) / 1000), toasts: pdf.toasts.slice(-4), xo: pdf.xo.slice(0, 300) }))
+    console.log(`  （${BIG_N} 屏导出 PDF 用了 ${Math.round((Date.now() - t0) / 1000)} 秒，${pdf.f ? Math.round(fs.statSync(pdf.f).size / 1048576) : 0} MB）`)
+    check(`屏多（#29）：收起来的第 1 屏和第 ${BIG_N} 屏互相跳的链接，PDF 里都能点`, (s.match(/\/Subtype \/Link /g) || []).length === 2, `${(s.match(/\/Subtype \/Link /g) || []).length} 个链接`)
+    await shot('15-big-pdf')
+    await sleep(500)
+    const t1 = Date.now()
+    const html = await run('/HTML/', 'html', 60000 + BIG_N * 300)
+    const hs = html.f ? fs.readFileSync(html.f, 'utf8') : ''
+    check(`屏多（#29）：整套 HTML 演示 ${BIG_N} 屏都在`, hs.includes(`id="ddp-s-${BIG_N - 1}"`) && !hs.includes(`id="ddp-s-${BIG_N}"`) && hs.includes('第1屏'), `${hs.length} 字`)
+    console.log(`  （整套 HTML 用了 ${Math.round((Date.now() - t1) / 1000)} 秒，${Math.round(hs.length / 1048576)} MB）`)
+  }
+
   // ⑬ 设计模式：会话顶上的模式切到「设计模式」，模型拿得到设计台的工具（整组起来了）；
   // 有 Office 的 DSH（0.2.2-rc.2 起）还要：加载 office 技能后有 Office 工具、技能目录里有 DSH 自带的 dsh-doc
   const modeCheck = async () => {
@@ -479,6 +606,8 @@ try {
     check('设计模式：标准模式和设计模式都探完了（没超时）', done(std) && done(des), why)
     check(`设计模式：Office 工具和标准模式一样（这版 DSH ${hasOffice ? '有' : '没有'} Office）`, JSON.stringify(officeOf(std)) === want && JSON.stringify(officeOf(des)) === want, why)
     check(`设计模式：DSH 自带的技能（dsh-doc）和标准模式一样（这版 DSH ${hasDoc ? '有' : '没有'}）`, !!std && !!des && std.doc === hasDoc && des.doc === hasDoc, why)
+    // #28 的通知在设计模式的会话里也要到得了模型（设计台本体挂在最外层，不在设计模式那组里）
+    await tuneCheck(true)
   }
   // 公网链接开着时在左边栏归档这个会话：链接马上失效（插件听 DSH 的归档事件）。要真通道，E2E_REAL_TUNNEL=1 才跑
   const archiveCheck = async () => {
@@ -523,6 +652,7 @@ try {
     check('DSH 日志里没有设计台的报错', !errs.length, errs.slice(0, 5).join('\n'))
   }
   if (MODE_ONLY) { await modeCheck(); logCheck(); throw MODE_DONE }
+  if (ONLY_28) { await tuneCheck(); await bigCheck(); await modeCheck(); logCheck(); throw MODE_DONE }
 
   // ②0 第一屏边写边看：右侧栏关着，草稿一开始流就弹出来，不等文件落地
   fs.mkdirSync(path.dirname(FIRST_DRAFT), { recursive: true })
@@ -542,7 +672,7 @@ try {
   await shot('1-canvas')
 
   // ②b 模型自己体检：调 check_design → 右侧栏量完把清单交回
-  const waitFor = async (fn, ms) => {
+  async function waitFor(fn, ms) {
     const end = Date.now() + ms
     while (Date.now() < end) { const v = fn(); if (v) return v; await sleep(300) }
     return null
@@ -781,7 +911,7 @@ try {
   const aside = await page(`document.querySelector('.ddp-single')?.style.right || ''`)
   check('调样式：面板打开，提示先点一个元素；单页的手机让到面板左边', /在页面上点一个元素/.test(panelTip || '') && aside === '296px', `${panelTip} / right=${aside}`)
   // 预览页里的元素：从 DOM 树进 iframe 找到它，量出在整个窗口里的位置（同站的 iframe，DOM.getDocument 能穿进去）
-  const nodeIn = async (key, selector) => {
+  async function nodeIn(key, selector) {
     const { root } = await chrome.cdp('DOM.getDocument', { depth: -1, pierce: true }, sessionId)
     let doc = null
     const walk = (n) => {
@@ -802,7 +932,7 @@ try {
     const i = attributes.indexOf('style')
     return i >= 0 ? attributes[i + 1] : ''
   }
-  const clickIn = async (key, selector) => {
+  async function clickIn(key, selector) {
     const id = await nodeIn(key, selector)
     if (!id) return false
     const { quads } = await chrome.cdp('DOM.getContentQuads', { nodeId: id }, sessionId)
@@ -891,7 +1021,7 @@ try {
   }
 
   // 在某个 iframe 里算（frameExpr 是在 DSH 页面里找到那个 iframe 的表达式）
-  const inPage = async (frameExpr, expression) => {
+  async function inPage(frameExpr, expression) {
     await chrome.cdp('Runtime.enable', {}, sessionId)
     const { result } = await chrome.cdp('Runtime.evaluate', { expression: frameExpr }, sessionId)
     const { node } = await chrome.cdp('DOM.describeNode', { objectId: result.objectId }, sessionId)
@@ -2023,6 +2153,8 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
   }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
+  await tuneCheck()
+  await bigCheck()
   await modeCheck()
   if (process.env.E2E_REAL_TUNNEL === '1') await archiveCheck()
   logCheck()

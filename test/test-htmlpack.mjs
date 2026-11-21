@@ -184,6 +184,38 @@ r = await call('htmlpack', { session: 's1', target, name: 'x', screens: [] })
 check('接口：没有屏拒', r.status === 400)
 r = await call('htmlpack', { session: 'nobody', name: 'x', screens: [{ key: 'home.html' }] })
 check('接口：不是本地文件的设计拒', r.status === 400 && r.body.error === 'not-file', JSON.stringify(r.body))
+
+// ── 用户手改过：模型下一步开始前补一条通知（#28） ──
+{
+  const ed = path.join(tmp, 'edits')
+  fs.mkdirSync(ed)
+  fs.writeFileSync(path.join(ed, 'app.css'), '.voicebtn {\n  background: #3366ff;\n}\n')
+  fs.writeFileSync(path.join(ed, 'home.html'), '<!doctype html><html><head><link rel="stylesheet" href="app.css"></head><body><a class="voicebtn">按住说话</a></body></html>')
+  const o = await call('open', { session: 's9', target: path.join(ed, 'home.html') })
+  const preStep = ons['agent/pre-step']
+  const user = { id: 'u1', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '把设计做进项目里' }] }
+  const step = (id, base = { kind: 'enter', messages: [user] }) => preStep({ agent: { session: { id } }, messages: [user], turn: 1, step: 1, signal: { aborted: false } }, async () => base)
+  let d = await step('s9')
+  check('手改通知：没改过就不加', typeof preStep === 'function' && d.messages.length === 1)
+  const e1 = await call('edit', { session: 's9', key: 'home.html', before: '按住说话', after: '按住开讲' })
+  const s1 = await call('style', { session: 's9', key: 'home.html', loc: { tag: 'a', n: 0, total: 1, cls: ['voicebtn'] }, css: { background: '#e8843c' }, name: 'a.voicebtn', rule: { href: `${o.body.origin}/app.css`, sel: '.voicebtn', n: 0, cls: 'voicebtn' } })
+  const bad = await call('style', { session: 's9', key: 'home.html', loc: { tag: 'a', n: 0, total: 1 }, css: { color: '#fff' }, name: 'a', rule: { href: 'http://evil.example/app.css', sel: '.voicebtn', n: 0 } })
+  check('各屏一起改：写进设计目录里的 app.css；别的源的样式表不写', e1.body.ok && s1.body.ok && s1.body.file === 'app.css' && /background: #e8843c;/.test(fs.readFileSync(path.join(ed, 'app.css'), 'utf8')) && bad.body.reason === 'no-rule', JSON.stringify([e1.body, s1.body, bad.body]))
+  d = await step('other')
+  check('手改通知：别的会话不加', d.messages.length === 1)
+  d = await step('s9')
+  const n = d.messages[1]
+  check('手改通知：加在用户这句后面，DSH 通知的样子，说清改了什么、叫模型先重读', d.messages.length === 2 && d.messages[0] === user && n.source.kind === 'design-studio' && n.source.form === 'notice' && /手改了 2 处/.test(n.source.summary) && /改字「按住说话」→「按住开讲」/.test(n.content[0].text) && /app\.css 的 \.voicebtn 规则/.test(n.content[0].text) && /先重新读/.test(n.content[0].text), JSON.stringify(n))
+  d = await step('s9')
+  check('手改通知：说过一次就不再说', d.messages.length === 1)
+  await call('edit', { session: 's9', key: 'home.html', before: '按住开讲', after: '按住说话' })
+  d = await step('s9', { kind: 'reject' })
+  const kept = await step('s9')
+  check('手改通知：这一步被拒了不加，也不吞掉（留到下一步）', d.kind === 'reject' && kept.messages.length === 2)
+  let threw = false
+  try { d = await preStep({ agent: null }, async () => ({ kind: 'enter', messages: [] })) } catch { threw = true }
+  check('手改通知：怪参数不出错，原样放行', !threw && d.kind === 'enter')
+}
 srv.close()
 
 // ── 真浏览器：从 file:// 打开 ──

@@ -480,6 +480,26 @@ check('调样式：交给模型的字带元素、选择器、改动和文件', a
   check('调样式：没有规则信息时和以前一样', formatStyleAsk(tr, sty, {}).includes('var(--r-md)。改进样式表'), formatStyleAsk(tr, sty, {}))
 }
 
+// ── 导出全部屏（#29）：照服务端给的那份，挂着的屏用右侧栏自己的 ──
+{
+  const { everyOf } = mod._test
+  const shown = [{ key: 'c.html', id: 'live-c' }, { key: 'old.html', id: 'live-old' }]
+  const list = [{ key: 'a.html' }, { key: 'c.html' }, { key: 'new.html' }]
+  const e = everyOf(shown, list)
+  check('导出全部屏：照服务端的顺序；挂着的用右侧栏的、刚加的用服务端的、服务端没有的（删了）不要', e.map((x) => x.key).join() === 'a.html,c.html,new.html' && e[1].id === 'live-c', JSON.stringify(e))
+  check('导出全部屏：服务端说没收起来的 → 就是显示的这些', everyOf(shown, []) === shown)
+}
+
+// ── 各屏一起改默认勾不勾（#28）：页面上同一种 + 服务端核对过各屏才勾 ──
+{
+  const { shareOn } = mod._test
+  const rule = { sel: '.pill', href: 'http://127.0.0.1:1/app.css', n: 0, cls: 'pill', uni: true, sig: 'A|pill' }
+  const sty = (extra) => ({ live: { background: '#fff' }, rules: { background: rule }, ...extra })
+  check('各屏一起改：还没核对完 → 不勾', shareOn(sty({ shareSeen: {} })) === false && shareOn(sty({})) === false)
+  check('各屏一起改：核对过各屏都同一种 → 勾；有不一样的 → 不勾', shareOn(sty({ shareSeen: { pill: true } })) === true && shareOn(sty({ shareSeen: { pill: false } })) === false)
+  check('各屏一起改：页面上就不是同一种 → 不勾；用户自己点过的照用户的', shareOn({ ...sty({ shareSeen: { pill: true } }), rules: { background: { ...rule, uni: false } } }) === false && shareOn(sty({ shared: true })) === true && shareOn(sty({ shared: false, shareSeen: { pill: true } })) === false)
+}
+
 // ── 风格卡：配色都过对比度，交给模型的字带全套 ──
 const { STYLES, formatStyle, accentUse } = mod._test
 {

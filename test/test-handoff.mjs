@@ -282,6 +282,13 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   check('交接说明：共用的 topbar / card 做成组件', md.includes('`.topbar`：2 屏都有') && md.includes('→ `Topbar` 组件') && md.includes('`.card`'))
   check('交接说明：脚本、输入控件、悬停样式、滑块都提到', /menu\.html：1 段脚本.*1 个输入控件/.test(md) && /悬停.*1 处/.test(md) && /圆角（--radius-md，现在是 12px）/.test(md), md)
   check('交接说明：素材、做法（每屏 compare_design，3% 以内）', md.includes('`img/hero.jpg`') && md.includes('compare_design') && md.includes('3%'))
+  {
+    const at = new Date(2026, 10, 21, 0, 29).getTime()
+    const tunedMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest, project: detectProject(dest), system: '', htmlByKey,
+      tuned: [{ at, label: '调样式「a.voicebtn」', changed: ['home.html'] }, { at, label: '调样式「a.voicebtn」→ app.css', changed: ['app.css', 'home.html'] }, { at, label: '改字「按住开讲」', changed: ['home.html'] }, { at, label: '做一个登录页', changed: ['login.html'] }] })
+    check('交接：列出用户手调过的（模型自己做的那几版不列），说清以文件为准、行内的值带进组件', /## 用户手调过的（以这些为准）/.test(tunedMd) && /11-21 00:29 调样式「a\.voicebtn」（home\.html）/.test(tunedMd) && /→ app\.css（app\.css、home\.html）/.test(tunedMd) && /改字「按住开讲」/.test(tunedMd) && !/做一个登录页/.test(tunedMd) && /行内 style 上的值要带进对应的组件/.test(tunedMd), tunedMd.slice(0, 600))
+    check('交接：开头就说行内 style 多半是用户手调的', /行内 `style="…"` 多半是用户在工作台里手调的/.test(tunedMd) && !/## 用户手调过的/.test(md))
+  }
   const same = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'same', dest: '/x/proj', project: { dir: '/x/proj', pkg: true, name: 'proj', framework: 'vue', label: 'Vue + Vite', tailwind: true, ts: true, pm: 'pnpm' }, system: '', htmlByKey })
   check('交接说明：网页设计没有小程序要点', !md.includes('小程序要点'))
   const bareMd = handoffMd({ root: design, rows, kind: 'web', size: [1280, 800], framework: 'react', dest: '/x/api', project: { dir: '/x/api', pkg: true, name: 'api', framework: '', label: '', tailwind: false, ts: false, pm: 'npm' }, system: '', htmlByKey })

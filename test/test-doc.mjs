@@ -190,6 +190,95 @@ check('接口：版面和拼版传得进去', r.status === 200 && (fs.readFileSy
 r = await call('doc', { session: 's1', format: 'pdf', pages: [{ ...page, w: 1, h: 1 }] })
 check('接口：页面尺寸不像话就按图片的一半算', r.status === 200 && fs.readFileSync(r.body.path).toString('latin1').includes('/MediaBox [0 0 6 3]'), JSON.stringify(r.body))
 
+// ── 分批传（#29：几百屏一次传不动）──
+{
+  const job = 'job' + Date.now().toString(36)
+  const pg = (key, to) => ({ jpg: JPG.toString('base64'), w: 390, h: 844, title: key, key, links: to ? [{ x: 0, y: 0, w: 100, h: 40, key: to }] : [] })
+  r = await call('doc', { session: 's1', job, pages: [pg('a.html', 'c.html'), pg('b.html', 'gone.html')] })
+  const mid = r
+  r = await call('doc', { session: 's1', job, pages: [pg('c.html', 'a.html')], done: true, format: 'pdf', name: 'chunked', target: `file|${site}` })
+  const pdf = r.status === 200 ? fs.readFileSync(r.body.path).toString('latin1') : ''
+  check('分批传：没 done 的只攒着，最后一批拼成 PDF（3 页）', mid.status === 200 && mid.body.n === 2 && r.status === 200 && (pdf.match(/\/Type \/Page\b/g) || []).length === 3, JSON.stringify([mid.body, r.body]))
+  check('分批传：链接按目标屏的 key 换成第几页，没截上的屏的链接去掉', (pdf.match(/\/Subtype \/Link/g) || []).length === 2, String((pdf.match(/\/Subtype \/Link/g) || []).length))
+  r = await call('doc', { session: 's1', job, pages: [], done: true, format: 'pdf', name: 'again' })
+  check('分批传：拼完 job 就没了（再 done 是空的，拒）', r.status === 400, JSON.stringify(r.body))
+  const j2 = 'other' + Date.now().toString(36)
+  await call('doc', { session: 's1', job: j2, pages: [pg('a.html')] })
+  r = await call('doc', { session: 's2', job: j2, pages: [pg('b.html')], done: true, format: 'pdf' })
+  check('分批传：别的会话接不上这个 job', r.status === 400 && r.body.error === 'job', JSON.stringify(r.body))
+  r = await call('doc', { session: 's1', job: j2, pages: [{ jpg: 'eHh4' }] })
+  check('分批传：中途有一页不是 JPEG → 拒，整份作废', r.status === 400 && (await call('doc', { session: 's1', job: j2, pages: [], done: true, format: 'pdf' })).status === 400)
+  const j3 = 'cx' + Date.now().toString(36)
+  await call('doc', { session: 's1', job: j3, pages: [pg('a.html')] })
+  r = await call('doc', { session: 's2', job: j3, cancel: true })
+  const j3Alive = (await call('doc', { session: 's1', job: j3, pages: [], done: true, format: 'pdf', name: 'kept' })).status === 200
+  const j4 = 'cy' + Date.now().toString(36)
+  await call('doc', { session: 's1', job: j4, pages: [pg('a.html')] })
+  r = await call('doc', { session: 's1', job: j4, cancel: true })
+  check('分批传：中途换了设计 → 取消，这份作废（别的会话取消不了）', r.status === 200 && j3Alive && (await call('doc', { session: 's1', job: j4, pages: [], done: true, format: 'pdf' })).status === 400)
+  const j5 = 'cz' + Date.now().toString(36)
+  r = await call('doc', { session: 's1', job: j5, pages: [pg('b.html')], at: 3, done: true, format: 'pdf' })
+  check('分批传：前面传过、job 却没了（过期 / 重启）→ 410 jobGone，不拿半截拼', r.status === 410 && r.body.error === 'jobGone', JSON.stringify(r.body))
+  const j6 = 'cw' + Date.now().toString(36)
+  await call('doc', { session: 's1', job: j6, pages: [pg('a.html'), pg('b.html')], at: 0 })
+  r = await call('doc', { session: 's1', job: j6, pages: [pg('c.html')], at: 5, done: true, format: 'pdf' })
+  const j6Gone = (await call('doc', { session: 's1', job: j6, pages: [], at: 2, done: true, format: 'pdf' })).status === 410
+  check('分批传：页数对不上（丢了一批）→ 409 jobGone，这份作废', r.status === 409 && r.body.error === 'jobGone' && j6Gone, JSON.stringify(r.body))
+  const j7 = 'cv' + Date.now().toString(36)
+  await call('doc', { session: 's1', job: j7, pages: [pg('a.html')], at: 0 })
+  r = await call('doc', { session: 's1', job: j7, pages: [pg('b.html')], at: 1, done: true, format: 'pdf', name: 'counted' })
+  check('分批传：带 at、页数对得上 → 照常拼', r.status === 200 && fs.existsSync(r.body.path), JSON.stringify(r.body))
+  r = await call('doc', { session: 's1', job: 'bad/../id', pages: [pg('a.html')], format: 'pdf' })
+  check('分批传：job 名字不对就当没分批（一次传完的老样子）', r.status === 200 && fs.existsSync(r.body.path), JSON.stringify(r.body))
+}
+
+// ── 收起来的屏（#29）：屏多过 60，导出时要把它们也算上 ──
+{
+  const many = path.join(tmp, 'many')
+  fs.mkdirSync(many)
+  for (let i = 0; i < 65; i++) {
+    const f = path.join(many, `s${String(i).padStart(2, '0')}.html`)
+    fs.writeFileSync(f, `<!doctype html><title>第 ${i} 屏</title><p>${i}</p>`)
+    const t = new Date(Date.now() - (100 - i) * 1000)
+    fs.utimesSync(f, t, t)
+  }
+  await call('open', { session: 'm1', target: path.join(many, 's64.html') })
+  r = await call('hidden', { session: 'm1' })
+  const hid = (r.body.list || []).filter((x) => x.hidden)
+  check('收起来的屏：给导出用的全部 65 屏，按先后、带标题和这套设计的 key，最早的 5 屏标着收起来', r.status === 200 && r.body.target === `file|${many}` && r.body.list.length === 65 && r.body.list[0].key === 's00.html' && r.body.list[0].title === '第 0 屏' && r.body.list[64].key === 's64.html' && hid.length === 5 && hid[4].key === 's04.html', JSON.stringify(r.body).slice(0, 300))
+  fs.renameSync(path.join(many, 's02.html'), path.join(many, 's02b.html'))
+  r = await call('hidden', { session: 'm1' })
+  check('收起来的屏：改了名的马上认（不靠右侧栏记的）', r.body.list.some((x) => x.key === 's02b.html') && !r.body.list.some((x) => x.key === 's02.html') && r.body.list.length === 65, JSON.stringify(r.body.list.slice(0, 6)))
+  check('收起来的屏：没超 1000 屏 → cut 是 0', r.body.cut === 0)
+  r = await call('style', { session: 'm1', target: `file|${many}`, key: 's63.html', loc: { tag: 'p', n: 0, total: 1, cls: [] }, css: { 'font-size': '20px', color: 'red' }, imp: ['font-size'] })
+  const s63 = fs.readFileSync(path.join(many, 's63.html'), 'utf8')
+  check('调样式：盖着它的规则带 !important 的那项，行内也带上', r.body.ok && s63.includes('font-size: 20px !important') && s63.includes('color: red') && !s63.includes('red !important'), s63)
+  // 保存样式时设计换了（右侧栏带的 target 对不上）→ 不写
+  r = await call('style', { session: 'm1', target: 'file|/别的设计', key: 's64.html', loc: { tag: 'p', n: 0, total: 1, cls: [] }, css: { color: 'red' } })
+  check('调样式：中途换了设计 → moved，不写', r.status === 200 && r.body.reason === 'moved' && !fs.readFileSync(path.join(many, 's64.html'), 'utf8').includes('style='), JSON.stringify(r.body))
+  // 各屏一起改默认勾不勾（#28）：各屏带 .pill 的都是同一种才勾
+  fs.writeFileSync(path.join(many, 's10.html'), '<!doctype html><a class="pill on">x</a><a class="pill">y</a>')
+  r = await call('sharecheck', { session: 'm1', cls: 'pill', sig: 'A|pill' })
+  check('各屏一起改核对：带 .pill 的都是 a（状态 class 不算）→ same', r.status === 200 && r.body.same === true, JSON.stringify(r.body))
+  fs.writeFileSync(path.join(many, 's11.html'), '<!doctype html><button class="pill big">x</button>')
+  r = await call('sharecheck', { session: 'm1', cls: 'pill', sig: 'A|pill' })
+  const diff = r.body.same === false
+  r = await call('sharecheck', { session: 'm1', cls: 'nope', sig: 'A|pill' })
+  check('各屏一起改核对：别的屏（收起来的也算）有不一样的 → 不勾；没有这个 class 的 → 不勾', diff && r.body.same === false, JSON.stringify(r.body))
+  r = await call('sharecheck', { session: 'm1', cls: 'a"b', sig: 'A|pill' })
+  check('各屏一起改核对：class 名不像样 → 不勾', r.status === 200 && r.body.same === false)
+  // 超过 1000 屏：只给前 1000，cut 说后面有几屏没给（右侧栏提示）
+  for (let i = 65; i < 1003; i++) fs.writeFileSync(path.join(many, `t${String(i).padStart(4, '0')}.html`), '<p>x</p>')
+  r = await call('hidden', { session: 'm1' })
+  check('收起来的屏：超过 1000 屏只给前 1000，cut 说后面有几屏', r.body.list.length === 1000 && r.body.cut === 3, `${r.body.list.length} ${r.body.cut}`)
+  r = await call('hidden', { session: 's1' })
+  check('收起来的屏：没收起来的给空', r.status === 200 && r.body.list.length === 0)
+  // 刚加的屏目录监听还没报上来（右侧栏以为没收起来的）：导出前问，现扫目录的也给
+  fs.writeFileSync(path.join(site, 'zz-new.html'), '<!doctype html><title>新屏</title>')
+  r = await call('hidden', { session: 's1' })
+  check('收起来的屏：刚加的屏还没监听到 → 现扫目录也给（排在后面），导出不漏', r.body.list.length === 2 && r.body.list[0].key === 'home.html' && r.body.list[1].key === 'zz-new.html' && r.body.list[1].hidden === true, JSON.stringify(r.body))
+}
+
 srv.close()
 try { fs.rmSync(tmp, { recursive: true, force: true }) } catch {}
 console.log(`\n${pass} 通过，${fail} 失败`)
