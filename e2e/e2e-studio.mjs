@@ -2242,7 +2242,9 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
   // 这一屏打不开（1.0 出错卡）：画布上一屏跳到不存在的页面 → 红边卡片（重试 / 让模型改）、标签旁「打不开」；回到原来的页面卡片自己走
   {
-    const was = await page(`(() => { const f = [...document.querySelectorAll('.ddp iframe.ddp-frame.cur')].find((x) => x.getBoundingClientRect().width > 150); if (!f) return ''; const s = f.getAttribute('src'); f.src = s.replace(/[^/?#]+\.html/, 'e2e-missing.html'); return s })()`)
+    await page(CANVAS) // 「打不开」挂在画布的屏名旁边：先回画布
+    await sleep(1200)
+    const was = await page(`(() => { const f = [...document.querySelectorAll('.ddp iframe.ddp-frame.cur')].find((x) => x.getBoundingClientRect().width > 60); if (!f) return ''; const s = f.getAttribute('src'); f.src = s.replace(/[^/?#]+\.html/, 'e2e-missing.html'); return s })()`)
     const card = await until(`(() => { const c = document.querySelector('.ddp-fail'); return c && c.innerText })()`, 10000)
     const tag = await page(`[...document.querySelectorAll('.ddp-failtag')].map((x) => x.textContent).join()`)
     const acts = await page(`[...document.querySelectorAll('.ddp-fail button')].map((b) => b.textContent.trim()).join('|')`)
@@ -2258,6 +2260,8 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   if (check('工具栏回到设计台首页', homeUp, await page(`document.querySelector('.ddp') ? document.querySelector('.ddp').className : '没有 .ddp'`))) {
     await page(`document.querySelector('.ddp-ask button.chip[aria-haspopup=dialog]').click(), 1`)
     const popUp = await until(`!!document.querySelector('.ddp-askpop')`, 5000)
+    await page(`(document.querySelectorAll('.ddp .dd-msg .dd-x').forEach((b) => b.click()), 1)`) // 前一步留下的消息条（6 秒才走）先关掉，量的是面板自己有没有被盖住
+    await sleep(500)
     const covered = popUp ? await page(`(() => { const p = document.querySelector('.ddp-askpop'); const r = p.getBoundingClientRect(); let bad = 0; for (const x of [.15, .5, .85]) for (const y of [.15, .5, .85]) { const e = document.elementFromPoint(r.left + r.width * x, r.top + r.height * y); if (!e || !p.contains(e)) bad++ } return bad })()`) : -1
     check('首页风格面板：九个点都点得到面板（没被下面盖住）', covered === 0, `被盖住 ${covered} 个点`)
     await shot('11-home-pop')
