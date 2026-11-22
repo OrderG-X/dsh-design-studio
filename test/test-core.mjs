@@ -733,6 +733,13 @@ check('改字：前后的换行缩进留着', rt.ok && rt.html === '<h1>\n  你�
 check('改字：找不到 / 空的', replaceText('<p>x</p>', 'y', 'z').reason === 'not-found' && replaceText('<p>x</p>', 'x', '  ').reason === 'empty')
 check('改字：数不到第 n 处', replaceText('<p>x</p><p>x</p>', 'x', 'z', 2).reason === 'not-found')
 check('改字：正则字符原样', replaceText('<p>¥9.9 (限时)</p>', '¥9.9 (限时)', '¥19', 0).html === '<p>¥19</p>')
+{
+  // 撤销：改完告诉右侧栏新字在源码里是第几处，照它换回去正好是原样
+  const src0 = '<p>马上登录</p><script>"马上登录"</script><p>立即 登录</p><b title="马上登录">马上登录</b><p>立即 登录</p>'
+  const a = replaceText(src0, '立即 登录', '马上登录', 1)
+  const b = a.ok && replaceText(a.html, '马上登录', '立即 登录', a.nth)
+  check('改字：回包带新字是第几处，换回去和原来一样', a.ok && a.nth === 2 && b.ok && b.html === src0, JSON.stringify({ a, b }))
+}
 
 const editDir = path.join(tmp, 'edit')
 fs.mkdirSync(editDir)

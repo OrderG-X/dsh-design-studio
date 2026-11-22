@@ -276,6 +276,41 @@ try {
   const left = fs.readdirSync(cache3).filter((n) => n.endsWith('.jpg')).length
   check('截的时候文件一直在改：缓存总数照样限住', left <= 3, `${left} 张`)
 
+  // ── 旧版本的缩略图（1.0 版本面板的卡片） ──
+  const cache4 = path.join(tmp, 'cache4')
+  const vers = { local: [{ n: 3, at: 3000, screens: ['s1.html', 's2.html'] }, { n: 2, at: 2000, screens: ['s1.html'] }] }
+  const vTracker = { snapshot: tracker.snapshot, stateOf: (id) => (snaps[id] ? { origin } : { origin: '' }), versions: (id) => vers[id] || [] }
+  const vThumbs = createCanvasThumbs({ tracker: vTracker, browser: () => browser, trust: () => 'tr1', admit: () => true, json, dir: cache4, assetMs: 0 })
+  const vServer = http.createServer((req, res) => vThumbs.verRoute(req, res))
+  await new Promise((r) => vServer.listen(0, '127.0.0.1', r))
+  const vGet = (qs) => new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${vServer.address().port}/verthumb?${qs}`, (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'], cache: res.headers['cache-control'] || '', body: Buffer.concat(chunks).toString() }))
+    }).on('error', reject)
+  })
+  try {
+    const p0 = pages.length
+    check('旧版本缩略图：参数不全 / 屏名不对 400', (await vGet('session=local&n=3&key=s1.html')).status === 400 && (await vGet('session=local&n=3&key=..%2Fx.html&w=800&h=600')).status === 400 && pages.length === p0)
+    check('旧版本缩略图：没这一版、那一版里没这屏、开发服务器的设计、没这个会话 → 404', (await vGet('session=local&n=9&key=s1.html&w=800&h=600')).status === 404 &&
+      (await vGet('session=local&n=2&key=s2.html&w=800&h=600')).status === 404 && (await vGet('session=proxy&n=3&key=s1.html&w=800&h=600')).status === 404 &&
+      (await vGet('session=nope&n=3&key=s1.html&w=800&h=600')).status === 404 && pages.length === p0)
+    const v1 = await vGet('session=local&n=3&key=s1.html&w=800&h=600')
+    check('旧版本缩略图：截那一版的地址（/__dsh_design__/v/3/），JPEG，浏览器可以缓存', v1.status === 200 && v1.type === 'image/jpeg' && /max-age/.test(v1.cache) && pages.length === p0 + 1 && pages.at(-1).url === `${origin}/__dsh_design__/v/3/s1.html`, JSON.stringify([v1.status, v1.cache, pages.at(-1)]))
+    await wait(20)
+    fs.writeFileSync(path.join(root, 's1.html'), '<h1>1 又改了</h1>')
+    const v2 = await vGet('session=local&n=3&key=s1.html&w=800&h=600')
+    check('旧版本缩略图：现在的文件改了也不重截（存下的版本不会变）', v2.status === 200 && v2.body === v1.body && pages.length === p0 + 1)
+    const v3 = await vGet('session=local&n=2&key=s1.html&w=800&h=600')
+    check('旧版本缩略图：另一版另截一张', v3.status === 200 && v3.body !== v1.body && pages.length === p0 + 2 && pages.at(-1).url === `${origin}/__dsh_design__/v/2/s1.html`)
+    vers.local[0].at = 3500 // 历史清过、同一个版本号存了别的东西
+    check('旧版本缩略图：同一个版本号、存的时间不一样 → 重截', (await vGet('session=local&n=3&key=s1.html&w=800&h=600')).status === 200 && pages.length === p0 + 3)
+    hasBrowser = false
+    check('旧版本缩略图：没浏览器 503', (await vGet('session=local&n=3&key=s2.html&w=800&h=600')).status === 503)
+    hasBrowser = true
+  } finally { vServer.close() }
+
   // ── 预览服务器：开始监听 / 不再监听都报（目录还没建时报不在听，建好再开补上；关了报不在听） ──
   const { createHub } = await import('../lib/serve.js')
   const ev = []

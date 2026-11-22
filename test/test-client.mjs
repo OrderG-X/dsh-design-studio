@@ -34,6 +34,35 @@ function check(name, ok, extra = '') {
   if (ok) { pass++; console.log(`✓ ${name}`) } else { fail++; console.log(`✗ ${name} ${extra}`) }
 }
 
+// ── 样式表结构：花括号配对、普通规则里不再套规则（漏一个 } 后面几百条样式全被吞掉，界面整个走样） ──
+{
+  const css = mod._test.STYLE
+  const bad = []
+  const stack = []
+  let pre = ''
+  let line = 1
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i]
+    if (c === '\n') line++
+    if (c === '/' && css[i + 1] === '*') { const j = css.indexOf('*/', i + 2); if (j < 0) { bad.push(`第 ${line} 行注释没关`); break } line += (css.slice(i, j).match(/\n/g) || []).length; i = j + 1; continue }
+    if (c === '"' || c === "'") { const j = css.indexOf(c, i + 1); pre += css.slice(i, j + 1); i = j; continue }
+    if (c === '{') {
+      const p = pre.trim()
+      const top = stack[stack.length - 1]
+      if (top && !top.at) bad.push(`样式第 ${line} 行「${p.slice(-50)}」套在「${top.p.slice(0, 40)}」里（前面漏了 }？）`)
+      stack.push({ at: p.startsWith('@') && !/^@(font-face|page)\b/.test(p), p })
+      pre = ''
+    } else if (c === '}') {
+      if (!stack.length) bad.push(`样式第 ${line} 行多了一个 }`)
+      stack.pop()
+      pre = ''
+    } else if (c === ';') pre = ''
+    else pre += c
+  }
+  if (stack.length) bad.push(`样式结尾还有 ${stack.length} 个 { 没关`)
+  check('样式表花括号配对、规则里没有误套规则', !bad.length, bad.slice(0, 5).join(' / '))
+}
+
 check('inject 写的是客户端短服务名', JSON.stringify(mod.inject) === JSON.stringify(['slots', 'locale', 'sidebarRight', 'sidebarRightTabs']))
 
 // ── 注册 ──
@@ -225,14 +254,15 @@ const { parseMeta, sizeOf, layoutGrid, fitCam, nearestLive, LIVE_MAX } = mod._te
   const { precheckOf: pc, fitCanvas: fc, layoutOk: lo, fitHOk: fo } = mod._test
   const M = (o) => ({ w: 1280, h: 720, pageW: 1280, pageH: 720, natural: null, dead: 0, ...o })
   const j = (x) => JSON.stringify(x)
-  check('预检：刚好装下什么都不报', j(pc([M()], 'slides', 0)) === j({ over: 0, long: 0, moved: 0, dead: 0, fail: 0, ai: 0 }))
-  check('预检：量不到的屏单独算，不当通过', j(pc([{ failed: true }, M()], 'slides', 0)) === j({ over: 0, long: 0, moved: 0, dead: 0, fail: 1, ai: 0 }))
+  check('预检：刚好装下什么都不报', j(pc([M()], 'slides', 0)) === j({ over: 0, long: 0, moved: 0, dead: 0, fail: 0, ai: 0, who: { over: [], long: [], moved: [] } }))
+  check('预检：量不到的屏单独算，不当通过', j(pc([{ failed: true }, M()], 'slides', 0)) === j({ over: 0, long: 0, moved: 0, dead: 0, fail: 1, ai: 0, who: { over: [], long: [], moved: [] } }))
   check('预检：幻灯片比画幅高算「会被裁」，整页取景就不算', pc([M({ pageH: 1500 })], 'slides', 0).over === 1 && pc([M({ pageH: 1500 })], 'slides', Infinity).over === 0)
   check('预检：比画幅宽，整页取景也会被裁', pc([M({ pageW: 1600 })], 'web', Infinity).over === 1)
   check('预检：网页长页算「长页」，整页取景不算，指定高度按高度算', pc([M({ pageH: 1500 })], 'web', 0).long === 1 && pc([M({ pageH: 1500 })], 'web', Infinity).long === 0 && pc([M({ pageH: 1500 })], 'web', 1600).long === 0 && pc([M({ pageH: 1500 })], 'web', 1000).long === 1)
-  check('预检：差两像素以内不报；死链接累加', j(pc([M({ pageH: 722, pageW: 1282, dead: [1, 2] }), M({ dead: [3, 4, 5] })], 'web', 0)) === j({ over: 0, long: 0, moved: 0, dead: 5, fail: 0, ai: 0 }))
+  check('预检：差两像素以内不报；死链接累加', j(pc([M({ pageH: 722, pageW: 1282, dead: [1, 2] }), M({ dead: [3, 4, 5] })], 'web', 0)) === j({ over: 0, long: 0, moved: 0, dead: 5, fail: 0, ai: 0, who: { over: [], long: [], moved: [] } }))
   check('预检：长页滚过了，照实说不在页顶，不说只截首屏；整页取景不算', ((r) => r.moved === 1 && r.long === 0)(pc([M({ pageH: 1500, sy: 300 })], 'web', 0)) && pc([M({ pageH: 1500, sy: 1 })], 'web', 0).long === 1 && pc([M({ pageH: 1500, sy: 300 })], 'web', Infinity).moved === 0)
   check('预检：AI 示意图按文件名去重计数，不算问题', pc([M({ aiPhotos: ['ai-photo-a.jpg', 'ai-photo-b.jpg'] }), M({ aiPhotos: ['ai-photo-a.jpg'] })], 'web', 0).ai === 2 && pc([M({ aiPhotos: ['ai-photo-a.jpg'] })], 'web', 0).over === 0)
+  check('预检：记下是第几个页面被裁（面板里写出屏名）', j(pc([M(), M({ pageH: 1500 }), { failed: true }, M({ pageW: 1600 }), M({ pageH: 1500, sy: 300 })], 'web', 0).who) === j({ over: [3], long: [1], moved: [4] }))
   check('预检：导出范围外的死链接不报', pc([M({ pageH: 3000, dead: [100, 800] })], 'web', 0).dead === 1 && pc([M({ pageH: 3000, dead: [100, 800] })], 'web', Infinity).dead === 2 && pc([M({ pageH: 3000, dead: [100, 800] })], 'web', 500).dead === 1 && pc([M({ pageH: 3000, sy: 700, dead: [100, 800] })], 'web', 0).dead === 1)
   check('按内容改画幅：幻灯片按量到的版面', fc([M({ natural: [1500, 800] }), M({ natural: [1440, 900] })], 'slides', [1280, 720]) === '1500x900')
   check('按内容改画幅：竖着堆的不改高；没有要改的不给按钮', fc([M({ natural: 0, pageH: 1440 })], 'slides', [1280, 720]) === '' && fc([M()], 'slides', [1280, 720]) === '')
@@ -523,6 +553,16 @@ const { STYLES, formatStyle, accentUse } = mod._test
   check('自动风格：审查 B 的误判都改了', id('健身 App，配色定为蓝白', 'app') === null && id('跑步 App，清新风：首页、训练、我的', 'app') === null && id('A theme park booking app', 'app') !== null && id('A color picker app', 'app') !== null && id('金融风控管理系统', 'web') === 'tech' && id('健身 App，风格：你定', 'app') === null && id('I run a coffee shop, watch our intro video', 'web') === 'retro' && id('新风系统控制面板', 'desktop') !== null,
     [id('健身 App，配色定为蓝白', 'app'), id('跑步 App，清新风：首页、训练、我的', 'app'), id('A theme park booking app', 'app'), id('A color picker app', 'app'), id('金融风控管理系统', 'web'), id('健身 App，风格：你定', 'app'), id('I run a coffee shop, watch our intro video', 'web')].join())
   { const t0 = Date.now(); autoStyle('健身 App，风格' + ' '.repeat(5000) + 'x', 'app'); autoStyle('配色' + '：'.repeat(3000) + ' '.repeat(3000), 'app'); autoStyle('风格' + ' '.repeat(40000) + 'x', 'app'); check('自动风格：长空白不卡（< 50ms）', Date.now() - t0 < 50, Date.now() - t0) }
+  {
+    const { recStyles } = mod._test
+    const ids = (text, kind) => recStyles(text, kind).map((x) => x.id)
+    const food = ids('巷口面馆 点单 购物车 订单', 'app')
+    const run = ids('跑步打卡 今日 训练 我的', 'app')
+    const none = ids('', 'slides')
+    check('外观换风格的推荐：五张不重样；吃的先给暖调、复古，跑步先给运动，没认出按类型再按常用补满',
+      [food, run, none].every((x) => x.length === 5 && new Set(x).size === 5) && food[0] === 'warm' && food.includes('retro') && run[0] === 'sport' && none[0] === 'swiss',
+      [food, run, none].map((x) => x.join(' ')).join(' | '))
+  }
   check('自动风格：兜底不给米色系的卡', ['做一张招聘海报|poster', '帮我做个记账 App|app', '做个工具网站|web', '会员月报邮件|email'].every((x) => { const [a, k] = x.split('|'); return !['warm', 'cream', 'japandi', 'ink', 'retro'].includes(id(a, k)) }))
   check('自动风格：没认出题材按类型给，App 不给米色系', id('一份 5 页的季度业务复盘幻灯片', 'slides') === 'swiss' && !['warm', 'cream', 'japandi', 'ink'].includes(id('帮我做个记账 App', 'app')) && id('', 'app') === null)
   const tz = makeT({ locale: { t: (k) => k } })
@@ -907,7 +947,7 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   keptRefs = []; keptAt = 0
   const watching = view(single)
   check('#13 单屏正看着写', !!raw(watching, draftDev))
-  findComp(watching, 'ScreenMenu').props.onPick('home.html')
+  findComp(watching, 'SwitchMenu').props.onPick('home.html')
   keptAt = 0
   check('#13 单屏看着写时从菜单换页：回包前 focus 还是旧的，也不再盖生成动画', !raw(view(single), draftDev))
   keptRefs = null
