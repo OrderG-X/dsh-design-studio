@@ -835,13 +835,13 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   check('拖着时：zip → zip', dragKind({ items: [{ kind: 'file', type: 'application/zip' }] }) === 'zip')
 }
 
-// ── 生成中：顶上的状态条（在做什么 + 计时）、鼠标框版面的占位 ──
+// ── 生成中：状态胶囊（在做什么 + 计时 + 停下）、鼠标框版面的占位 ──
 {
   const P = mod._test.poller('sBusy')
   const view = (x) => { P.state = x; return body.comp({ ...body.opts.inject('sBusy') }) }
-  const barOf = (x) => findComp(view(x), 'BusyBar')
+  const barOf = (x) => findComp(view(x), 'StatusCap')
   const b1 = barOf({ url: '', turn: true, turnFor: 72000, tool: '' })
-  check('生成中：顶上状态条说「在想」，计时按服务端说的这一轮开始了多久', !!b1 && b1.props.phase.text === '在想…' && text(b1).includes('1:12'), b1 && text(b1))
+  check('生成中：状态胶囊说「在想」，计时按服务端说的这一轮开始了多久', !!b1 && b1.props.phase.text === '在想…' && text(b1).includes('1:12'), b1 && text(b1))
   const say = (x) => { const b = barOf({ url: '', turn: true, turnFor: 1000, ...x }); return b ? b.props.phase : null }
   check('生成中：按调的工具说人话（体检 / 跑命令 / 看文件 / 认不出的）', say({ tool: 'check_design' }).text === '正在体检' && say({ tool: 'bash' }).text === '正在跑命令'
     && say({ tool: 'read_file' }).text === '正在看文件' && say({ tool: 'mystery_tool' }).text === '模型正在工作', JSON.stringify([say({ tool: 'check_design' }), say({ tool: 'bash' }), say({ tool: 'read_file' }), say({ tool: 'mystery_tool' })]))
@@ -850,7 +850,7 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   const w2 = say({ tool: 'write', writing: 'tokens.css', lines: 4 })
   check('生成中：流里认出了文件 → 说做第几屏、带文件名和写了几行（不到 10 行不说行数）', w1.text === '正在做第 1 屏' && w1.sub === 'menu.html · 已写 120 行' && w2.text === '正在写 tokens.css' && !w2.sub, JSON.stringify([w1, w2]))
   const ask = say({ asking: true, tool: 'ask_user_question' })
-  check('生成中：在等用户回答就直说（不闪光、没有进度线）', ask.asking === true && ask.text === '模型在等你回答（在对话里）' && !text(findComp(view({ url: '', turn: true, asking: true }), 'BusyBar')).includes('undefined'))
+  check('生成中：在等用户回答就直说（不闪光、没有进度线）', ask.asking === true && ask.text === '模型在等你回答（在对话里）' && !text(findComp(view({ url: '', turn: true, asking: true }), 'StatusCap')).includes('undefined'))
   const v = view({ url: '', turn: true, kind: 'app', tool: '' })
   const stage = findEl(v, (el) => el.props && typeof el.props.className === 'string' && el.props.className.startsWith('ddp-stage'))
   check('生成中：状态条占了顶上，舞台带 bz（提示、消息往下让）', !!stage && stage.props.className === 'ddp-stage bz', stage && stage.props.className)
