@@ -1642,14 +1642,14 @@ try {
   const implView = await page(`(() => {
     const b = document.querySelector('.ddp-ibar'), dock = b
     return { url: b && b.querySelector('.ddp-iurl') ? b.querySelector('.ddp-iurl').textContent : '', score: b && b.querySelector('.ddp-iscore') ? b.querySelector('.ddp-iscore').textContent : '',
-      knob: !!document.querySelector('.ddp-icmp .ddp-knob'), tags: [...document.querySelectorAll('.ddp-icmp .tag')].map((x) => x.textContent).join('|'),
-      tools: dock ? [...dock.querySelectorAll('.ddp-tool')].map((x) => x.textContent + (x.classList.contains('on') ? '*' : '')).join('|') : '', pick: !!document.querySelector('.ddp-dock button.pick') }
+      knob: !!document.querySelector('.ddp-icmp .ddp-knob'), tags: [...document.querySelectorAll('.ddp-ilg .ch')].map((x) => x.textContent).join('|'),
+      tools: dock ? [...dock.querySelectorAll('.ddp-imode button, .ddp-ibx')].map((x) => x.textContent + (x.classList.contains('on') ? '*' : '')).join('|') : '', pick: !!document.querySelector('.ddp-dock button.pick') }
   })()`)
   const lis = await implLis()
   await shot('impl-split')
   check('和做出来的比：灵动条换成「地址 ｜ 拖线 / 叠加 / 并排 ｜ 差异 ｜ 重新比 ×」，拖线把手、两边标签', implView.url === `localhost:${IMPL_PORT}/menu.html` && /^差异 \d+(\.\d)?%$/.test(implView.score) && implView.knob && implView.tags === '设计稿|做出来的' && /^拖线\*\|叠加\|并排/.test(implView.tools) && !implView.pick, JSON.stringify(implView))
   check('和做出来的比：嵌进来的是做出来的那页（少一行菜单），经设计台的预览服务器', /^http:\/\/127\.0\.0\.1:\d+\/menu\.html$/.test(implSrc || '') && !(implSrc || '').includes(':' + IMPL_PORT + '/') && lis === 2, `${implSrc} / li=${lis}`)
-  const ibar = (name) => page(`[...document.querySelectorAll('.ddp-ibar .ddp-tool')].find((x) => x.textContent === '${name}').click()`)
+  const ibar = (name) => page(`[...document.querySelectorAll('.ddp-ibar .ddp-imode button, .ddp-ibar .ddp-idiff')].find((x) => x.textContent === '${name}').click()`)
   await ibar('叠加')
   await sleep(400)
   const ov1 = await page(`(() => { const im = document.querySelector('.ddp-icmp.ov > .im'); return im ? { op: im.style.opacity, range: document.querySelector('.ddp-iop input').value } : null })()`)
@@ -2251,6 +2251,8 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     await shot('11-home-pop')
     // 套外框（#19 第 2 步）：选了这个类型，下面列出外框库里的外框，能挑一个
     await page(`document.querySelector('.ddp-askpop') && document.querySelector('.ddp-ask button.chip[aria-haspopup=dialog]').click(), 1`)
+    await page(`(() => { const m = document.querySelector('.ddp-askkinds .more'); if (m && m.getAttribute('aria-expanded') !== 'true') m.click(); return 1 })()`)
+    await sleep(200)
     await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
     const frRow = await until(`(() => { const r = document.querySelector('.ddp-askframes'); return r ? [...r.querySelectorAll('button')].map((b) => b.textContent.trim()) : null })()`, 8000)
     await page(`[...document.querySelectorAll('.ddp-askframes button')].find((b) => b.textContent.trim() === '示例弹窗')?.click(), 1`)
