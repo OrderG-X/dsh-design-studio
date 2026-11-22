@@ -124,7 +124,7 @@ check('还没拿到状态（DSH 刚启动）：先空着，不闪空状态', !lo
 mod._test.poller('sEmpty').state = { url: '' }
 const emptyView = body.comp({ ...body.opts.inject('sEmpty') })
 const emptyText = text(emptyView)
-check('首页：一句问话 + 大输入框（参考图、风格）+ 类型 + 收起的「打开已有的 HTML」', emptyText.includes('想做点什么') && emptyText.includes('参考图') && emptyText.includes('风格：自动') && emptyText.includes('小程序') && emptyText.includes('打开已有的 HTML'), emptyText)
+check('首页：一句问话 + 大输入框（参考图、风格）+ 类型 + 收起的「打开 HTML」', emptyText.includes('想做点什么') && emptyText.includes('参考图') && emptyText.includes('风格：自动') && emptyText.includes('小程序') && emptyText.includes('打开 HTML'), emptyText)
 check('空状态：网页版（没有桌面版的桥）不显示「浏览…」，提示照旧', !emptyText.includes('浏览…') && emptyText.includes('输入文件路径，或本地端口'), emptyText)
 globalThis.__DSH_HOST_PATHS__ = { pathFor: (f) => '/Users/me/site/' + f.name }
 const deskText = text(body.comp({ ...body.opts.inject('sEmpty') }))
@@ -140,7 +140,7 @@ function findEl(el, ok) {
 const isBrowse = (el) => el.type === 'button' && el.props && el.props.className === 'ddp-browse'
 const deskBtn = findEl(body.comp({ ...body.opts.inject('sEmpty') }), isBrowse)
 check('空状态：桌面版真有「浏览…」按钮、点得动', !!deskBtn && typeof deskBtn.props.onClick === 'function' && deskBtn.props.type === 'button')
-// 排在哪：顶条（开始 / 市场 / 我的作品 / 灵感）→ 问话 → 大输入框 → 接着做 → 模板 → 收起的「打开已有的 HTML」（地址框在里面）
+// 排在哪：顶条（开始 / 市场 / 我的作品 / 灵感）→ 问话 → 大输入框 → 接着做 → 模板 → 收起的「打开 HTML」（地址框在里面）
 const homeView = body.comp({ ...body.opts.inject('sEmpty') })
 const bar = findEl(homeView, (el) => el.props && el.props.className === 'ddp-homebar')
 const barTabs = []
@@ -165,7 +165,7 @@ globalThis.document = { querySelectorAll: () => [emptyEd] }
 const sent = []
 const iaNew = { captureInsertion: () => ({ start: 0, end: 0 }), insertText: (x) => { sent.push(x); return true }, submit: () => sent.push('<submit>') }
 const homeAsk = findComp(body.comp({ ...body.opts.inject('sEmpty'), inputActions: iaNew }), 'HomeAsk')
-check('首页：有大输入框，「+」里三项（打开 HTML、品牌、设计库）', !!homeAsk && homeAsk.props.plus.length === 3)
+check('首页：有大输入框，「+」里两项（打开 HTML…、品牌…；设计库就是头顶的页签）', !!homeAsk && homeAsk.props.plus.length === 2 && /打开 HTML/.test(homeAsk.props.plus[0][2]) && /品牌/.test(homeAsk.props.plus[1][2]))
 homeAsk.props.onSend({ text: '做个面馆点单', kind: 'miniprogram', style: null })
 await new Promise((r) => setTimeout(r, 150))
 check('首页：发出去 = 放进输入框（带类型）+ 自动挑的风格卡 + 直接发', sent.length === 3 && sent[0].includes('做个面馆点单') && sent[0].includes('类型：小程序') && /^〔风格〕/.test(sent[1]) && /自动挑的/.test(sent[1]) && sent[2] === '<submit>', JSON.stringify(sent))

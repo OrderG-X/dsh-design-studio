@@ -897,7 +897,7 @@ try {
   const order = await until(`(() => { const l = [...document.querySelectorAll('.ddp-cell .ddp-lab > span:first-of-type')].map((x) => x.textContent); return l.length >= 4 && l.join(',') })()`, 30000)
   // 标签是页面标题，标题没载出来时先显示文件名：两种都认
   check('再出的一版紧挨着原版', /(首页|home),(首页 B|home-b)(,|$)/.test(order || ''), order)
-  check('几个版本并排：每屏标题旁都有「用这版」，不用先选中', /A(首页|home)(用这版|Use this),B(首页 B|home-b)(用这版|Use this)/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => { const c = x.cloneNode(true); c.querySelectorAll('.lb').forEach((e) => e.remove()); return c.textContent }).join(',')`) || ''))
+  check('几个版本并排：每屏标题旁都有「用这版」，不用先选中', /A(首页|home)(用这版|Use this take),B(首页 B|home-b)(用这版|Use this take)/.test(await page(`[...document.querySelectorAll('.ddp-cell .ddp-lab')].map((x) => { const c = x.cloneNode(true); c.querySelectorAll('.lb').forEach((e) => e.remove()); return c.textContent }).join(',')`) || ''))
   // 先点一下那一屏选中它（按钮在选中的那屏标签旁）
   // （那一屏可能在画面外，鼠标点不到，直接发 pointer 事件：按在那屏上、在窗口上松开）
   await page(`(() => {
@@ -1575,7 +1575,7 @@ try {
   await sleep(300)
   check('版本面板：侧栏窄时灵动条也在面板下面，「回到这一版」点得到', narrowVer && narrowVer.clear === true && narrowVer.hit === true, JSON.stringify(narrowVer))
   // 1.0 标题栏：标志、⊞ 屏名 ▾ ｜ 导出 ▾ ⋯ 转成代码；底下的灵动条也不能出框
-  const EN = { 分享: 'Share', 导出: 'Export', 转成代码: 'Build as code', 选择: 'Select', 改字: 'Text', 调样式: 'Style', 画笔: 'Draw', 试用: 'Play', 外观: 'Look', 体检: 'Check', 说一句或输命令: 'Ask or run a command', 对比: 'Compare', 回到这一版: 'Restore this' }
+  const EN = { 分享: 'Share', 导出: 'Export', 转成代码: 'Build as code', 选择: 'Select', 改字: 'Text', 调样式: 'Style', 画笔: 'Draw', 试用: 'Play', 外观: 'Look', 体检: 'Check', 说一句或输命令: 'Ask or run a command', 和现在对比: 'Compare with now', 回到这一版: 'Restore this' }
   const navFit = (w, en) => page(`(async () => {
     const d = document.querySelector('.ddp'), css = d.style.cssText
     const lbs = [...document.querySelectorAll('.ddp-top .lb, .ddp-top .ddp-btn > span, .ddp-dock .ddp-tool > span, .ddp-dock .dd-cmd > span, .ddp-dock .dd-bt')].filter((x) => !x.children.length), old = lbs.map((x) => x.textContent)
@@ -1620,8 +1620,8 @@ try {
   await say('IMPL-CMP 比一下菜单')
   const implToast = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /模型刚和做出来的比过/.test(x)) || ''`, 60000)
   await waitFor(() => cmpResults.length > 0, 10000)
-  check('和做出来的比：模型比完（拿到差异）→ 右侧栏提示「看对比」', /差异 \d/.test(cmpResults[0] || '') && /菜单/.test(implToast) && /看对比/.test(implToast), `${implToast} / ${(cmpResults[0] || '').slice(0, 120)}`)
-  await page(`[...document.querySelectorAll('.ddp-toast button')].find((x) => x.textContent === '看对比').click()`)
+  check('和做出来的比：模型比完（拿到差异）→ 右侧栏提示「看对比」', /差异 \d/.test(cmpResults[0] || '') && /菜单/.test(implToast) && /和做出来的比/.test(implToast), `${implToast} / ${(cmpResults[0] || '').slice(0, 120)}`)
+  await page(`[...document.querySelectorAll('.ddp-toast button')].find((x) => x.textContent === '和做出来的比').click()`)
   const implSrc = await until(`(() => { const f = document.querySelector('.ddp-icmp .im iframe'); return f && f.getAttribute('src') })()`, 15000)
   await sleep(1500)
   // 嵌进来的是做出来的那页（少一行菜单），走的是设计台的预览服务器（端口不是开发服务器自己的）
@@ -2240,6 +2240,18 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
   const barBack = await until(`!document.querySelector('.ddp-top .wide') && !!document.querySelector('.ddp-addr')`, 3000)
   check('地址栏：输错路径报错后点到别处 → 照样收起、工具栏回来', !!addrErr && !!barBack, JSON.stringify({ addrErr, editing: await page(`!!document.querySelector('.ddp-top .wide')`) }))
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
+  // 这一屏打不开（1.0 出错卡）：画布上一屏跳到不存在的页面 → 红边卡片（重试 / 让模型改）、标签旁「打不开」；回到原来的页面卡片自己走
+  {
+    const was = await page(`(() => { const f = [...document.querySelectorAll('.ddp iframe.ddp-frame.cur')].find((x) => x.getBoundingClientRect().width > 150); if (!f) return ''; const s = f.getAttribute('src'); f.src = s.replace(/[^/?#]+\.html/, 'e2e-missing.html'); return s })()`)
+    const card = await until(`(() => { const c = document.querySelector('.ddp-fail'); return c && c.innerText })()`, 10000)
+    const tag = await page(`[...document.querySelectorAll('.ddp-failtag')].map((x) => x.textContent).join()`)
+    const acts = await page(`[...document.querySelectorAll('.ddp-fail button')].map((b) => b.textContent.trim()).join('|')`)
+    check('这一屏打不开：红边出错卡写清哪个文件，带「重试」「让模型改」，标签旁「打不开」', /这一屏打不开/.test(card || '') && /e2e-missing\.html 找不到了/.test(card || '') && acts === '重试|让模型改' && tag === '打不开', JSON.stringify({ card, acts, tag }))
+    await shot('10c-screen-fail')
+    if (was) await page(`(() => { const f = [...document.querySelectorAll('.ddp iframe.ddp-frame.cur')].find((x) => /e2e-missing/.test(x.src)); if (f) f.src = ${JSON.stringify(was)}; return 1 })()`)
+    const back = await until(`!document.querySelector('.ddp-fail') && !document.querySelector('.ddp-failtag')`, 10000)
+    check('这一屏打不开：回到能开的页面 → 出错卡和「打不开」自己没了', back)
+  }
   // ⑫ 首页风格面板不被下面的「接着做」盖住（issue #9）
   await page(`document.querySelector('.ddp-top .dd-logo').click(), 1`)
   const homeUp = await until(`!!document.querySelector('.ddp-home .ddp-askta')`, 20000)
@@ -2260,6 +2272,36 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     check('首页「套外框」：下面列出外框库里的外框（新外框 + 示例弹窗），点了选上', JSON.stringify(frRow) === JSON.stringify(['新外框', '示例弹窗']) && frOn, JSON.stringify({ frRow, frOn }))
     await shot('11-home-frames')
     await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
+    // 我的作品 › 外框 ⋯（1.0 补的入口）：改名（输入框，回车存进 frame.json）、删除（点两下，挪进外框库的 .trash）
+    {
+      const od = path.join(HOME, '.dsh', 'design-frames', 'old-side')
+      fs.mkdirSync(od, { recursive: true })
+      fs.writeFileSync(path.join(od, 'frame.json'), JSON.stringify({ id: 'old-side', name: '旧侧栏', size: [360, 720], css: [], frames: [{ id: 'side', file: 'side.html', name: '侧栏', slots: { main: '侧栏内容' } }] }))
+      fs.writeFileSync(path.join(od, 'side.html'), '<!doctype html><html><head><meta charset="utf-8"><meta name="dsh-design" content="framed 360x720"></head><body><div data-frame="old-side/side"><div data-slot="main"></div></div></body></html>')
+    }
+    await page(`(() => { const b = [...document.querySelectorAll('.ddp-home [role=tab], .ddp-home button')].find((x) => x.innerText.trim() === '我的作品'); if (b) b.click(); return !!b })()`)
+    await until(`!!document.querySelector('.ddp .mktabs')`, 8000)
+    await page(`[...document.querySelectorAll('.ddp .mktabs button')][1].click(), 1`)
+    await until(`document.querySelectorAll('.ddp-frm').length >= 2`, 8000)
+    const frMenu = (name, item) => page(`(async () => { const c = [...document.querySelectorAll('.ddp-frm')].find((x) => x.querySelector('.nm b')?.textContent === ${JSON.stringify(name)}); if (!c) return 'no card'; c.querySelector('.dd-wkm>.ddp-btn').click(); await new Promise((r) => setTimeout(r, 250)); const it = [...document.querySelectorAll('.ddp [role=menuitem], .ddp .ddp-menu button')].find((b) => b.textContent.trim() === ${JSON.stringify(item)}); if (!it) return 'no item'; it.click(); await new Promise((r) => setTimeout(r, 250)); return 'ok' })()`)
+    const frMenuItems = await page(`(async () => { const c = document.querySelector('.ddp-frm'); c.querySelector('.dd-wkm>.ddp-btn').click(); await new Promise((r) => setTimeout(r, 250)); const xs = [...document.querySelectorAll('.ddp [role=menuitem], .ddp .ddp-menu button')].filter((b) => b.getClientRects().length).map((b) => b.textContent.trim()); c.querySelector('.dd-wkm>.ddp-btn').click(); return xs.join('|') })()`)
+    const renGo = await frMenu('示例弹窗', '改名')
+    await until(`!!document.querySelector('.ddp-frm input.rn')`, 3000)
+    await chrome.cdp('Input.insertText', { text: '演示弹窗' }, sessionId)
+    await enter()
+    const fdemo = path.join(HOME, '.dsh', 'design-frames', 'demo-popup', 'frame.json')
+    const renamed = await waitFor(() => { try { return JSON.parse(fs.readFileSync(fdemo, 'utf8')).name === '演示弹窗' } catch { return false } }, 5000)
+    const renShown = await until(`[...document.querySelectorAll('.ddp-frm .nm b')].some((b) => b.textContent === '演示弹窗')`, 5000)
+    check('我的作品 › 外框 ⋯：菜单有「用这个外框做新设计 / 改名 / 在文件夹里显示 / 删除」，改名回车 → frame.json 和卡片都换成新名字', /用这个外框做新设计\|改名\|在文件夹里显示\|删除/.test(frMenuItems || '') && renGo === 'ok' && renamed && renShown, JSON.stringify({ frMenuItems, renGo, renamed, renShown }))
+    const delGo = await frMenu('旧侧栏', '删除')
+    await page(`(() => { const b = document.querySelector('.ddp-frm .sure .dd-bt.danger'); if (b) b.click(); return !!b })()`)
+    const delGone = await until(`![...document.querySelectorAll('.ddp-frm .nm b')].some((b) => b.textContent === '旧侧栏') && /外框已删除/.test(document.body.innerText)`, 5000)
+    let trashed = []
+    try { trashed = fs.readdirSync(path.join(HOME, '.dsh', 'design-frames', '.trash')) } catch { /* 没挪 */ }
+    check('我的作品 › 外框 ⋯ 删除：再点一下确认 → 卡片没了、提示「外框已删除」，文件夹挪进外框库的 .trash', delGo === 'ok' && delGone && trashed.length === 1, JSON.stringify({ delGo, delGone, trashed }))
+    await shot('11b-works-frames')
+    await page(`(() => { const b = [...document.querySelectorAll('.ddp-libwrap [role=tab], .ddp-libwrap button')].find((x) => x.innerText.trim() === '开始'); if (b) b.click(); return !!b })()`)
+    await until(`!document.querySelector('.ddp-libwrap')`, 3000)
   }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})
   await tuneCheck()

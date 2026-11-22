@@ -10,7 +10,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readManifest, ensureMeta, injectFrameData, listFrames, saveFrame, frameSection } from '../lib/frames.js'
+import { readManifest, ensureMeta, injectFrameData, listFrames, saveFrame, frameSection, renameFrame, removeFrame, frameDir } from '../lib/frames.js'
 import { findBrowser, createBrowser } from '../lib/browser.js'
 import { spawn } from 'node:child_process'
 import { bundle } from '../lib/bundle.js'
@@ -93,6 +93,29 @@ check('frame.json：id「dsh」留给自带的', /留给自带/.test(readManifes
 }
 
 // ── 真浏览器 ──
+// 我的作品 › 外框 ⋯：改名、删除（不用浏览器，直接摆一个库）
+{
+  const RL = path.join(tmp, 'rlib')
+  const mk = (id) => {
+    const d = path.join(RL, id)
+    fs.mkdirSync(d, { recursive: true })
+    fs.writeFileSync(path.join(d, 'main.html'), '<!doctype html><div data-frame="x/main"><div data-slot="main"></div></div>')
+    fs.writeFileSync(path.join(d, 'frame.json'), '\uFEFF' + JSON.stringify({ id, name: '旧名字', size: [400, 600], css: [], frames: [{ id: 'main', file: 'main.html', name: '主体', slots: { main: '' } }], savedAt: 'x' }))
+  }
+  mk('pop-a')
+  mk('pop-b')
+  check('外框改名：中文名改了、别的字段原样留着（带 BOM 的也认）', renameFrame('pop-a', '  浏览器  弹窗 ', { dir: RL }).ok && listFrames(RL).find((x) => x.id === 'pop-a').name === '浏览器 弹窗' && JSON.parse(fs.readFileSync(path.join(RL, 'pop-a', 'frame.json'), 'utf8')).savedAt === 'x')
+  check('外框改名：英文界面改的是 nameEn', renameFrame('pop-a', 'Popup', { en: true, dir: RL }).ok && listFrames(RL).find((x) => x.id === 'pop-a').nameEn === 'Popup' && listFrames(RL).find((x) => x.id === 'pop-a').name === '浏览器 弹窗')
+  check('外框改名：空名字、太长、不认识的 id、自带的 dsh、../ 都不改', renameFrame('pop-a', '  ', { dir: RL }).error === 'badName' && renameFrame('pop-a', '字'.repeat(31), { dir: RL }).error === 'badName' &&
+    ['nope', 'dsh', '../pop-a', ''].every((id) => renameFrame(id, '新', { dir: RL }).error === 'noFrame'))
+  check('外框改名：没留下临时文件', fs.readdirSync(path.join(RL, 'pop-a')).every((f) => !f.endsWith('.tmp')))
+  fs.mkdirSync(path.join(RL, '.trash', 'old-1000000000000'), { recursive: true })
+  const del = removeFrame('pop-b', RL)
+  const tr = fs.readdirSync(path.join(RL, '.trash'))
+  check('外框删除：挪进 .trash、列表里没了、30 天前的旧垃圾顺手清掉', del.ok && !frameDir('pop-b', RL) && listFrames(RL).map((x) => x.id).join() === 'pop-a' && tr.length === 1 && /^pop-b-\d{13}$/.test(tr[0]), JSON.stringify({ del, tr }))
+  check('外框删除：不认识的 id / 自带的 dsh / 已经删了的 → noFrame', ['pop-b', 'dsh', '..', '.trash'].every((id) => removeFrame(id, RL).error === 'noFrame'))
+}
+
 const bin = findBrowser()
 if (!bin) {
   console.log('（本机没有 Chrome / Edge：跳过真浏览器那部分）')
