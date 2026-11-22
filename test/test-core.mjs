@@ -739,6 +739,18 @@ fs.renameSync(path.join(appDir, 'guide-a.html'), path.join(appDir, 'guide-x.html
 t7.changed(appDir, ['guide-a.html', 'guide-x.html'])
 await sleep(5)
 check('drafts 里有上一回的同名旧稿、这回自己改名：不跳', t7.snapshot('s7').focus === 'guide-a.html', t7.snapshot('s7').focus)
+// 模型把 guide-a 改名成别的、同一批顺手改了 guide.html 和 drafts 里旧稿的链接：也别跳
+fs.writeFileSync(path.join(appDir, 'guide.html'), '<p>guide')
+fs.renameSync(path.join(appDir, 'guide-x.html'), path.join(appDir, 'guide-a.html'))
+t7.changed(appDir)
+await t7.setView('s7', { focus: 'guide-a.html' })
+fs.renameSync(path.join(appDir, 'guide-a.html'), path.join(appDir, 'guide-alt.html'))
+fs.writeFileSync(path.join(appDir, 'guide.html'), '<p>guide <a href="guide-alt.html">')
+fs.writeFileSync(path.join(appDir, 'drafts', 'guide-a.html'), '<p>上一回的旧稿 <a href="guide-alt.html">')
+t7.changed(appDir, ['guide-a.html', 'guide-alt.html', 'guide.html', 'drafts/guide-a.html'])
+await sleep(5)
+check('改名成别的、同一批改了原版和 drafts 旧稿：不跳', t7.snapshot('s7').focus === 'guide-a.html', t7.snapshot('s7').focus)
+fs.renameSync(path.join(appDir, 'guide-alt.html'), path.join(appDir, 'guide-x.html'))
 for (const f of ['guide.html', 'guide-x.html']) fs.rmSync(path.join(appDir, f))
 // 单看着 plan-b 时「用这版」：模型同一批把老的 plan.html 挪进 drafts/、plan-b 改名成 plan.html → 换到 plan.html
 fs.writeFileSync(path.join(appDir, 'plan.html'), '<p>plan')
@@ -810,7 +822,20 @@ check('改字：回包带被换掉的原样（orig）', rt.ok && rt.orig === '�
 rt = rt.ok && replaceText(rt.html, '马上登录', '立即 登录', rt.nth, rt.orig)
 check('改字撤销：照原样写回（&nbsp; 留着）', rt && rt.ok && rt.html === '<a>立即&nbsp;登录</a>', JSON.stringify(rt))
 rt = replaceText('<a>马上登录</a>', '马上登录', '立即 登录', 0, '<b>立即 登录</b>')
-check('改字撤销：带尖括号、或不是这段字的「原样」不认，照常转义', rt.ok && rt.html === '<a>立即 登录</a>' && replaceText('<a>马上登录</a>', '马上登录', '立即 登录', 0, '别的字').html === '<a>立即 登录</a>', JSON.stringify(rt))
+check('改字撤销：带 <、或不是这段字的「原样」不认，也不照转义硬写（当成改过了）', !rt.ok && rt.reason === 'changed' && replaceText('<a>马上登录</a>', '马上登录', '立即 登录', 0, '别的字').reason === 'changed', JSON.stringify(rt))
+check('改字（不带 raw）：照常转义', replaceText('<a>马上登录</a>', '马上登录', '立即 登录', 0).html === '<a>立即 登录</a>')
+// 原样里有字面的 >（库存&nbsp;>10）也照原样写回
+rt = replaceText('<p>库存&nbsp;>10</p>', '库存 >10', '有货', 0)
+rt = rt.ok && replaceText(rt.html, '有货', '库存 >10', rt.nth, rt.orig)
+check('改字撤销：原样带字面 > 和 &nbsp; → 原样写回', rt && rt.ok && rt.html === '<p>库存&nbsp;>10</p>', JSON.stringify(rt))
+// <pre> 里多行代码带 >、很长（超过 2000 字）：换行、缩进照原样回来
+{
+  const code = 'if (a > b) {\n    run()\n}\n' + '// 注释 '.repeat(400)
+  const src = `<pre>${code}</pre>`
+  let r = replaceText(src, code, '改掉', 0)
+  r = r.ok && replaceText(r.html, '改掉', code, r.nth, r.orig)
+  check('改字撤销：<pre> 多行带 >、超过 2000 字 → 换行缩进原样回来', r && r.ok && r.html === src, JSON.stringify(r).slice(0, 200))
+}
 rt = replaceText('<h1>\n  欢迎回来\n</h1>', '欢迎回来', '你好', 0)
 check('改字：前后的换行缩进留着', rt.ok && rt.html === '<h1>\n  你好\n</h1>', JSON.stringify(rt))
 check('改字：找不到 / 空的', replaceText('<p>x</p>', 'y', 'z').reason === 'not-found' && replaceText('<p>x</p>', 'x', '  ').reason === 'empty')
