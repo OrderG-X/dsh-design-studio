@@ -306,6 +306,10 @@ try {
     check('旧版本缩略图：另一版另截一张', v3.status === 200 && v3.body !== v1.body && pages.length === p0 + 2 && pages.at(-1).url === `${origin}/__dsh_design__/v/2/s1.html`)
     vers.local[0].at = 3500 // 历史清过、同一个版本号存了别的东西
     check('旧版本缩略图：同一个版本号、存的时间不一样 → 重截', (await vGet('session=local&n=3&key=s1.html&w=800&h=600')).status === 200 && pages.length === p0 + 3)
+    const p5 = pages.length
+    check('旧版本缩略图：地址里的项目不是现在开着的 / 存版时间对不上 → 409、不截', (await vGet(`session=local&root=${encodeURIComponent(root + '-other')}&n=3&key=s1.html&w=800&h=600`)).status === 409 &&
+      (await vGet(`session=local&root=${encodeURIComponent(root)}&at=3000&n=3&key=s1.html&w=800&h=600`)).status === 409 && pages.length === p5)
+    check('旧版本缩略图：项目和存版时间都对得上 → 照常给图', (await vGet(`session=local&root=${encodeURIComponent(root)}&at=3500&n=3&key=s1.html&w=800&h=600`)).status === 200)
     hasBrowser = false
     check('旧版本缩略图：没浏览器 503', (await vGet('session=local&n=3&key=s2.html&w=800&h=600')).status === 503)
     hasBrowser = true

@@ -207,7 +207,11 @@ fs.writeFileSync(path.join(app, 'home.html'), '<p>手边改过</p>')
 const ed = tr.editText('s1', { key: 'home.html', before: '手边改过', after: '手调过' })
 const vMe = tr.versions('s1')
 check('1.0：手调写回 → 改之前那版是 pre、写回后那版是 me', ed.ok && vMe[0].by === 'me' && /改字/.test(vMe[0].label) && vMe[1].by === 'pre', JSON.stringify(vMe.slice(0, 2).map((v) => [v.by, v.label])))
-const rr = tr.restoreVersion('s1', 1)
+const vOne = tr.versions('s1').find((x) => x.n === 1)
+const bad = (fn) => { try { fn(); return false } catch { return true } }
+const nBefore = tr.versions('s1').length
+check('1.0：回退带的项目不是现在开着的 / 存版时间对不上 → 不写', bad(() => tr.restoreVersion('s1', 1, { root: app + '-other', at: vOne.at })) && bad(() => tr.restoreVersion('s1', 1, { root: tr.snapshot('s1').target.root, at: vOne.at + 1 })) && tr.versions('s1').length === nBefore)
+const rr = tr.restoreVersion('s1', 1, { root: tr.snapshot('s1').target.root, at: vOne.at })
 check('会话里回到第 1 版', rr.saved === null && tr.snapshot('s1').vrev >= 3)
 
 // ── 预览服务器给旧版本的文件 ──
