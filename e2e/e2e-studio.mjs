@@ -936,6 +936,27 @@ try {
   await page(SINGLE)
   await until(`!!document.querySelector('iframe.ddp-frame.cur[src*="menu.html"]')`, 15000)
   await sleep(1500)
+  // 1.0.1：DSH 每个会话各挂一个设计台。别的会话里藏着的那个停在首页 / 设计库 / 命令面板上时，看得见的这个单键、← →、Esc 照样能用
+  {
+    await page(`(() => { const g = document.createElement('div'); g.className = 'ddp'; g.id = 'e2e-ghost'; g.style.display = 'none'; g.innerHTML = '<div class="ddp-home over"></div><div class="ddp-libwrap"></div><div class="ddp-isl dd-pal"></div>'; document.body.appendChild(g); return true })()`)
+    const press = (k) => page(`(() => { const s = [...document.querySelectorAll('.ddp-stage')].find((x) => x.getClientRects().length); if (!s) return false; s.focus(); s.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return true })()`)
+    const curSrc = () => page(`(() => { const f = document.querySelector('iframe.ddp-frame.cur'); return f ? f.getAttribute('src') || '' : '' })()`)
+    await press('ArrowRight')
+    const moved = await until(`!document.querySelector('iframe.ddp-frame.cur[src*="menu.html"]')`, 6000)
+    const after = await curSrc()
+    await sleep(800)
+    await press('ArrowLeft')
+    const back = await until(`!!document.querySelector('iframe.ddp-frame.cur[src*="menu.html"]')`, 6000)
+    check('1.0.1：别的会话藏着的设计台停在首页 / 设计库时，这里 ← → 照样翻屏', !!moved && !!back, `moved=${moved} (${after}) back=${back}`)
+    await sleep(800)
+    await press('v')
+    const pickOn = await until(`document.querySelector('.ddp-dock button.ddp-tool.pick')?.getAttribute('aria-pressed') === 'true'`, 4000)
+    await press('Escape')
+    const pickOff = await until(`document.querySelector('.ddp-dock button.ddp-tool.pick')?.getAttribute('aria-pressed') === 'false'`, 4000)
+    check('1.0.1：同上，单键 V 进点选、Esc 退出', !!pickOn && !!pickOff, `on=${pickOn} off=${pickOff}`)
+    await page(`document.getElementById('e2e-ghost')?.remove()`)
+    await sleep(500)
+  }
   await page(`document.querySelector('.ddp-dock button[data-tip="调样式"]').click()`)
   const panelTip = await until(`((x) => /在页面上点一个元素/.test(x) && x)(document.querySelector('.ddp-style')?.innerText || '')`, 5000)
   await sleep(800) // 抽屉升起来、画布让出位置
