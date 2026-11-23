@@ -517,6 +517,21 @@ if (!bin) {
     }
     check('屏幕缩放（125% / 200%）：原样的外框不报（含 translate(-50%) 居中的字）', sc.length === 8 && sc.every((x) => x.length === 0), JSON.stringify(sc))
     check('屏幕缩放 125%：插件样式把工具栏改高 → 照样报', sct && sct.length === 1 && sct[0].prop === 'height', JSON.stringify(sct))
+    // 新版 Chrome 有时把 justify-content: flex-end 报成 flow-end（11-24 发版机器上碰到）：同一个意思，外框不算被改
+    const FLOW = `(() => { const g = CSSStyleDeclaration.prototype.getPropertyValue; CSSStyleDeclaration.prototype.getPropertyValue = function (k) { const v = g.call(this, k); return /^(justify-content|align-items)$/.test(k) ? String(v).replace(/^flex-/, 'flow-') : v }; return 1 })()`
+    const patched = (js) => { const x = Object.create(b); x.withPage = (o, fn) => b.withPage(o, async (p) => { await p.eval(js); return fn(p) }); return x }
+    const fb = patched(FLOW)
+    const fbSave = patched(FLOW.replace("/^flex-/, 'flow-'", "/^flow-/, 'flex-'"))
+    // 存外框时 Chrome 报 flex-end、体检时报 flow-end（另存一个外框 flow-popup，不动前面用的 chrome-popup）
+    const fsrc = stageSrc('src-flow', { man: manifest({ id: 'flow-popup', name: 'flow 弹窗' }), html: popup('flow-popup/popup') })
+    fs.writeFileSync(path.join(fsrc, 'fit.html'), FIT.replace('chrome-popup/fit', 'flow-popup/fit'))
+    const fsave = await saveFrame({ browser: fbSave, src: fsrc, dir: LIB })
+    const flowHtml = fsave.ok ? fs.readFileSync(path.join(LIB, 'flow-popup', 'fit.html'), 'utf8') : ''
+    fs.writeFileSync(path.join(design, 'flow-fit.html'), flowHtml)
+    await new Promise((r) => setTimeout(r, 1500))
+    const flowRow = (await measureAll(fb, { screens: [{ key: 'flow-fit.html', url: `${entry.origin}/flow-fit.html`, label: 'flow-fit' }], sizes: [[460, 640]], kind: 'framed', dark: false }))[0]
+    const flowEnd = frameIssues(flowRow)
+    check('Chrome 把 flex-end 报成 flow-end：外框不报', fsave.ok && flowHtml.includes('flex-end') && Array.isArray(flowRow.issues) && !flowRow.error && flowEnd.length === 0, JSON.stringify([fsave.ok || fsave.text, flowHtml.includes('flex-end'), flowRow.error, flowEnd]))
 
     // 别的类型的页面碰巧有 data-frame / data-slot：不报「没登记」
     const nsw = frameIssues(await run('nosig.html', false, 'web'))
