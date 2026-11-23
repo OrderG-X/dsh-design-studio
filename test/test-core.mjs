@@ -627,6 +627,20 @@ check('清掉预览 → 盘上也删了', !mem.data.s5)
   check('技能列表里提到 ui-design 不算', t10.snapshot('s10') && !t10.stateOf('s10').design)
 }
 {
+  // 转成代码的步骤条：handoff_design 写好交接包时记下是哪套设计；那轮结束时填上 end（发了别的话、被拒都不记）
+  const th = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:12' }) })
+  const tn = (type, reason) => th.observe('sh', { type, time: Date.now(), data: { turn: 1, ...(reason ? { reason: { kind: reason } } : {}) } })
+  const h0 = th.snapshot('sh').ho
+  tn('turn/start')
+  th.markHandoff('sh', '/d/tea')
+  const h1 = th.snapshot('sh').ho
+  tn('turn/end', 'completed')
+  const h2 = th.snapshot('sh').ho
+  tn('turn/start')
+  const h3 = th.snapshot('sh').ho
+  check('转成代码：没交接过 → 没有；交接包写好 → 记下设计目录、这轮在跑；这轮结束 → 填上；下一轮不再算在跑', h0 === null && h1 && h1.root === '/d/tea' && h1.at > 0 && h1.end === null && h2 && h2.end === 'completed' && h3 && h3.end === 'completed', JSON.stringify([h0, h1, h2, h3]))
+}
+{
   // 以前存下来的：别的项目端口这种自动打开的，重启后不再接着显示；设计稿照常恢复
   const mem2 = { data: { a: { target: { kind: 'proxy', port: 8789, path: '/' }, source: 'auto', at: 1 }, b: { target: { kind: 'file', file: index, root: site }, source: 'auto', design: true, at: 2 } }, load() { return JSON.parse(JSON.stringify(this.data)) }, save(d) { this.data = JSON.parse(JSON.stringify(d)) } }
   const t11 = createTracker({ open: async () => ({ origin: 'http://127.0.0.1:11' }), store: mem2 })

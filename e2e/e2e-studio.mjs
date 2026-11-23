@@ -941,9 +941,14 @@ try {
     await page(`(() => { const g = document.createElement('div'); g.className = 'ddp'; g.id = 'e2e-ghost'; g.style.display = 'none'; g.innerHTML = '<div class="ddp-home over"></div><div class="ddp-libwrap"></div><div class="ddp-isl dd-pal"></div>'; document.body.appendChild(g); return true })()`)
     const press = (k) => page(`(() => { const s = [...document.querySelectorAll('.ddp-stage')].find((x) => x.getClientRects().length); if (!s) return false; s.focus(); s.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return true })()`)
     const curSrc = () => page(`(() => { const f = document.querySelector('iframe.ddp-frame.cur'); return f ? f.getAttribute('src') || '' : '' })()`)
+    // 1.0.2：翻屏时上一屏留在底下、新的一屏好了滑进来，中间不露出空白占位（每帧看一眼）
+    await page(`(() => { window.__skel = 0; const t0 = performance.now(); const tick = () => { const st = [...document.querySelectorAll('.ddp-stage')].find((x) => x.getClientRects().length); if (st && [...st.querySelectorAll('.ddp-skel:not(.gone)')].some((x) => x.getClientRects().length)) window.__skel++; if (performance.now() - t0 < 2500) requestAnimationFrame(tick) }; requestAnimationFrame(tick); return 1 })()`)
     await press('ArrowRight')
     const moved = await until(`!document.querySelector('iframe.ddp-frame.cur[src*="menu.html"]')`, 6000)
     const after = await curSrc()
+    await sleep(2600)
+    const skel = await page('window.__skel')
+    check('1.0.2：单看翻屏不先闪一下空白占位（上一屏留着，新的一屏好了再盖上）', moved && skel === 0, `skel=${skel}`)
     await sleep(800)
     await press('ArrowLeft')
     const back = await until(`!!document.querySelector('iframe.ddp-frame.cur[src*="menu.html"]')`, 6000)
@@ -1711,6 +1716,9 @@ try {
   const implGone = await page(`({ cmp: !!document.querySelector('.ddp-icmp'), banner: !!document.querySelector('.ddp-ibar'), pick: !!document.querySelector('.ddp-dock button.pick') })`)
   // 「转成代码」面板底下有「和做出来的比」：记着的地址直接打开
   await page(openSheet('转成代码', 'code'))
+  // 1.0.2：步骤条只认这次 DSH 里真写好的交接包；只是自己点了「重新比」、没交接过 → 停在第 1 步（和 1.0.1 一样）。走到后面几步的单元测试在 test-client
+  const hoStep = await until(`(() => { const ls = [...document.querySelectorAll('.dd-sheet .dd-steps li')]; return ls.length === 3 && ls[0].classList.contains('on') && ls[0].getAttribute('aria-current') === 'step' && !ls[1].classList.contains('done') && !ls[2].classList.contains('on') })()`, 5000)
+  check('1.0.2：没交接过、只是比过 → 转成代码的步骤条停在第 1 步', hoStep, await page(`[...document.querySelectorAll('.dd-sheet .dd-steps li')].map((x) => x.className + ':' + x.textContent).join(' | ')`))
   await page(`[...document.querySelectorAll('.dd-sheet .dd-sf .dd-bt')].find((x) => /和做出来的比/.test(x.textContent)).click()`)
   const menuBack = await until(`(() => { const f = document.querySelector('.ddp-icmp .im iframe'); return f && f.getAttribute('src') })()`, 10000)
   // 对比开着导出这一屏：导出的就是比的那屏（设计稿那边登记给了右侧栏）

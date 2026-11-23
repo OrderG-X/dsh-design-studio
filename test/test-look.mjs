@@ -491,6 +491,37 @@ li{padding:14px 0;list-style:none}.tab{position:absolute;left:0;right:0;bottom:0
   fs.writeFileSync(path.join(site, 'neg.html'), `<!doctype html><html><head><meta charset="utf-8"><title>负边距</title><link rel="stylesheet" href="neg.css">
 <style>body{margin:0;padding:24px;font:16px/1.4 sans-serif}.author{margin:0}</style></head><body><p class="author">石黑一雄 著 · 宋佥 译</p><div class="row"><span class="price">¥68</span><span>精装 392 页</span></div></body></html>`)
   // 附图：名字和价格叠在一起、框里的字被截断
+  // 大字行高收得紧、拼音紧贴在上面：字体上下沿伸进拼音里、字其实没碰到，不算叠字；行高 0.7 两段字真压在一起照样报
+  fs.writeFileSync(path.join(site, 'ruby.html'), `<!doctype html><html><head><meta charset="utf-8"><title>拼音</title>
+<style>body{margin:0;font:16px/1.5 "PingFang SC",sans-serif;padding:40px}p,h1{margin:0}.py{font-size:26px;font-weight:800}.word{font-size:116px;line-height:1.08;font-weight:900}</style></head>
+<body><p class="py">zhēng fā</p><h1 class="word">蒸发</h1></body></html>`)
+  fs.writeFileSync(path.join(site, 'squash.html'), `<!doctype html><html><head><meta charset="utf-8"><title>压字</title>
+<style>body{margin:0;font:16px/1.5 sans-serif;padding:40px}p,h1{margin:0}.a{font-size:60px;line-height:.7}.b{font-size:60px;line-height:.7}</style></head>
+<body><h1 class="a">上面一行大字</h1><p class="b">下面一行大字</p></body></html>`)
+  // 整张幻灯片用 transform 放大两倍：字号、行高要换成屏幕上的大小再比（真压在一起的照样报、拼音那种照样不报）
+  fs.writeFileSync(path.join(site, 'squash2x.html'), `<!doctype html><html><head><meta charset="utf-8"><title>放大压字</title>
+<style>body{margin:0;font:16px/1.5 sans-serif}p,h1{margin:0}.st{width:640px;height:360px;box-sizing:border-box;padding:20px;transform:scale(2);transform-origin:0 0}.a,.b{font-size:30px;line-height:.7}</style></head>
+<body><div class="st"><h1 class="a">上面一行大字</h1><p class="b">下面一行大字</p></div></body></html>`)
+  fs.writeFileSync(path.join(site, 'ruby2x.html'), `<!doctype html><html><head><meta charset="utf-8"><title>放大拼音</title>
+<style>body{margin:0;font:16px/1.5 "PingFang SC",sans-serif}p,h1{margin:0}.st{width:640px;height:360px;box-sizing:border-box;padding:20px;transform:scale(2);transform-origin:0 0}.py{font-size:13px;font-weight:800}.word{font-size:58px;line-height:1.08;font-weight:900}</style></head>
+<body><div class="st"><p class="py">zhēng fā</p><h1 class="word">蒸发</h1></div></body></html>`)
+  // 行高比字号小的两行大字（字形真压在一起）、竖排标题上压了一行横排字：都照 1.0.1 原样报
+  fs.writeFileSync(path.join(site, 'tight60.html'), `<!doctype html><html><head><meta charset="utf-8"><title>紧标题</title>
+<style>body{margin:40px}h1,h2{font:900 60px/.75 "PingFang SC",sans-serif;margin:0}</style></head><body><h1>探索自然的秘密</h1><h2>蒸发与凝结</h2></body></html>`)
+  fs.writeFileSync(path.join(site, 'vert.html'), `<!doctype html><html><head><meta charset="utf-8"><title>竖排</title>
+<style>body{margin:40px}.box{position:relative}h1{writing-mode:vertical-rl;font:900 60px/1.2 "PingFang SC",sans-serif;margin:0}p{position:absolute;top:120px;left:0;font:900 40px/1.2 "PingFang SC",sans-serif;margin:0}</style></head>
+<body><div class="box"><h1>竖排大标题</h1><p>压字</p></div></body></html>`)
+  // 行高 1 的大字用负 margin 往上拽、两行的行框真叠了（第 4 轮 Astra、Sol 的例子）：照 1.0.1 原样报
+  fs.writeFileSync(path.join(site, 'negm60.html'), `<!doctype html><html><head><meta charset="utf-8"><title>负边距</title>
+<style>body{margin:40px}h1,h2{font:900 60px/1 "PingFang SC",sans-serif;margin:0}h2{margin-top:-16px}</style></head><body><h1>探索自然的秘密</h1><h2>蒸发与凝结</h2></body></html>`)
+  fs.writeFileSync(path.join(site, 'negm100.html'), `<!doctype html><html><head><meta charset="utf-8"><title>负边距大</title>
+<style>body{margin:40px}h1,h2{font:900 100px/1 "PingFang SC",sans-serif;margin:0}h2{margin-top:-25px}</style></head><body><h1>水的旅行</h1><h2>蒸发凝结</h2></body></html>`)
+  // 标题组只往竖向拉（scaleY 1.3）：横竖缩放不一样，照 1.0.1 原样比（第 5 轮 Sol 的例子）
+  fs.writeFileSync(path.join(site, 'negm60y.html'), `<!doctype html><html><head><meta charset="utf-8"><title>竖向拉伸</title>
+<style>body{margin:40px}.g{transform:scaleY(1.3);transform-origin:0 0}h1,h2{font:900 60px/1 "PingFang SC",sans-serif;margin:0}h2{margin-top:-16px}</style></head><body><div class="g"><h1>探索自然的秘密</h1><h2>蒸发与凝结</h2></div></body></html>`)
+  // 拉丁字母紧排：É 的重音、y p 的下伸会出行框，照 1.0.1 原样比（第 6 轮 Sol 的例子）
+  fs.writeFileSync(path.join(site, 'latin.html'), `<!doctype html><html><head><meta charset="utf-8"><title>拉丁紧排</title>
+<style>body{margin:40px}p{font:italic 600 30px/1 Georgia,serif;margin:0}h1{font:900 140px/1 Arial,sans-serif;margin:0}</style></head><body><p>Typography</p><h1>ÉVÉNEMENT</h1></body></html>`)
   fs.writeFileSync(path.join(site, 'over.html'), `<!doctype html><html><head><meta charset="utf-8"><title>叠字</title>
 <style>body{margin:0;font:16px/1.4 sans-serif;padding:24px}.card{position:relative;height:120px;border:1px solid #ddd;padding:16px;margin-top:900px}
 .price{position:absolute;right:16px;top:20px;font-size:28px;font-weight:700}.name{font-size:22px}
@@ -1034,6 +1065,14 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
     const negLocate = (items) => items.map((it) => { const f = decodeURIComponent(new URL(it.href).pathname.slice(1)); return { file: f, line: findRule(fs.readFileSync(path.join(site, f), 'utf8'), it.sel, it.n) } })
     const neg = await measureAll(b, { screens: [{ key: 'neg.html', url: `${entry.origin}/neg.html`, label: 'neg' }, { key: 'over.html', url: `${entry.origin}/over.html`, label: 'over' }], sizes: [[390, 844]], kind: 'app', locate: negLocate })
     const negOv = neg[0].issues.find((x) => x.type === 'overlap'), absOv = neg[1].issues.find((x) => x.type === 'overlap')
+    const tight = await measureAll(b, { screens: ['ruby', 'squash', 'ruby2x', 'squash2x', 'tight60', 'vert', 'negm60', 'negm100', 'negm60y', 'latin'].map((k) => ({ key: k + '.html', url: `${entry.origin}/${k}.html`, label: k })), sizes: [[1280, 720]], kind: 'slides' })
+    const ovOf = (r) => r.issues.some((x) => x.type === 'overlap')
+    check('真浏览器：大字行高收得紧、拼音紧贴在上面不算叠字；行高 0.7 两段大字压在一起照样报', !ovOf(tight[0]) && ovOf(tight[1]), JSON.stringify(tight.map((r) => r.issues.map((x) => x.type))))
+    check('真浏览器：整张幻灯片 transform 放大两倍也一样（拼音不报、真压在一起的报）', !ovOf(tight[2]) && ovOf(tight[3]), JSON.stringify(tight.map((r) => r.issues.map((x) => x.type))))
+    check('真浏览器：行高 0.75 的两行大标题、竖排标题上压了字，照样报叠字', ovOf(tight[4]) && ovOf(tight[5]), JSON.stringify(tight.map((r) => r.issues.map((x) => x.type))))
+    check('真浏览器：行高 1 的大字负 margin 往上拽（60px -16px、100px -25px），照样报叠字', ovOf(tight[6]) && ovOf(tight[7]), JSON.stringify(tight.map((r) => r.issues.map((x) => x.type))))
+    check('真浏览器：标题组只往竖向拉（scaleY 1.3）、负 margin 叠在一起，照样报叠字', ovOf(tight[8]), JSON.stringify(tight.map((r) => r.issues.map((x) => x.type))))
+    check('真浏览器：拉丁字母紧排（小标题贴着带重音的大写标题），照样报叠字', ovOf(tight[9]), JSON.stringify(tight.map((r) => r.issues.map((x) => x.type))))
     check('真浏览器：叠字找到原因——价格行的负 margin，规则在 neg.css 第 3 行', negOv && negOv.cause && negOv.cause.prop === 'margin-top' && negOv.cause.value === '-24px' && /div\.row/.test(negOv.cause.sel) && negOv.rule && negOv.rule.sel === '.row' && negOv.rule.file === 'neg.css' && negOv.rule.line === 3, JSON.stringify(negOv))
     check('真浏览器：叠字找到原因——价格是绝对定位；量出叠了多少 px', absOv && absOv.px > 0 && absOv.cause && absOv.cause.prop === 'position' && absOv.cause.value === 'absolute' && /price/.test(absOv.cause.sel), JSON.stringify(absOv))
     // 业务标注：定位（选择器、文字兜底、写错的、匹配多个、整屏说明）

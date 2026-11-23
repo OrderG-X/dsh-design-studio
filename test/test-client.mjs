@@ -310,6 +310,15 @@ sp = splitTitles(['八克 | 登录', '八克 | 首页'])
 check('合成大图：品牌在前面也认', sp.brand === '八克' && sp.labels.join(',') === '登录,首页')
 sp = splitTitles(['登录', '首页'])
 check('合成大图：没有共同部分 → 原样', sp.brand === '' && sp.labels.join(',') === '登录,首页')
+{
+  // 1.0.2 转成代码的步骤条：拿不准就第 1 步（和 1.0.1 一样）
+  const { hoStepOf } = mod._test
+  const im = { 'a.html': { pct: 3.2, when: 200 }, 'gone.html': { pct: 1, when: 300 } }
+  const S = (ho, x = {}) => hoStepOf({ st: { ho, ...x }, root: '/d', impl: im, keys: ['a.html', 'b.html'], busy: !!x.turn })
+  check('步骤条：交接包写好、那轮在跑 → 模型在做；在问用户问题 → 第 1 步', S({ root: '/d', at: 100, end: null }, { turn: true }) === 1 && S({ root: '/d', at: 100, end: null }, { turn: true, asking: true }) === 0 && S({ root: '/d', at: 100, end: null }) === 0)
+  check('步骤条：交接那轮做完、有交接以后的比对 → 逐屏比；比对比交接早 / 只剩删掉的屏 → 第 1 步', S({ root: '/d', at: 100, end: 'completed' }) === 2 && S({ root: '/d', at: 250, end: 'completed' }) === 0 && hoStepOf({ st: { ho: { root: '/d', at: 100, end: 'completed' } }, root: '/d', impl: { 'gone.html': { pct: 1, when: 300 } }, keys: ['a.html'] }) === 0)
+  check('步骤条：被停 / 出错 / 老版 DSH 没说怎么结束的（done）、没交接过（DSH 重启过）、换了设计目录 → 第 1 步', S({ root: '/d', at: 100, end: 'aborted' }) === 0 && S({ root: '/d', at: 100, end: 'done' }) === 0 && S({ root: '/d', at: 100, end: 'error' }) === 0 && S(null) === 0 && S({ root: '/other', at: 100, end: 'completed' }) === 0 && hoStepOf({ st: null }) === 0)
+}
 const pc = pickColors([
   { name: '--color-primary-ink', value: '#fff' },
   { name: '--color-primary', value: '#1f4d3a' },
