@@ -667,22 +667,112 @@ const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, for
 }
 {
   // 演示跳屏（makeDemoNav）：前进压栈、点回上一屏算返回、返回 / 从头来、页面自己改地址只改记下的那屏
-  let d = { stack: ['a.html'], layers: [{ id: 1, key: 'a.html', dir: 0, shown: true }] }
+  let d = { stack: [{ key: 'a.html', state: '' }], layers: [{ id: 1, key: 'a.html', state: '', dir: 0, shown: true }] }
   const seq = { current: 1 }
   const nav = mod._test.makeDemoNav({ setDemo: (f) => { d = typeof f === 'function' ? f(d) : f }, demoSeq: seq, fileTarget: true })
+  const path = () => d.stack.map((x) => x.key + (x.state ? '?' + x.state : '')).join()
   nav.demoTo('b.html')
-  const fwd = d.stack.join() === 'a.html,b.html' && d.layers.length === 2 && d.layers[1].dir === 1 && d.layers[1].id === 2
+  const fwd = path() === 'a.html,b.html' && d.layers.length === 2 && d.layers[1].dir === 1 && d.layers[1].id === 2
   nav.demoShown(2)
   nav.demoTo('c.html'); nav.demoTo('b.html')
-  const back = d.stack.join() === 'a.html,b.html' && d.layers[1].dir === -1
+  const back = path() === 'a.html,b.html' && d.layers[1].dir === -1
   nav.demoBack()
-  const back2 = d.stack.join() === 'a.html' && d.layers[1].key === 'a.html'
+  const back2 = path() === 'a.html' && d.layers[1].key === 'a.html'
   nav.demoTo('b.html'); nav.demoTo('c.html'); nav.demoRestart()
-  const restart = d.stack.join() === 'a.html' && d.layers[1].dir === -1
+  const restart = path() === 'a.html' && d.layers[1].dir === -1
   const top = d.layers[d.layers.length - 1].id
   nav.demoHref(top, 'http://127.0.0.1:1/x.html')
-  const href = d.stack[d.stack.length - 1] === 'x.html' && d.layers[d.layers.length - 1].key === 'x.html'
+  const href = d.stack[d.stack.length - 1].key === 'x.html' && d.layers[d.layers.length - 1].key === 'x.html'
   check('演示跳屏：前进、点回上一屏算返回、返回、从头来、页面自己跳了只改记下的那屏', fwd && back && back2 && restart && href, JSON.stringify(d))
+  // 一页多状态（#30）：同一屏换个状态也算往前走一步；回到上一步那个状态算返回；data-back 按走过的路退，没得退才去写的地方
+  d = { stack: [{ key: 'o.html', state: '' }], layers: [{ id: 50, key: 'o.html', state: '', dir: 0, shown: true }] }
+  nav.demoGo('/o.html', 'paid')
+  const stFwd = path() === 'o.html,o.html?paid' && d.layers[1].state === 'paid' && d.layers[1].dir === 1
+  nav.demoGo('/o.html', '')
+  const stBack = path() === 'o.html' && d.layers[1].dir === -1
+  nav.demoGo('/o.html', 'paid'); nav.demoGo('/list.html', '')
+  nav.demoGo('/home.html', '', true)
+  const bk = path() === 'o.html,o.html?paid' && d.layers[1].key === 'o.html' && d.layers[1].state === 'paid' && d.layers[1].dir === -1
+  d = { stack: [{ key: 'o.html', state: '' }], layers: [{ id: 60, key: 'o.html', state: '', dir: 0, shown: true }] }
+  nav.demoGo('/home.html', '', true)
+  const bkNone = path() === 'o.html,home.html'
+  nav.demoGo('', '', true); nav.demoGo('', '', true)
+  const bkEmpty = path() === 'o.html'
+  nav.demoHref(d.layers[d.layers.length - 1].id, 'http://127.0.0.1:1/o.html?state=empty', 'default, empty')
+  const hrefSt = d.stack[0].state === 'empty' && d.layers[d.layers.length - 1].state === 'empty'
+  check('演示跳屏（#30）：换状态算一步、退回原状态算返回、data-back 按走过的路退 / 没得退去 href / 什么都没写不动、页面自己换状态记下', stFwd && stBack && bk && bkNone && bkEmpty && hrefSt, JSON.stringify({ stFwd, stBack, bk, bkNone, bkEmpty, hrefSt, d }))
+  // 老页面自己拿 ?state= 当参数（没写 dsh-states）：页面自己跳了不记状态（不然地址一变又重载、别的参数丢了）；写了的默认状态记成默认
+  d = { stack: [{ key: 'list.html', state: '' }], layers: [{ id: 70, key: 'list.html', state: '', dir: 0, shown: true }] }
+  const was = d
+  nav.demoHref(70, 'http://127.0.0.1:1/list.html?state=CA&page=2', '')
+  const oldSame = d === was
+  d = { stack: [{ key: 'o.html', state: 'paid' }], layers: [{ id: 71, key: 'o.html', state: 'paid', dir: 0, shown: true }] }
+  nav.demoHref(71, 'http://127.0.0.1:1/o.html?state=default', 'default, paid')
+  const defRec = d.stack[0].state === '' && d.layers[0].state === ''
+  const was2 = d
+  nav.demoHref(71, 'http://127.0.0.1:1/o.html?state=default', 'default, paid')
+  const defSame = d === was2
+  check('演示跳屏（#30）：老页面的 ?state= 不记、写了的默认状态记成默认', oldSame && defRec && defSame, JSON.stringify({ oldSame, defRec, defSame, d }))
+  // 跨页链接带的 ?state= 那页没写（老设计）：页面报的还是这层载的地址 → 不改、不再载一遍
+  d = { stack: [{ key: 'home.html', state: '' }, { key: 'result.html', state: 'success' }], layers: [{ id: 72, key: 'result.html', state: 'success', dir: 1, shown: true }] }
+  const was3 = d
+  nav.demoHref(72, 'http://127.0.0.1:1/result.html?state=success', '')
+  const crossSame0 = d === was3
+  nav.demoHref(72, 'http://127.0.0.1:1/result.html?state=fail', '')
+  const crossSame = crossSame0 && d === was3
+  // 链接带锚点：放在这一层的地址上，不算进走过的路
+  d = { stack: [{ key: 'home.html', state: '' }], layers: [{ id: 73, key: 'home.html', state: '', dir: 0, shown: true }] }
+  nav.demoGo('/o.html', 'paid', false, '#receipt')
+  const hashLay = d.layers[1].hash === '#receipt' && d.stack[1].hash === undefined && path() === 'home.html,o.html?paid'
+  nav.demoGo('/x.html', '', false, 'javascript:1')
+  const hashBad = !d.layers[1].hash
+  check('演示跳屏（#30）：跨页带的没写的状态不再载一遍；锚点只放在这一层地址上', crossSame && hashLay && hashBad, JSON.stringify({ crossSame, hashLay, hashBad, d }))
+  // 回默认状态写 order.html 和 ?state=default 是一回事：都算退回上一步，返回的路一样
+  const navD = mod._test.makeDemoNav({ setDemo: (f) => { d = typeof f === 'function' ? f(d) : f }, demoSeq: seq, fileTarget: true, defOf: (k) => (k === 'o.html' ? 'default' : '') })
+  const trip = (back) => {
+    d = { stack: [{ key: 'home.html', state: '' }, { key: 'o.html', state: '' }], layers: [{ id: 80, key: 'o.html', state: '', dir: 0, shown: true }] }
+    navD.demoGo('/o.html', 'paid')
+    navD.demoGo('/o.html', back)
+    const a = path()
+    navD.demoGo('', '', true)
+    return a + ' | ' + path()
+  }
+  d = { stack: [{ key: 'o.html', state: '' }, { key: 'o.html', state: 'paid' }], layers: [{ id: 81, key: 'o.html', state: 'paid', dir: 1, shown: true }] }
+  navD.demoGo('/o.html', 'default', false, '#receipt')
+  const popHash = d.stack.length === 1 && d.layers[1].hash === '#receipt' && d.layers[1].dir === -1
+  check('演示跳屏（#30）：点回上一步的链接带锚点（?state=default#receipt）→ 退回去也滚到锚点', popHash, JSON.stringify(d))
+  const t1 = trip('')
+  const t2 = trip('default')
+  check('演示跳屏（#30）：order.html 和 ?state=default 回默认，返回的路一样', t1 === t2 && t1 === 'home.html,o.html | home.html', JSON.stringify({ t1, t2 }))
+  // 单看换状态（#30）：顶栏记着的就是要的（去了别的页又回来，页面显示的不是顶栏那个）→ 重新载这屏；不然交给顶栏换。锚点 3 秒内带上一次
+  {
+    const plan = mod._test.stateGoPlan
+    const hn = mod._test.withHashNext
+    const O = 'http://127.0.0.1:5/o.html'
+    const okPlan = plan(O + '?state=paid', { state: 'paid' }) === 'reload' && plan(O, { state: 'default', def: true }) === 'reload' &&
+      plan(O + '?state=paid', { state: 'default', def: true }) === 'pick' && plan(O, { state: 'paid' }) === 'pick' && plan(O + '?state=paid', { state: 'empty' }) === 'pick'
+    const okHash = hn(O + '?state=paid', { hash: '#receipt', at: 1000 }, 2000) === O + '?state=paid#receipt' && hn(O + '#a', { hash: '#b', at: 0 }, 10) === O + '#b' &&
+      hn(O, { hash: '#x', at: 0 }, 5000) === O && hn(O, null, 0) === O
+    check('单看换状态（#30）：顶栏就是要的那个 → 重载这屏；锚点带上一次、过时不带', okPlan && okHash, JSON.stringify({ okPlan, okHash }))
+  }
+  // 状态写法：名字只认英文数字，能带中文名，重复的、超过 8 个的不要，不到两个当没写
+  const ps = mod._test.parseStates
+  const a1 = ps('default:有数据, empty：空列表；paid=已付款,bad name,empty:又一个')
+  check('状态写法（#30）：默认在前、中文名、全角标点、重复和不认的名字跳过', JSON.stringify(a1) === JSON.stringify([{ name: 'default', label: '有数据' }, { name: 'empty', label: '空列表' }, { name: 'paid', label: '已付款' }]), JSON.stringify(a1))
+  check('状态写法（#30）：只有一个当没写；最多 8 个', ps('only').length === 0 && ps('a,b,c,d,e,f,g,h,i,j').length === 8 && ps('').length === 0)
+  const ws = mod._test.withState
+  check('状态写法（#30）：地址换状态 / 回默认', ws('http://127.0.0.1:5/o.html', 'paid') === 'http://127.0.0.1:5/o.html?state=paid' && ws('http://127.0.0.1:5/o.html?state=paid', '') === 'http://127.0.0.1:5/o.html' && ws('http://127.0.0.1:5/o.html', 'x y') === 'http://127.0.0.1:5/o.html')
+  // 浏览器里那份和服务端 states.js 一模一样
+  const sv = await import('../lib/states.js')
+  const cases = ['default:有数据, empty：空列表；paid=已付款', 'a', 'x,y,z', ' a : 甲 , b ', 'a,b,c,d,e,f,g,h,i,j', 'a:' + '长'.repeat(40) + ',b']
+  check('状态写法（#30）：client.js 和 states.js 解析得一样', cases.every((c) => JSON.stringify(ps(c)) === JSON.stringify(sv.parseStates(c))))
+  // 导出「每个状态各出一张」：标题里屏名后面带状态，产品名还在原处；写了状态的屏展开成每个状态一行，旧版本不展开
+  const stt = mod._test.stateTitle
+  check('导出（#30）：状态标题插在屏名后面（· ｜ — 分隔的产品名不动），英文状态名用半角括号', stt('订单 · 梅林练', '已付款') === '订单（已付款） · 梅林练' && stt('Order | Gym', 'Paid') === 'Order (Paid) | Gym' && stt('订单', '空') === '订单（空）' && stt('A - B', 'x') === 'A (x) - B', JSON.stringify([stt('订单 · 梅林练', '已付款'), stt('Order | Gym', 'Paid'), stt('A - B', 'x')]))
+  const bys = mod._test.byStates
+  const sf = (k) => (k === 'o.html' ? ps('default:待付款,paid:已付款') : [])
+  const ex = bys([{ key: 'h.html', url: 'http://127.0.0.1:5/h.html' }, { key: 'o.html', url: 'http://127.0.0.1:5/o.html' }, { key: 'o.html', url: 'http://127.0.0.1:5/v/2/o.html', v: 2 }], sf)
+  check('导出（#30）：写了状态的屏每个状态一行（默认那行地址不带 ?state=），没写的、旧版本照原样', ex.length === 4 && ex[1].xs === 'default' && ex[1].xsFirst && ex[1].url === 'http://127.0.0.1:5/o.html' && ex[2].xs === 'paid' && ex[2].url === 'http://127.0.0.1:5/o.html?state=paid' && !ex[0].xs && !ex[3].xs, JSON.stringify(ex))
 }
 const tZ = makeT({})
 const tE = makeT({ locale: { bind: () => (k) => LE[k] } })
@@ -707,6 +797,12 @@ check('中文 / 英文翻译都拿得到', tZ('chipMark') === '标注图' && tE(
   const DYN = /^(ck|cd|ckOs|ckZone|ckEdge|ckWhen|ckWhat|mkHow|anT|el|tkn|mkErr|zipWhy|pkNote|shGhErr|shSubErr)_|^styleW\d+$/
   const unused = Object.keys(LZ).filter((k) => typeof LZ[k] === 'string' && !DYN.test(k) && !new RegExp(`\\b${k}\\b`).test(rest))
   check('文案：每个键都有人用', !unused.length, unused.join(' '))
+  // 同一套文案里一个键写了两次：后面那条悄悄盖掉前面的（#30 的「并排看全部状态」被风格卡的「全部」盖过）
+  const dup = [[zs, es], [es, ee]].flatMap(([a, b]) => {
+    const seen = new Set()
+    return [...lf.slice(a, b).matchAll(/^ {6}([A-Za-z0-9_]+):/gm)].map((m) => m[1]).filter((k) => (seen.has(k) ? true : (seen.add(k), false)))
+  })
+  check('文案：同一套里没有重复的键', !dup.length, dup.join(' '))
 }
 const W = '文件：/d/home.html'
 const issue = { type: 'contrast', sel: 'p.tip', text: '小字', fg: '#cccccc', bg: '#ffffff', ratio: 1.6, size: 12 }

@@ -38,7 +38,7 @@ const writeOld = (name, text) => {
 writeOld('tokens.css', ':root{--brand:#c8763e}\n')
 writeOld('app.css', 'body{margin:0}\n')
 writeOld('a.html', '<!doctype html><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="app.css"><h1>A</h1><a href="b.html">go</a>')
-writeOld('b.html', '<!doctype html><link rel="stylesheet" href="tokens.css"><h1>B</h1><a href="a.html">back</a>')
+writeOld('b.html', '<!doctype html><meta name="dsh-states" content="default:a, paid:b"><link rel="stylesheet" href="tokens.css"><h1>B</h1><a href="a.html">back</a>')
 
 const routes = new Map()
 const disposers = []
@@ -197,6 +197,20 @@ try {
   fs.statSync = realStat
 }
 
+// 一页多状态（#30）：?state=paid 打包时就把 <html data-state> 设好（srcdoc 里没有地址参数）；和不带状态的分开缓存；怪名字不设
+{
+  const SET = 'document.documentElement.setAttribute("data-state","paid")'
+  writeOld('o.html', '<!doctype html><html data-state="default"><head><meta name="dsh-states" content="default:待付款, paid:已付款"></head><body><a href="?state=paid">付</a></body></html>')
+  const plain = await call(url('o.html'))
+  const paid = await call(url('o.html', '&state=paid'))
+  const bad = await call(url('o.html', '&state=' + encodeURIComponent('<x>')))
+  const old = await call(url('a.html', '&state=paid'))
+  check('状态：带 ?state=paid 的那份开画前设好 data-state，地址也带上状态（返回、跳转按它算）', paid.status === 200 && htmlOf(paid).includes(SET) && /"href":"[^"]*\/o\.html\?state=paid"/.test(htmlOf(paid)), htmlOf(paid).slice(0, 400))
+  check('状态：页面没写这个状态（老页面自己拿 ?state= 当参数）→ 不设', old.status === 200 && !htmlOf(old).includes(SET))
+  check('状态：和不带状态的分开缓存（不同 ETag、不带的那份没设状态）', !!paid.headers.ETag && paid.headers.ETag !== plain.headers.ETag && !htmlOf(plain).includes('setAttribute("data-state","'), `${plain.headers.ETag} ${paid.headers.ETag}`)
+  check('状态：怪名字不设、当没带', bad.status === 200 && !htmlOf(bad).includes('setAttribute("data-state","'))
+}
+
 // 文件没动、信任变了：这套是装好的别人的设计系统，退回一版和现在一模一样的旧版——文件一个都没写，
 // 但退回来的页面从此按别人做的预览（要加硬规矩）。不能再给缓存里那份没加规矩的
 const ver = tracker.keepVersion('t', '测试')
@@ -226,6 +240,14 @@ const nowStrict = await call(url('b.html'), { 'if-none-match': warm.headers.ETag
 let strictBody = {}
 try { strictBody = JSON.parse(nowStrict.body) } catch { /* 下面报 */ }
 check('信任变了、文件没动：重新打包成加规矩的那份，不回 304', nowStrict.status === 200 && strictBody.strict === true, `${nowStrict.status} strict=${strictBody.strict}`)
+
+// 别人做的（加硬规矩）带状态：设状态那段也要带 nonce，不然被 CSP 拦掉、永远停在默认状态
+{
+  const sp = await call(url('b.html', '&state=paid'))
+  const h = htmlOf(sp)
+  const nonce = (/script-src 'nonce-([^']+)'/.exec(h) || [])[1]
+  check('状态（加硬规矩）：设状态的脚本带着 CSP 里那个 nonce', sp.status === 200 && JSON.parse(sp.body).strict === true && !!nonce && h.includes(`<script nonce="${nonce}">document.documentElement.setAttribute("data-state","paid")`), h.slice(0, 600))
+}
 
 for (const d of disposers) { try { d() } catch { /* 关预览服务器 */ } }
 try { fs.rmSync(home, { recursive: true, force: true }) } catch { /* 临时目录，删不掉也无所谓 */ }

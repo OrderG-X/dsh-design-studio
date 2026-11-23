@@ -835,6 +835,23 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
 <button id="agree">同意并继续</button><p class="row">一</p><p class="row">二</p>
 <label>我已阅读并同意<a href="#">《用户协议》</a>与<a href="#">《隐私政策》</a></label>
 <div><p>有字</p><span style="opacity:0">只在透明的子元素里</span></div><div style="opacity:0"><span>查看详情</span></div><button id="see">查看详情</button><div hidden><span>只在藏着的地方有</span></div><section><p>看得见的一段</p><div hidden><span>藏在看得见的容器里</span></div></section><section><div><b>含双人早餐</b></div></section><footer>含双人早餐</footer></body></html>`)
+  // 一页多状态（#30）：「已付款」状态才有的底栏压住最后一行；两个状态都有同一个坏链接；「空」状态没问题
+  fs.writeFileSync(path.join(site, 'st-order.html'), `<!doctype html><html data-state="default"><head><meta charset="utf-8"><meta name="dsh-design" content="app"><meta name="dsh-states" content="default:待付款, paid:已付款, empty:空"><title>订单</title>
+<style>body{margin:0;font:15px/1.4 sans-serif}main{padding:16px 16px 120px}li{padding:14px 0;list-style:none}.paybar{display:none}
+[data-state="paid"] main{padding-bottom:0}[data-state="paid"] .paybar{display:block;position:fixed;bottom:0;left:0;right:0;height:83px;background:#fafafa}
+[data-state="empty"] li{display:none}</style></head>
+<body><main><a href="st-gone.html">去不存在的页</a> <a href="?state=paid">付款</a> <a id="self" href="st-order.html">本页</a> <a id="rc" href="?state=paid#last">看收据</a> <button id="onc" onclick="if (!window.agreed) return; location.href='?state=paid'">脚本付款</button> <a id="chg" href="?state=paid" onclick="this.setAttribute('href', '?state=empty')">改了去处</a> <a id="pg" href="?state=paid&amp;page=2">第 2 页</a> <a id="pg2" href="?page=2">翻页</a> <a id="blank" target="_blank" href="?state=paid">新窗口看</a> <a id="guard" href="?state=paid" onclick="if (!window.agreed) { event.preventDefault(); document.body.dataset.warn = '1' }">同意后付款</a><ul>${Array.from({ length: 12 }, (_, i) => `<li>第 ${i + 1} 件</li>`).join('')}<li id="last">最后一件</li></ul></main><div class="paybar">已付款</div></body></html>`)
+  // 右侧栏单看时页面里点「同一页换状态」的链接（#30）：首页（链到订单）、没写状态的老页面（自己拿 ?state= 当参数）
+  fs.writeFileSync(path.join(site, 'st-home.html'), '<!doctype html><html><head><meta charset="utf-8"><title>首页</title></head><body><a id="go" href="st-order.html">订单</a></body></html>')
+  fs.writeFileSync(path.join(site, 'st-old.html'), '<!doctype html><html><head><meta charset="utf-8"><title>门店</title></head><body><a id="ca" href="?state=CA">加州</a></body></html>')
+  const wrapDir = path.join(tmp, 'wrap')
+  fs.mkdirSync(wrapDir)
+  fs.writeFileSync(path.join(wrapDir, 'wrap.html'), `<!doctype html><html><head><meta charset="utf-8"></head><body><iframe id="f" style="width:390px;height:844px"></iframe><script>
+window.got = []
+const q = new URLSearchParams(location.search)
+addEventListener('message', (e) => { const d = e.data; if (!d || d.dshDesign !== 1) return; window.got.push(d.type + (d.state ? ':' + d.state : '')); if (d.type === 'stateGo') window.got.push('sg:' + d.state + ':' + (d.def === true ? 'def' : '-') + ':' + (d.hash || '')); if (d.type === 'hello') e.source.postMessage({ dshDesign: 1, type: 'init', seed: null, relay: false, stateNav: q.get('nav') || '' }, e.origin) })
+document.getElementById('f').src = q.get('src')
+</script></body></html>`)
   const hub = createHub({ parents: () => [] })
   const entry = await hub.open({ kind: 'file', root: site })
   const screens = ['home.html', 'shell.html', 'clean.html'].map((key) => ({ key, url: `${entry.origin}/${key}`, label: key }))
@@ -1201,6 +1218,140 @@ header svg{position:absolute;right:0;top:20px;width:200px;height:120px}</style><
       const [lkOk, lkBad, lkCount] = [await lk('dg-links3.html'), await lk('dg-links3-bad.html'), await lk('dg-links3-count.html')]
       check('真浏览器图表：层间箭头 + 层内递进（ar-mods seq）一起用，箭头上下两端都对着模块、空隙里画了递进箭头；层里插占位的横箭头、箭头比模块少都报「箭头没对着模块」（两审第 2 轮）', ends && ends.off < 2 && /conic-gradient/.test(ends.seq) && !lkOk.length && lkBad.length >= 1 && lkCount.length >= 1 && /ar-mods seq/.test(detailOf(lkBad[0])), JSON.stringify([ends, lkOk.length, lkBad.length, lkCount.length]))
       check('真浏览器图表：1200 宽、字放大 1.6 倍：挨着箭头的两层模块各占一行、箭头对得上；横竖箭头的关系词两边都留出线和箭头；data-tone="mono" 三层同色（两审第 1 轮）', links2 && links2.rows === 2 && links2.off < 2 && links2.gap >= 20 && links2.tones === 1, JSON.stringify(links2))
+    }
+    // 一页多状态（#30）：check_design 每个状态各量一遍（真浏览器、真预览服务器按 ?state= 设好状态）
+    {
+      const realTracker = studio.tracker
+      const realBrowser = studio.browser
+      const stKey = 'st-order.html'
+      const snapSt = { url: `${entry.origin}/${stKey}`, focus: stKey, target: { kind: 'file', root: site, file: path.join(site, stKey) }, screens: [{ key: stKey, url: `${entry.origin}/${stKey}`, label: '订单' }] }
+      studio.tracker = { snapshot: () => snapSt, stateOf: () => ({ target: snapSt.target, origin: entry.origin }) }
+      studio.browser = b
+      const exec = { agent: { session: { id: 'sStates' } } }
+      const saved = []
+      const ctx = { get: (k) => (k === 'attachments' ? { saveImages: async (imgs) => imgs.map((x, i) => { saved.push(x); return { id: `st-${saved.length}-${i}` } }) } : null) }
+      const secOf = (text, name) => (text.split('\n\n').find((x) => x.startsWith(name)) || '')
+      try {
+        const all = await checkTool.execute({ sizes: ['375'] }, exec, ctx)
+        const [d, p, e] = ['default「待付款」', 'paid「已付款」', 'empty「空」'].map((x) => secOf(all.text, `${stKey}（状态 ${x}）`))
+        check('真浏览器状态：三个状态各量一遍，各列一段', /量了 3 屏 × 1 种尺寸/.test(all.text) && d && p && e, all.text)
+        check('真浏览器状态：底栏只在「已付款」压住最后一行 → 只报在那个状态下', /被固定栏压住：li#last「最后一件」|被固定栏压住：[^\n]*最后一件/.test(p) && !/被固定栏压住/.test(d) && !/被固定栏压住/.test(e), all.text)
+        const deadN = (all.text.match(/指向 st-gone\.html/g) || []).length
+        check('真浏览器状态：几个状态都有的坏链接只报一次，后面的状态不说「都能打开」', deadN === 1 && /指向 st-gone\.html/.test(d) && /1 个打不开（1 个前面的状态里报过了）/.test(p) && !/都能打开/.test(p + e), all.text)
+        check('真浏览器状态：严重问题按那个状态的地址截了图，清单里写看图几', Array.isArray(all.images) && all.images.length >= 1 && /最后一件[^\n]*（看图 1/.test(p), JSON.stringify([all.images, p]))
+        const re = await checkTool.execute({ sizes: ['375'], screens: ['st-order?state=paid'] }, exec, ctx)
+        check('真浏览器状态：screens 写 st-order?state=paid 只量这个状态，问题还在、不算新出', /量了 1 屏/.test(re.text) && /状态 paid/.test(re.text) && !/状态 default/.test(re.text) && /被固定栏压住/.test(re.text) && /新出 0 个/.test(re.text) && !/\[新\]/.test(re.text), re.text)
+        const again = await checkTool.execute({ sizes: ['375'], screens: ['st-order.html'] }, exec, ctx)
+        check('真浏览器状态：screens 写原文件名 → 全部状态再量；坏链接换回头一个状态报，不算修好也不算新出', /量了 3 屏/.test(again.text) && /修好 0 个，新出 0 个/.test(again.text), again.text)
+        const zz = await checkTool.execute({ sizes: ['375'], screens: ['st-order?state=zzz'] }, exec, ctx)
+        const lz = await lookTool.execute({ screens: ['st-order?state=zzz'], size: '375' }, exec, ctx)
+        check('真浏览器状态：点名的状态这屏没写 → 说出来（这屏有哪几个），说清量 / 截的是什么', /点名的状态没找到：st-order\.html 没有状态 zzz（这屏有：default、paid、empty），量的是这屏全部状态/.test(zz.text) && /量了 3 屏/.test(zz.text) && /没有状态 zzz（这屏有：default、paid、empty），截的是默认状态/.test(lz.text), zz.text + '\n---\n' + lz.text)
+        const lk = await lookTool.execute({ screens: ['st-order?state=paid'], at: 'bottom', size: '375' }, exec, ctx)
+        check('真浏览器状态：look_design 也能看某个状态（说明里写状态名）', /订单（已付款）|st-order\.html\?state=paid/.test(lk.text) && Array.isArray(lk.images) && lk.images.length === 1, lk.text)
+      } finally {
+        studio.tracker = realTracker
+        studio.browser = realBrowser
+      }
+    }
+    // 右侧栏单看（#30）：只在右侧栏让这一帧显示的那页、点的是这页写了的状态时交给右侧栏换状态；点链接去了别的页、老页面自己的 ?state= 照常跳
+    {
+      const hubP = createHub({ parents: () => [] })
+      const wrap = await hubP.open({ kind: 'file', root: wrapDir })
+      const hubC = createHub({ parents: () => [wrap.origin] })
+      const kid = await hubC.open({ kind: 'file', root: site })
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+      const run = (src, nav, steps) => b.withPage({ url: `${wrap.origin}/wrap.html?src=${encodeURIComponent(`${kid.origin}/${src}`)}&nav=${encodeURIComponent(nav)}`, w: 600, h: 900 }, async (p) => {
+        const until = async (expr, ms = 4000) => { const end = Date.now() + ms; for (;;) { let v; try { v = await p.frameEval(expr) } catch { v = undefined } if (v || Date.now() > end) return v; await sleep(100) } }
+        const got = () => p.eval('JSON.stringify(window.got)').then(JSON.parse)
+        for (let i = 0; i < 40 && !(await got()).includes('hello'); i++) await sleep(100)
+        return steps({ p, until, got })
+      })
+      const mine = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.querySelector('a[href="?state=paid"]')`)
+        await p.frameEval(`document.querySelector('a[href="?state=paid"]').click()`)
+        await sleep(600)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search`) }
+      })
+      check('真浏览器状态（右侧栏单看）：本页写了的状态 → 交给右侧栏换（发 stateGo），页面自己不跳', mine.got.includes('stateGo:paid') && mine.got.includes('sg:paid:-:') && mine.st === 'default|', JSON.stringify(mine))
+      const rc = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('rc')`)
+        await p.frameEval(`document.getElementById('rc').click()`)
+        await sleep(600)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search + location.hash`) }
+      })
+      check('真浏览器状态（右侧栏单看）：换状态的链接带锚点（?state=paid#last）→ 锚点一起交给右侧栏', rc.got.includes('sg:paid:-:#last') && rc.st === 'default|', JSON.stringify(rc))
+      const guard = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('guard')`)
+        await p.frameEval(`document.getElementById('guard').click()`)
+        await sleep(600)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search + '|' + (document.body.dataset.warn || '')`) }
+      })
+      check('真浏览器状态（右侧栏单看）：页面自己的点击处理拦了（没勾同意）→ 不换状态、页面的提示照出', !guard.got.includes('stateGo:paid') && guard.st === 'default||1', JSON.stringify(guard))
+      // 第 3 轮：只认真的 <a href>（onclick 里的地址随页面）；页面点击时改了 href 按改后的；带别的参数的随页面；?page=2 不算回默认
+      const onc = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('onc')`)
+        await p.frameEval(`document.getElementById('onc').click()`)
+        await sleep(600)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search`) }
+      })
+      check('真浏览器状态（右侧栏单看）：地址只写在 onclick 里、页面自己不让跳 → 不换状态', !onc.got.some((x) => /^stateGo/.test(x)) && onc.st === 'default|', JSON.stringify(onc))
+      const chg = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('chg')`)
+        await p.frameEval(`document.getElementById('chg').click()`)
+        await sleep(600)
+        return { got: await got() }
+      })
+      const blank = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('blank')`)
+        await p.frameEval(`document.getElementById('blank').click()`)
+        await sleep(600)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state')`) }
+      })
+      check('真浏览器状态（右侧栏单看）：target="_blank" 的 ?state=paid → 不当成这一帧换状态', !blank.got.some((x) => /^stateGo/.test(x)) && blank.st === 'default', JSON.stringify(blank))
+      check('真浏览器状态（右侧栏单看）：页面点击时把 href 改成 ?state=empty → 按改后的换', chg.got.includes('stateGo:empty') && !chg.got.includes('stateGo:paid'), JSON.stringify(chg))
+      const pg = await run('st-order.html', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('pg')`)
+        await p.frameEval(`document.getElementById('pg').click()`)
+        await until(`location.search.includes('page=2') && document.readyState === 'complete'`)
+        await sleep(200)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search`) }
+      })
+      check('真浏览器状态（右侧栏单看）：?state=paid&page=2 → 不交给右侧栏（参数会丢），页面自己跳、状态照样设好', !pg.got.some((x) => /^stateGo/.test(x)) && pg.st === 'paid|?state=paid&page=2', JSON.stringify(pg))
+      const pg2 = await run('st-order.html?state=paid', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.documentElement.getAttribute('data-state') === 'paid' && document.getElementById('pg2')`)
+        await p.frameEval(`document.getElementById('pg2').click()`)
+        await until(`location.search === '?page=2' && document.readyState === 'complete'`)
+        await sleep(200)
+        return { got: await got(), st: await p.frameEval(`location.search`) }
+      })
+      check('真浏览器状态（右侧栏单看）：已付款里点 ?page=2 → 不当成回默认状态', !pg2.got.some((x) => /^stateGo/.test(x)) && pg2.st === '?page=2', JSON.stringify(pg2))
+      const home = await run('st-order.html?state=paid', '/st-order.html', async ({ p, until, got }) => {
+        await until(`document.documentElement.getAttribute('data-state') === 'paid' && document.getElementById('self')`)
+        await p.frameEval(`document.getElementById('self').click()`)
+        await sleep(600)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search`) }
+      })
+      check('真浏览器状态（右侧栏单看）：「已付款」里点指着本页、不带状态的链接 → 交给右侧栏回默认状态（顶栏标签跟着变）', home.got.includes('stateGo:default') && home.got.includes('sg:default:def:') && home.st === 'paid|?state=paid', JSON.stringify(home))
+      const away = await run('st-home.html', '/st-home.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('go')`)
+        await p.frameEval(`document.getElementById('go').click()`)
+        await until(`document.querySelector('a[href="?state=paid"]')`)
+        await sleep(300)
+        await p.frameEval(`document.querySelector('a[href="?state=paid"]').click()`)
+        await until(`document.documentElement.getAttribute('data-state') === 'paid'`)
+        return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.pathname`) }
+      })
+      check('真浏览器状态（右侧栏单看）：在这一帧里点链接去了别的页，再点那页的 ?state=paid → 不交给右侧栏（不然切的是原来那屏），页面自己换', !away.got.includes('stateGo:paid') && away.st === 'paid|/st-order.html', JSON.stringify(away))
+      const old = await run('st-old.html', '/st-old.html', async ({ p, until, got }) => {
+        await until(`document.getElementById('ca')`)
+        await p.frameEval(`document.getElementById('ca').click()`)
+        await until(`location.search === '?state=CA' && document.readyState === 'complete'`)
+        await sleep(200)
+        return { got: await got(), st: await p.frameEval(`String(document.documentElement.getAttribute('data-state')) + '|' + location.search`) }
+      })
+      check('真浏览器状态（右侧栏单看）：没写状态的老页面点 ?state=CA → 照常跳过去，<html> 上不留 data-state', !old.got.includes('stateGo:CA') && old.st === 'null|?state=CA', JSON.stringify(old))
+      hubP.closeAll()
+      hubC.closeAll()
     }
   } finally {
     b.stop()

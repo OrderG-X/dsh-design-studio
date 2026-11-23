@@ -44,9 +44,11 @@
    <meta name="dsh-design" content="app">          <!-- 类型；小程序写 miniprogram；Windows 软件写 desktop windows；海报可带尺寸：poster 1080x1920；图表写 diagram 1600x1000；DSH 插件写 dshplugin 1280x800；套外框照外框里写好的那行，别改 -->
    ```
 
-   **几屏共用的东西只写一份**：样式放 `tokens.css` 和一个公共的 `app.css`；图标、书封这类 SVG 放进一个 `icons.svg`（每个图标一个 `<symbol id="…">`），页面里用 `<svg><use href="icons.svg#cart"></use></svg>` 引用——换风格时改一处所有屏一起变，不会漏改。状态栏、标签栏这种 HTML 结构每屏照抄一份，保持一模一样。
+   **几屏共用的东西只写一份**：样式放 `tokens.css` 和一个公共的 `app.css`；图标、书封这类 SVG 放进一个 `icons.svg`（每个图标一个 `<symbol id="…">`），页面里用 `<svg><use href="icons.svg#cart"></use></svg>` 引用——换风格时改一处所有屏一起变，不会漏改。状态栏、标签栏这种 HTML 结构每屏照抄一份，保持一模一样。卡片、按钮这类共用部件的样式写进 `app.css`，别在各屏自己的 `<style>` 里各写一份——屏一多就会写走样，`check_design` 会提醒「部件各屏写得不一样」。
 
-   **几屏之间用真链接串起来**，让它成为点得动的原型：按钮、卡片、标签栏、返回箭头都写成 `<a href="detail.html">`（或 `data-href="detail.html"`）。返回也写具体去哪一屏（`<a href="home.html">`），不要用 `history.back()`。右侧画布会从按钮画一条连线到目标屏，「演示」时点按钮就跳过去（带过场动画），手机扫码看时也点得动。
+   **几屏之间用真链接串起来**，让它成为点得动的原型：按钮、卡片、标签栏、返回箭头都写成 `<a href="detail.html">`（或 `data-href="detail.html"`）。返回箭头写成 `<a href="home.html" data-back>`：演示、手机上看时回到上一屏（从哪来回哪去），`href` 是没有上一屏时去哪；不要用 `history.back()`。右侧画布会从按钮画一条连线到目标屏，「演示」时点按钮就跳过去（带过场动画），手机扫码看时也点得动。
+
+   **同一个页面的几种样子（空列表 / 有数据 / 已付款 / 出错）写成「状态」，别另做一屏**：`<head>` 里写 `<meta name="dsh-states" content="default:有数据, empty:空列表, paid:已付款">`（第一个是默认；冒号前是英文名，后面是给人看的名字；最多 8 个），`<html data-state="default">`，差别全用 CSS 写：`[data-state="empty"] .list { display: none }`。跳到某个状态就链接 `order.html?state=paid`，同一屏里换状态写 `<a href="?state=paid">`。画布上屏名旁边能切状态，`check_design` 每个状态都量。只有一种样子的屏不用写。
 
 4. **写完第一屏就调 `preview_page`**（`target` 填这个文件，`kind` 填类型），用户从第一屏起就能看着它长出来；后面的屏写到同一目录会自动并排出现，不用再调。
 

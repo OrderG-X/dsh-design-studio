@@ -130,6 +130,17 @@ try {
   fs.rmSync(oldCss)
   check('删了一个旧样式文件：重截', (await get(q('s1.html'))).status === 200 && pages.length === n2 + 1)
 
+  // 一页多状态（#30）：画布上这屏切到了别的状态 → 按带 ?state= 的地址另截一张；怪名字当没带
+  {
+    const d = await get(q('s1.html'))
+    const n = pages.length
+    const st = await get(q('s1.html', '&state=paid'))
+    const again = await get(q('s1.html', '&state=paid'))
+    const odd = await get(q('s1.html', '&state=' + encodeURIComponent('a b')))
+    check('状态：另截一张（地址带 ?state=paid），再要给缓存；和默认状态的图不是一张', st.status === 200 && pages.length === n + 1 && pages[n].url === `${origin}/s1.html?state=paid` && again.body === st.body && st.name !== d.name, JSON.stringify([pages[n] && pages[n].url, st.name, d.name]))
+    check('状态：怪名字当没带（给默认状态那张，不另截）', odd.status === 200 && odd.name === d.name && pages.length === n + 1, JSON.stringify([odd.name, d.name, pages.length - n]))
+  }
+
   // ── 同一屏同时只截一次 ──
   hold = gate()
   const n0 = pages.length
