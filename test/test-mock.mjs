@@ -278,8 +278,12 @@ else {
     // mock.json 改了：从新文件重新开始，旧的那份清掉
     await at('home.html', (p) => p.eval(`(async () => { document.getElementById('accept').click(); ${tick} })()`))
     fs.writeFileSync(path.join(site, MOCK_FILE), JSON.stringify({ ...MOCK, user: { ...MOCK.user, name: '小王' } }))
-    await wait(30)
-    const fresh = await at('profile.html', (p) => p.eval(`({ name: document.getElementById('name').textContent, stage: document.getElementById('stage').textContent, keys: Object.keys(localStorage).filter((k) => k.startsWith('dsh-mock:')).length })`))
+    // 改了 mock.json，预览服务器会让开着的页整页刷新（文件监听有延迟，CI 上更慢）：取值撞上刷新就再取一次
+    let fresh = { name: '' }
+    for (let i = 0, end = Date.now() + 8000; fresh.name !== '小王' && Date.now() < end; i++) {
+      await wait(i ? 400 : 300)
+      try { fresh = await at('profile.html', (p) => p.eval(`({ name: document.getElementById('name').textContent, stage: document.getElementById('stage').textContent, keys: Object.keys(localStorage).filter((k) => k.startsWith('dsh-mock:')).length })`)) } catch (e) { fresh = { name: '', err: String(e && e.message) } }
+    }
     check('mock.json 改了：用新数据重新开始，旧的存档清掉', fresh.name === '小王' && fresh.stage === 'interviewing' && fresh.keys <= 1, JSON.stringify(fresh))
     // 改了 mock.json，预览服务器过一会儿会让开着的页整页刷新（文件监听有延迟）：等它过去，后面的页取值时不被刷新打断
     await wait(1500)
@@ -414,14 +418,16 @@ else {
       const eb = await hb.open({ kind: 'file', root: site })
       const par = path.join(tmp, 'par')
       fs.mkdirSync(par)
-      const ep = await hp.open({ kind: 'file', root: par })
-      P = ep.origin
-      const ex = await hx.open({ kind: 'file', root: par })
+      // 先写好外层页再开服务器、再等一会儿：开着以后才写，文件监听晚一点会让外层页整页刷新，正好把发给桥的修改冲掉
       fs.writeFileSync(path.join(par, 'p.html'), `<!doctype html><html><head><title>p</title></head><body>
 <iframe id="br" src="${eb.origin}/__dsh_design__/mock.html"></iframe><iframe id="pg" src="${eb.origin}/home.html"></iframe>
 <script>window.got = []; addEventListener('message', (e) => { if (e.data && e.data.ddpMock === 1) window.got.push({ o: e.origin, d: e.data }) })
 window.send = (m) => document.getElementById('br').contentWindow.postMessage({ ddpMock: 1, ...m }, ${JSON.stringify(eb.origin)})
 window.last = () => { const g = window.got.filter((x) => x.d.type === 'data'); return g.length ? g[g.length - 1].d : null }</script></body></html>`)
+      const ep = await hp.open({ kind: 'file', root: par })
+      P = ep.origin
+      const ex = await hx.open({ kind: 'file', root: par })
+      await wait(1200)
       const br = await b.withPage({ url: P + '/p.html', w: 600, h: 900, store: true }, async (p) => {
         const until = async (expr, ms = 4000) => { const end = Date.now() + ms; for (;;) { let v; try { v = await p.eval(expr) } catch { v = undefined } if (v || Date.now() > end) return v; await wait(100) } }
         const r = {}
