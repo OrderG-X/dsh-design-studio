@@ -713,6 +713,11 @@ const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, for
   nav.demoHref(71, 'http://127.0.0.1:1/o.html?state=default', 'default, paid')
   const defSame = d === was2
   check('演示跳屏（#30）：老页面的 ?state= 不记、写了的默认状态记成默认', oldSame && defRec && defSame, JSON.stringify({ oldSame, defRec, defSame, d }))
+  // 状态跟着模拟数据走的页（页面报的状态那段前面有「#mock」）：点名第一个状态要记下（不带 = 数据里那个，不一样）
+  d = { stack: [{ key: 'o.html', state: '' }], layers: [{ id: 73, key: 'o.html', state: '', dir: 0, shown: true }] }
+  nav.demoHref(73, 'http://127.0.0.1:1/o.html?state=default', '#mock\ndefault, paid')
+  const folRec = d.stack[0].state === 'default' && d.layers[0].state === 'default'
+  check('演示跳屏（#30）：状态跟着数据走的页，点名第一个状态记下来（不当成没写）', folRec, JSON.stringify(d))
   // 跨页链接带的 ?state= 那页没写（老设计）：页面报的还是这层载的地址 → 不改、不再载一遍
   d = { stack: [{ key: 'home.html', state: '' }, { key: 'result.html', state: 'success' }], layers: [{ id: 72, key: 'result.html', state: 'success', dir: 1, shown: true }] }
   const was3 = d
@@ -772,7 +777,7 @@ const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, for
   const bys = mod._test.byStates
   const sf = (k) => (k === 'o.html' ? ps('default:待付款,paid:已付款') : [])
   const ex = bys([{ key: 'h.html', url: 'http://127.0.0.1:5/h.html' }, { key: 'o.html', url: 'http://127.0.0.1:5/o.html' }, { key: 'o.html', url: 'http://127.0.0.1:5/v/2/o.html', v: 2 }], sf)
-  check('导出（#30）：写了状态的屏每个状态一行（默认那行地址不带 ?state=），没写的、旧版本照原样', ex.length === 4 && ex[1].xs === 'default' && ex[1].xsFirst && ex[1].url === 'http://127.0.0.1:5/o.html' && ex[2].xs === 'paid' && ex[2].url === 'http://127.0.0.1:5/o.html?state=paid' && !ex[0].xs && !ex[3].xs, JSON.stringify(ex))
+  check('导出（#30）：写了状态的屏每个状态一行（默认那行地址也写明状态，key 不变），没写的、旧版本照原样', ex.length === 4 && ex[1].xs === 'default' && ex[1].xsFirst && ex[1].url === 'http://127.0.0.1:5/o.html?state=default' && ex[1].key === 'o.html' && ex[2].xs === 'paid' && ex[2].url === 'http://127.0.0.1:5/o.html?state=paid' && !ex[0].xs && !ex[3].xs, JSON.stringify(ex))
 }
 const tZ = makeT({})
 const tE = makeT({ locale: { bind: () => (k) => LE[k] } })

@@ -1332,6 +1332,41 @@ document.getElementById('f').src = q.get('src')
         return { got: await got(), st: await p.frameEval(`document.documentElement.getAttribute('data-state') + '|' + location.search`) }
       })
       check('真浏览器状态（右侧栏单看）：「已付款」里点指着本页、不带状态的链接 → 交给右侧栏回默认状态（顶栏标签跟着变）', home.got.includes('stateGo:default') && home.got.includes('sg:default:def:') && home.st === 'paid|?state=paid', JSON.stringify(home))
+      // 状态跟着模拟数据走的页（数据里是「已付款」）：不带状态的「本页」链接 = 跟着数据，不能被当成点名第一个
+      {
+        const sfDir = path.join(tmp, 'stfollow')
+        fs.mkdirSync(sfDir, { recursive: true })
+        fs.writeFileSync(path.join(sfDir, 'mock.json'), JSON.stringify({ o: { st: 'paid' } }))
+        fs.writeFileSync(path.join(sfDir, 'sf.html'), '<!doctype html><html><head><meta charset="utf-8"><meta name="dsh-states" content="pending:待付款, paid:已付款" data-mock="o.st"><title>订单</title></head><body><a id="self" href="sf.html">本页</a> <a id="first" href="?state=pending">待付款</a></body></html>')
+        const sf = await hubC.open({ kind: 'file', root: sfDir })
+        const runF = (src, steps) => b.withPage({ url: `${wrap.origin}/wrap.html?src=${encodeURIComponent(`${sf.origin}/${src}`)}&nav=${encodeURIComponent('/sf.html')}`, w: 600, h: 900 }, async (p) => {
+          const until = async (expr, ms = 4000) => { const end = Date.now() + ms; for (;;) { let v; try { v = await p.frameEval(expr) } catch { v = undefined } if (v || Date.now() > end) return v; await sleep(100) } }
+          const got = () => p.eval('JSON.stringify(window.got)').then(JSON.parse)
+          for (let i = 0; i < 40 && !(await got()).includes('hello'); i++) await sleep(100)
+          return steps({ p, until, got })
+        })
+        const fSelf = await runF('sf.html', async ({ p, until, got }) => {
+          await until(`document.documentElement.getAttribute('data-state') === 'paid' && document.getElementById('self')`)
+          await p.frameEval(`document.getElementById('self').click()`)
+          await sleep(800)
+          return { got: await got(), st: await until(`document.documentElement.getAttribute('data-state')`) }
+        })
+        check('真浏览器状态（跟着数据走的页）：没点名状态时点「本页」→ 不交给右侧栏、还是数据里的「已付款」', !fSelf.got.some((x) => /^stateGo/.test(x)) && fSelf.st === 'paid', JSON.stringify(fSelf))
+        const fClr = await runF('sf.html?state=pending', async ({ p, until, got }) => {
+          await until(`document.documentElement.getAttribute('data-state') === 'pending' && document.getElementById('self')`)
+          await p.frameEval(`document.getElementById('self').click()`)
+          await sleep(600)
+          return { got: await got() }
+        })
+        check('真浏览器状态（跟着数据走的页）：点名了「待付款」再点「本页」→ 让右侧栏去掉点名（回到跟着数据），不是钉在第一个', fClr.got.includes('sg::def:') && !fClr.got.includes('stateGo:pending'), JSON.stringify(fClr))
+        const fFirst = await runF('sf.html', async ({ p, until, got }) => {
+          await until(`document.documentElement.getAttribute('data-state') === 'paid' && document.getElementById('first')`)
+          await p.frameEval(`document.getElementById('first').click()`)
+          await sleep(600)
+          return { got: await got() }
+        })
+        check('真浏览器状态（跟着数据走的页）：点 ?state=第一个 → 点名第一个（不当成回默认）', fFirst.got.includes('stateGo:pending') && fFirst.got.includes('sg:pending:-:'), JSON.stringify(fFirst))
+      }
       const away = await run('st-home.html', '/st-home.html', async ({ p, until, got }) => {
         await until(`document.getElementById('go')`)
         await p.frameEval(`document.getElementById('go').click()`)

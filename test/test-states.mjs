@@ -43,7 +43,7 @@ const sn = splitStateNames(['order.html?state=empty', 'home', 'nope?state=x'], p
 const one = expandStates(list, (sc) => sts[sc.key], { only: sn.only })
 check('点名状态：order.html?state=empty 拆成屏名、只量那个状态（地址带 ?state=）；没点名的屏照常', same(sn.names, ['order.html', 'home', 'nope']) && same(one.list.map((x) => x.key), ['home.html', 'order.html?state=empty']) && one.list[1].url === 'http://h/order.html?state=empty', JSON.stringify(one.list))
 const dflt = expandStates(list, (sc) => sts[sc.key], { only: splitStateNames(['order?state=default'], pick).only })
-check('点名状态：点的是默认状态 → key 不变、地址不带 ?state=（文件里写着默认）', same(dflt.list.map((x) => x.key), ['home.html', 'order.html']) && dflt.list[1].state === 'default' && dflt.list[1].url === 'http://h/order.html')
+check('点名状态：点的是默认状态 → key 不变、地址写明默认状态（状态跟着模拟数据走的屏不写会是数据里那个）', same(dflt.list.map((x) => x.key), ['home.html', 'order.html']) && dflt.list[1].state === 'default' && dflt.list[1].url === 'http://h/order.html?state=default')
 check('点名状态：同一屏也写了不带状态的 → 全部状态', expandStates(list, (sc) => sts[sc.key], { only: splitStateNames(['order?state=paid', 'order'], pick).only }).list.length === 4)
 {
   // 开发服务器的路由本来就带 ?state=（/stores?state=CA 是单独一屏，没写 dsh-states）：整个对得上就当屏名

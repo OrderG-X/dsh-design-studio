@@ -50,6 +50,21 @@
 
    **同一个页面的几种样子（空列表 / 有数据 / 已付款 / 出错）写成「状态」，别另做一屏**：`<head>` 里写 `<meta name="dsh-states" content="default:有数据, empty:空列表, paid:已付款">`（第一个是默认；冒号前是英文名，后面是给人看的名字；最多 8 个），`<html data-state="default">`，差别全用 CSS 写：`[data-state="empty"] .list { display: none }`。跳到某个状态就链接 `order.html?state=paid`，同一屏里换状态写 `<a href="?state=paid">`。画布上屏名旁边能切状态，`check_design` 每个状态都量。只有一种样子的屏不用写。
 
+   **点了会变、换页还在的原型，用「模拟数据」**（多角色 / 多阶段、有列表和表单、点按钮后内容要跟着变的 App 原型；只是静态展示的不用）：在这套设计的目录里写一个 `mock.json`（一个对象，整套原型共用，用户名、阶段、列表、表单都放这里，写真实的样例内容），页面里不写 JS 就能用：
+
+   ```html
+   <span data-mock-text="user.name"></span>                       <!-- 显示；也可以拼：'¥' + order.total -->
+   <div data-mock-show="user.stage == 'onsite'">…</div>           <!-- 条件不成立就藏起来；&& || ! 比较 三元都能写 -->
+   <button data-mock-set="user.stage = 'onsite'; unread = 0">接受邀约</button>   <!-- 点了改数据，几句用 ; 隔开；也可以同时是链接 -->
+   <a data-mock-class="on: tab == 'home'" data-mock-set="tab = 'home'">首页</a>  <!-- 按条件加 class -->
+   <button data-mock-attr="disabled: !form.agree">下一步</button>  <!-- 按条件设属性 -->
+   <input data-mock-model="form.phone">                            <!-- 输入框、勾选框和数据双向，填了换页还在 -->
+   <ul data-mock-each="app in applications"><template><li><b data-mock-text="app.title"></b><button data-mock-set="app.status = 'done'">完成</button></li></template></ul>
+   <button data-mock-reset>重置演示数据</button>
+   ```
+
+   页面的状态可以跟着数据走：`<meta name="dsh-states" content="interviewing:面试中, onsite:在项" data-mock="user.stage">`——数据里 `user.stage` 是几，这页就是哪个状态；角色、阶段这种全局的东西这样写，一处改了所有页一起变，不用每种组合做一屏。改了的数据存在浏览器里，换页、刷新都还在；`mock.json` 一改就从新文件重新开始。复杂的逻辑写脚本：`mock.get('user.stage')`、`mock.set('cart.count', 2)`、`mock.push('cart.items', {…})`、`mock.remove('cart.items', 0)`、`mock.on((data) => …)`、`mock.reset()`——**不要自己用 localStorage 另写一套数据**。mock.json 里有的东西（名字、金额、状态），页面上显示它的地方都绑上，别这屏绑了、那屏写死——用户在右侧栏「数据」里改一处，所有屏要一起变。条件里只能写字段、字面量和运算，不能调函数。写错的条件、找不到的字段 `check_design` 会报出来。
+
 4. **写完第一屏就调 `preview_page`**（`target` 填这个文件，`kind` 填类型），用户从第一屏起就能看着它长出来；后面的屏写到同一目录会自动并排出现，不用再调。
 
 5. **写完先量、再看，然后收尾**：
