@@ -75,14 +75,22 @@ const loop = await call({ remoteAddress: '127.0.0.1', host: '127.0.0.1:3080' })
 check('本机来源、没有 Peer：照旧放行（老行为不变）', okJson(loop), `${loop.status} ${loop.body.slice(0, 80)}`)
 
 // ── 新版 DSH：handler 收到准入 Peer → 放行（这一条就是局域网 / 反代能用的关键）──
-const lanPeer = await call({ peer: { id: 'peer-1' } })
+const lanPeer = await call({ peer: { id: 'peer-1', principal: { kind: 'owner' } } })
 check('局域网来源、有准入 Peer：放行（修复点）', okJson(lanPeer), `${lanPeer.status} ${lanPeer.body.slice(0, 80)}`)
 
-const crossPeer = await call({ headers: { 'sec-fetch-site': 'cross-site' }, peer: { id: 'peer-1' } })
+const crossPeer = await call({ headers: { 'sec-fetch-site': 'cross-site' }, peer: { id: 'peer-1', principal: { kind: 'owner' } } })
 check('有准入 Peer 时不再按本机的规矩拦（来源已由 DSH 验过）', okJson(crossPeer), `${crossPeer.status} ${crossPeer.body.slice(0, 80)}`)
 
-const proxyPeer = await call({ remoteAddress: '172.25.0.2', host: 'chat.example.com', peer: { id: 'peer-2' } })
+const proxyPeer = await call({ remoteAddress: '172.25.0.2', host: 'chat.example.com', peer: { id: 'peer-2', principal: { kind: 'owner' } } })
 check('反代来源、有准入 Peer：放行', okJson(proxyPeer), `${proxyPeer.status} ${proxyPeer.body.slice(0, 80)}`)
+
+// ── 准入了、但不是主人（以后 DSH 的访客之类）：设计台不让进，连本机来源也一样 ──
+const guest = await call({ peer: { id: 'peer-4', principal: { kind: 'guest' } } })
+check('有 Peer 但不是主人：403', guest.status === 403, `${guest.status} ${guest.body.slice(0, 80)}`)
+const guestLoop = await call({ remoteAddress: '127.0.0.1', host: '127.0.0.1:3080', peer: { id: 'peer-5', principal: { kind: 'guest' } } })
+check('不是主人、从本机来：也 403（不退回本机兜底）', guestLoop.status === 403, `${guestLoop.status}`)
+const bare = await call({ peer: { id: 'peer-6' } })
+check('Peer 没写身份：403', bare.status === 403, `${bare.status}`)
 
 // ── 老版本 DSH：connection.requestRejection 还在，照旧听它的 ──
 let seen = 0
@@ -97,7 +105,7 @@ check('老版本 DSH：requestRejection 拒绝 → 403', legacyDeny.status === 4
 
 let called = 0
 legacy = { requestRejection: () => { called++; return 0 }, trustedHosts: [] }
-const peerWins = await call({ peer: { id: 'peer-3' } })
+const peerWins = await call({ peer: { id: 'peer-3', principal: { kind: 'owner' } } })
 check('有准入 Peer 时不再走老 connection 那套', okJson(peerWins) && called === 0, `${peerWins.status} called=${called}`)
 
 for (const d of disposers) { try { d() } catch { /* 收尾 */ } }
