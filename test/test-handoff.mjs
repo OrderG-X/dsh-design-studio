@@ -11,7 +11,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import http from 'node:http'
-import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, slotHtml, isFramed, implUrl, implServe, handoffMd, buildHandoff, compareScreens, diffIn, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
+import { detectProject, projectFor, defaultFramework, routeOf, pagePathOf, sharedParts, slotHtml, isFramed, implUrl, implServe, handoffMd, handoffScreens, findHandoffScreen, buildHandoff, compareScreens, diffIn, blockAt, FRAMEWORKS, defaultDest, pickedDest, within, localOnly } from '../lib/handoff.js'
+import { compareTool, handoffTool, studio } from '../lib/index.js'
 import { createHub } from '../lib/serve.js'
 import { findBrowser, createBrowser } from '../lib/browser.js'
 
@@ -384,6 +385,156 @@ fs.writeFileSync(path.join(design, 'menu.html'), PAGE('菜单', '<header class="
   check('交接说明：跟现有项目一样（Tailwind 要映射变量，不新建）', same.startsWith('# 交接：shop → Vue + Vite（跟项目一样）') && /现有项目 proj：Vue \+ Vite \+ Tailwind，TypeScript，包管理 pnpm/.test(same) && /theme\.extend/.test(same) && !/npm create/.test(same))
 }
 
+// ── 完整交接清单和分批截图（替身浏览器让 CI 无须装 Chrome） ──
+{
+  const root = path.join(tmp, 'many-screens')
+  const components = path.join(root, 'components')
+  fs.mkdirSync(components, { recursive: true })
+  const key = (n) => `screen-${String(n).padStart(3, '0')}.html`
+  const nav = path.join(components, 'nav-link.html')
+  const writeNav = (n) => fs.writeFileSync(nav, `<nav><a href="${key(n)}">导航</a></nav>`)
+  writeNav(13)
+  fs.writeFileSync(path.join(components, 'shared-nav.html'), '<header><c-nav-link/></header>')
+  fs.writeFileSync(path.join(components, 'activity-card.html'), `<article class="activity-card" data-status="open" data-variant="wide">
+    <h2>{{title}}</h2><img src="{{cover | }}"><i>{{size | small}}</i><b data-mock-text="activity.subtitle"></b><slot/>
+    </article><style>.activity-card[data-status="closed"]{opacity:.6}</style>`)
+  for (let n = 1; n <= 61; n++) {
+    const to = n === 61 ? 13 : n === 13 ? 50 : 61
+    const content = {
+      1: '<form><input></form><c-shared-nav/>',
+      2: '<c-shared-nav/>',
+      13: '<form><input></form><c-activity-card title="活动" :cover="photo"/>',
+      61: `<c-activity-card :title="activity.title" :cover='gallery[0]["cover"]'/><!-- <c-activity-card :cover="ignored" /> -->`,
+    }[n] || ''
+    fs.writeFileSync(path.join(root, key(n)), `<title>第 ${n} 屏</title><a href="./${key(to)}?state=open">跳转</a>${content}`)
+  }
+  const origin = 'http://127.0.0.1:4661'
+  const catalog = handoffScreens(root, origin)
+  check('完整清单：61 屏，按文件名、无扩展名和建议路由找到第 13、50、61 屏', catalog.length === 61 && catalog[60].batch === 6
+    && findHandoffScreen(catalog, key(13))?.key === key(13) && findHandoffScreen(catalog, 'screen-050')?.key === key(50) && findHandoffScreen(catalog, '/screen-061')?.url === origin + '/' + key(61))
+  const browser = {
+    available: () => true,
+    withPage: ({ url }, run) => run({
+      eval: async (code) => code.includes('.links') ? [] : code.includes('.scroll') ? { of: 1 } : code.includes('.info') ? {} : true,
+      shot: async () => Buffer.from(url),
+    }),
+  }
+  const first = await buildHandoff(browser, { root, catalog, kind: 'app' })
+  const tableRows = (md) => md.split('\n').filter((line) => /^\| .*\| screen-\d+\.html \|/.test(line))
+  const rowFor = (md, n) => tableRows(md).find((line) => line.includes(`| ${key(n)} |`))
+  check('第一批：只截 12 屏，表格一直列全并写出无浏览器也能读到的跳转', first.shots === 12 && tableRows(first.md).length === 61
+    && rowFor(first.md, 13)?.includes('第 2 批截 | screen-050') && rowFor(first.md, 61)?.includes('第 6 批截 | screen-013') && first.pending.join() === '2,3,4,5,6')
+  const jpg = (stem) => fs.readFileSync(path.join(first.dir, 'shots', stem), 'utf8')
+  const a = jpg('screen-001-1.jpg')
+  const firstFile = path.join(root, key(1))
+  fs.writeFileSync(firstFile, fs.readFileSync(firstFile, 'utf8').replace('第 1 屏', '新标题').replace('<input>', '<input><input>'))
+  writeNav(50)
+  const second = await buildHandoff(browser, { root, catalog, batch: 2, kind: 'app' })
+  const md = fs.readFileSync(second.file, 'utf8')
+  check('第二批：新增 12 张，保留首批截图，仍列全部 61 屏', second.shots === 12 && jpg('screen-001-1.jpg') === a
+    && jpg('screen-013-1.jpg').endsWith(key(13)) && tableRows(md).length === 61 && rowFor(md, 1)?.includes('screen-001-1.jpg')
+    && rowFor(md, 50)?.includes('第 5 批截') && md.includes(`${key(13)}：1 个输入控件`))
+  check('页面和嵌套共用导航改动：第一批受影响屏列为待重截，标题、链接、逐屏说明用新版',
+    rowFor(md, 1)?.includes('新标题') && rowFor(md, 1)?.includes('截图已过期') && md.includes(`${key(1)}：2 个输入控件`)
+    && rowFor(md, 2)?.includes('截图已过期') && rowFor(first.md, 2)?.includes('screen-013') && rowFor(md, 2)?.includes('screen-050')
+    && !rowFor(md, 2)?.includes('screen-013') && !rowFor(md, 3)?.includes('截图已过期') && second.pending.join() === '1,3,4,5,6')
+  check('组件契约：列代码文件、参数、插槽、状态、变体、使用屏和 mock 字段', [
+    '## 组件', '### ActivityCard', 'components/ActivityCard.tsx', '多个路由引用同一个组件文件', 'title`（必填）',
+    'size`（选填，默认 `"small"`）', '默认插槽', '`data-status` `closed`、`open`', '`data-variant` `wide`',
+    `用在 \`${key(13)}\`、\`${key(61)}\``, '读取 mock 字段 `activity.subtitle`、`activity.title`、`gallery[0]["cover"]`、`photo`',
+  ].every((s) => md.includes(s)) && !md.includes('`ignored`'))
+  const redone = await buildHandoff(browser, { root, catalog, batch: 1, kind: 'app' })
+  check('重截第一批后清掉过期提示', redone.pending.join() === '3,4,5,6' && !rowFor(redone.md, 2)?.includes('截图已过期'))
+  const snapshot = {
+    target: { kind: 'file', root, file: path.join(root, key(1)) },
+    screens: catalog.slice(0, 60), origin, url: catalog[0].url, focus: key(1), kind: 'app', size: [390, 844],
+  }
+  const tracker = { snapshot: () => snapshot, stateOf: () => snapshot, cwdOf: () => tmp, versions: () => [], markHandoff: () => {} }
+  const exec = { agent: { session: { id: 'many-screens' } } }
+  const urls = []
+  const previous = { tracker: studio.tracker, browser: studio.browser }
+  try {
+    studio.tracker = tracker
+    studio.browser = { available: () => true, withPage: ({ url }) => { urls.push(url); throw new Error('浏览器替身结束比对') } }
+    const compared = await compareTool.execute({ screen: 'screen-061', url: '5173', size: '390x844' }, exec)
+    check('比对工具：指定画布上没有的第 61 屏，确实打开这一屏的预览地址', urls[0] === origin + '/' + key(61) && compared.text.includes('浏览器替身结束比对'))
+    studio.browser = null
+    const result = await handoffTool.execute({ screens: [key(61)] }, exec)
+    // 一张都没截成（没浏览器）：不让模型反复调下一批空跑，说先照 HANDOFF.md 写、截图以后补
+    check('交接工具：无浏览器也能指定第 61 屏，只回摘要和路径，不叫模型空跑下一批', result.text.includes(key(61))
+      && result.text.includes(second.file) && !result.text.includes('handoff_design batch=') && result.text.includes('截图以后再补') && !result.images
+      && result.text.includes('Chrome / Edge') && !result.text.includes('## 屏幕和路由'), result.text)
+    check('重新指定第 61 屏补说明，未覆盖之前的图片', jpg('screen-001-1.jpg') === a && jpg('screen-013-1.jpg').endsWith(key(13)))
+    for (let n = 62; n <= 200; n++) fs.writeFileSync(path.join(root, key(n)), `<title>第 ${n} 屏</title>`)
+    const last = await handoffTool.execute({ batch: 17 }, exec)
+    check('交接工具：第 17 批包含第 200 屏，清单没有因画布或批量大小截断', last.text.includes(key(200))
+      && tableRows(fs.readFileSync(second.file, 'utf8')).length === 200)
+    const smallRoot = path.join(tmp, 'two-screens')
+    fs.mkdirSync(smallRoot)
+    for (const name of ['index.html', 'detail.html']) fs.writeFileSync(path.join(smallRoot, name), '<title>小项目</title>')
+    snapshot.target = { kind: 'file', root: smallRoot, file: path.join(smallRoot, 'index.html') }
+    snapshot.screens = handoffScreens(smallRoot, origin)
+    studio.browser = {
+      ...browser,
+      withPage: (opts, run) => {
+        if (opts.url.endsWith('/detail.html')) throw new Error('详情截失败')
+        return browser.withPage(opts, run)
+      },
+    }
+    const small = await handoffTool.execute({}, exec)
+    const smallDoc = path.join(smallRoot, 'handoff', 'HANDOFF.md')
+    check('交接工具：12 屏以内也只回本批摘要、失败项和路径', small.text.includes('新增或更新 1 张截图')
+      && small.text.includes(smallDoc) && small.text.includes(path.join(smallRoot, 'handoff', 'shots'))
+      && small.text.includes('detail.html：详情截失败') && !small.text.includes('## 屏幕和路由') && !small.images
+      && fs.readFileSync(smallDoc, 'utf8').includes('## 做法和验收'))
+  } finally {
+    Object.assign(studio, previous)
+  }
+}
+
+// 一屏分段和手机图都截完才替换以前的一套。
+{
+  const root = path.join(tmp, 'atomic-shots')
+  fs.mkdirSync(root)
+  fs.writeFileSync(path.join(root, 'index.html'), '<title>长页</title>')
+  let version = 'old'
+  let failure = ''
+  const browser = {
+    available: () => true,
+    withPage: ({ w }, run) => {
+      const mobile = w === 390
+      let part = 0
+      return run({
+        eval: async (code) => {
+          if (code.includes('.links')) return []
+          if (!code.includes('.scroll')) return {}
+          part = Number(code.match(/scroll\((\d+)\)/)[1]) + 1
+          return { of: 2 }
+        },
+        shot: async () => {
+          const label = mobile ? 'mobile' : String(part)
+          if (label === failure) throw new Error(`失败 ${label}`)
+          return Buffer.from(`${version}-${label}`)
+        },
+      })
+    },
+  }
+  const first = await buildHandoff(browser, { root })
+  const shotDir = path.join(first.dir, 'shots')
+  const bytes = () => ['1', '2', 'mobile'].map((part) => fs.readFileSync(path.join(shotDir, `index-${part}.jpg`), 'utf8')).join()
+  version = 'new'
+  for (const part of ['2', 'mobile']) {
+    failure = part
+    const result = await buildHandoff(browser, { root })
+    check(`重截长页失败（${part}）：保留上一套完整截图，记为待重截`, first.shots === 3 && bytes() === 'old-1,old-2,old-mobile'
+      && result.shots === 0 && result.rows[0].error === `失败 ${part}` && result.pending.join() === '1'
+      && result.md.includes('index-1.jpg、index-2.jpg、index-mobile.jpg'))
+  }
+  failure = ''
+  const redone = await buildHandoff(browser, { root })
+  check('重截全部成功：整套替换并清掉失败提示', bytes() === 'new-1,new-2,new-mobile' && redone.shots === 3 && !redone.pending.length)
+}
+
 // ── 真浏览器 ──
 const bin = findBrowser()
 if (!bin) console.log('（没找到 Chrome / Edge，跳过真浏览器那几条）')
@@ -420,7 +571,8 @@ else {
     check('交接包：每屏截图 + 网页手机宽的一张', shots.includes('home-1.jpg') && shots.includes('home-mobile.jpg') && shots.includes('menu-1.jpg') && r.shots === shots.length, shots.join())
     check('交接包：标题、跳转从页面上拿到了', r.rows[0].title === '首页' && r.rows[0].links.some((l) => /menu\.html/.test(l.path)) && /\| 首页 \| home\.html .*\| menu \|/.test(r.md), JSON.stringify(r.rows[0].links))
     const again = await buildHandoff(b, { root: design, screens: screens.slice(0, 1), kind: 'app', size: [390, 844], framework: 'html', dest: path.join(tmp, 'site') })
-    check('交接包：再做一次，旧截图清掉；App 不截手机宽那张', fs.readdirSync(path.join(design, 'handoff', 'shots')).join() === again.rows[0].shots.join() && !again.rows[0].mobile)
+    const after = fs.readdirSync(path.join(design, 'handoff', 'shots'))
+    check('交接包：只清重截的那一屏的旧图；App 不截手机宽那张', after.includes('home-1.jpg') && !after.includes('home-mobile.jpg') && after.includes('menu-1.jpg') && after.includes('menu-mobile.jpg') && !again.rows[0].mobile)
 
     // 做出来的：一份一样的（本地文件，没有设计台的脚本），一份改过的（按钮颜色、标题字号、少一张卡片）
     const impl = path.join(tmp, 'impl')

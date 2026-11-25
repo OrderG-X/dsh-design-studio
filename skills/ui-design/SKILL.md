@@ -44,7 +44,21 @@
    <meta name="dsh-design" content="app">          <!-- 类型；小程序写 miniprogram；Windows 软件写 desktop windows；海报可带尺寸：poster 1080x1920；图表写 diagram 1600x1000；DSH 插件写 dshplugin 1280x800；套外框照外框里写好的那行，别改 -->
    ```
 
-   **几屏共用的东西只写一份**：样式放 `tokens.css` 和一个公共的 `app.css`；图标、书封这类 SVG 放进一个 `icons.svg`（每个图标一个 `<symbol id="…">`），页面里用 `<svg><use href="icons.svg#cart"></use></svg>` 引用——换风格时改一处所有屏一起变，不会漏改。状态栏、标签栏这种 HTML 结构每屏照抄一份，保持一模一样。卡片、按钮这类共用部件的样式写进 `app.css`，别在各屏自己的 `<style>` 里各写一份——屏一多就会写走样，`check_design` 会提醒「部件各屏写得不一样」。
+   **几屏共用的东西只写一份**：样式放 `tokens.css` 和公共的 `app.css`；图标、书封这类 SVG 放进 `icons.svg`（每个图标一个 `<symbol id="…">`），用 `<svg><use href="icons.svg#cart"></use></svg>` 引用——换风格时改一处所有屏一起变，不会漏改。**4 屏以上、同一块出现在 2 屏以上**（标签栏、顶栏、卡片、列表项、按钮组等），先在 `components/` 下写组件（`components/<名>.html`，组件文件只放 `components/` 下），各屏用 `<c-名>` 引用，改组件所有屏一起变；3 屏以内或只出现一次的块照常写（用户明确要抽组件、或要把老设计改成组件时照做），共用样式放 `app.css`，别在各屏 `<style>` 里各写一份（`check_design` 会提醒「部件各屏写得不一样」）。详细规则见 `references/components.md`，最小例子（上为组件文件，下为页面用法）：
+
+   ```html
+   <!-- components/activity-card.html -->
+   <article class="activity-card" data-status="{{status | open}}">
+     <h3 class="ac-title">{{title}}</h3><span class="ac-tag" data-if="tag">{{tag | }}</span><slot></slot>
+   </article>
+   <style>.activity-card[data-status="ended"] { opacity: .6; }</style>
+   ```
+
+   ```html
+   <c-activity-card title="周末徒步" tag="热门"><a href="detail.html">查看</a></c-activity-card>
+   <c-activity-card title="读书会" status="ended" />
+   <div data-mock-each="act in activities"><template><c-activity-card :title="act.title" :status="act.status" /></template></div>
+   ```
 
    **几屏之间用真链接串起来**，让它成为点得动的原型：按钮、卡片、标签栏、返回箭头都写成 `<a href="detail.html">`（或 `data-href="detail.html"`）。返回箭头写成 `<a href="home.html" data-back>`：演示、手机上看时回到上一屏（从哪来回哪去），`href` 是没有上一屏时去哪；不要用 `history.back()`。右侧画布会从按钮画一条连线到目标屏，「演示」时点按钮就跳过去（带过场动画），手机扫码看时也点得动。
 

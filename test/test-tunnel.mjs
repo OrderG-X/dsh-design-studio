@@ -15,6 +15,7 @@ import zlib from 'node:zlib'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { findCloudflared, createPublicShare, launchWatched, URL_RE, assetFor, downloadCloudflared } from '../lib/tunnel.js'
+import { MAX_TOTAL as PACK_FILE_MAX } from '../lib/bundle.js'
 
 let pass = 0
 let fail = 0
@@ -76,7 +77,7 @@ const make = (mode = 'ok', { env = {}, ...extra } = {}) => createPublicShare({
 
 {
   const pub = make()
-  let st = await pub.start('s1', { title: '咖啡', root: '/r' }, { name: '咖啡' })
+  let st = await pub.start('s1', { title: '咖啡', root: tmp }, { name: '咖啡' })
   check('开：先是「正在连」，还没有链接', st.on && st.state === 'starting' && !st.url, JSON.stringify(st))
   st = await until(() => { const x = pub.status('s1'); return x.state === 'ready' ? x : null })
   const ins = pub._inspect('s1')
@@ -117,11 +118,11 @@ const make = (mode = 'ok', { env = {}, ...extra } = {}) => createPublicShare({
   check('原来没有的文件后来加了：也重新打包', builds === b0 + 2)
   check('打开次数（GET 才算）', pub.status('s1').views === 5, String(pub.status('s1').views))
 
-  pub.update('s1', { title: '咖啡外带', root: '/r' })
+  pub.update('s1', { title: '咖啡外带', root: tmp })
   r = await get(ins.port, '/' + ins.token)
   check('右侧栏换了参数：下次打开按新的', /<title>咖啡外带<\/title>/.test(r.body.toString()))
   check('换参数时换了设计（root 不一样）：不跟着换', pub.update('s1', { title: '别的设计', root: '/other' }) === false && /<title>咖啡外带<\/title>/.test((await get(ins.port, '/' + ins.token)).body.toString()))
-  st = await pub.start('s1', { title: '再点一次', root: '/r' })
+  st = await pub.start('s1', { title: '再点一次', root: tmp })
   check('开着再点「开」：不新开通道、只换参数', st.on && pub._inspect('s1').pid === ins.pid)
 
   pub.stop('s1')
@@ -258,7 +259,7 @@ const make = (mode = 'ok', { env = {}, ...extra } = {}) => createPublicShare({
 }
 
 {
-  // 打包失败：一会儿之内直接回「暂时打不开」，不每个请求都重打一遍（打包在插件里同步做，会卡住插件）
+  // 换参数打包失败：继续提供旧版本，短时间内不反复重打。
   const pub = make()
   await pub.start('p1', { title: 'x', root: '/r' })
   const ins = pub._inspect('p1')
@@ -267,18 +268,118 @@ const make = (mode = 'ok', { env = {}, ...extra } = {}) => createPublicShare({
   const r1 = await get(ins.port, '/' + ins.token)
   const r2 = await get(ins.port, '/' + ins.token)
   const r3 = await get(ins.port, '/' + ins.token)
-  check('打包失败：503，接着几个请求不重打', r1.status === 503 && r2.status === 503 && r3.status === 503 && builds === b0 + 1, `${r1.status} ${builds - b0}`)
-  check('开着以后重新打包失败：右侧栏知道（对方看到的是「暂时打不开」）', pub.status('p1').broken === 'tooBig' && pub.status('p1').on, JSON.stringify(pub.status('p1')))
+  check('换参数打包失败：三个请求都继续拿到上一版，只重打一次', [r1, r2, r3].every((r) => r.status === 200 && r.body.toString().includes('<title>x</title>')) && builds === b0 + 1, `${r1.status} ${builds - b0}`)
+  check('开着以后重打失败：状态有原因，链接仍在', pub.status('p1').broken === 'tooBig' && pub.status('p1').brokenMsg === '新版本没发布：too big' && pub.status('p1').on, JSON.stringify(pub.status('p1')))
   pub.update('p1', { title: 'x', root: '/r', boom: true, dark: true })
   check('换了别的参数（切深浅色）但还没打成功：失败提示不消失', pub.status('p1').broken === 'tooBig')
   pub.update('p1', { title: '好了', root: '/r' })
   const r4 = await get(ins.port, '/' + ins.token)
-  check('参数改好了：马上重打、能打开，右侧栏不再说打不开', r4.status === 200 && /<title>好了<\/title>/.test(r4.body.toString()) && !pub.status('p1').broken)
+  check('参数改好了：马上重打、能打开，失败提示清掉', r4.status === 200 && /<title>好了<\/title>/.test(r4.body.toString()) && !pub.status('p1').broken && !pub.status('p1').brokenMsg)
   check('右侧栏每次刷新带的状态很短（没有次数、链接，免得一直重画）', JSON.stringify(Object.keys(pub.status('p1', { brief: true }))) === '["on","state"]')
   pub.stop('p1')
   await pub.start('p1', { title: 'x', root: '/r', boom: true })
   check('关着时的简短状态只有开没开、原因代号（不带报错原文）', JSON.stringify(Object.keys(pub.status('p1', { brief: true })).sort()) === '["error","on"]', JSON.stringify(pub.status('p1', { brief: true })))
   pub.stop('p1')
+}
+
+{
+  const file = path.join(tmp, 'same-mtime.html')
+  const component = path.join(tmp, 'new-card.html')
+  const mtime = new Date('2026-11-10T10:00:00Z')
+  const write = (text) => { fs.writeFileSync(file, text); fs.utimesSync(file, mtime, mtime) }
+  write('<p>one</p>')
+  const before = fs.statSync(file)
+  let time = Date.now()
+  let count = 0
+  const pub = make('ok', {
+    now: () => time,
+    build: () => {
+      count++
+      const html = fs.readFileSync(file, 'utf8')
+      if (!html.includes('bad')) return { html, deps: [file] }
+      if (!fs.existsSync(component)) throw Object.assign(new Error('same-mtime.html 缺少 new-card 组件'), { code: 'missing', deps: [file, component] })
+      return { html: fs.readFileSync(component, 'utf8'), deps: [file, component] }
+    },
+  })
+  await pub.start('fingerprint', { root: tmp })
+  const { port, token } = pub._inspect('fingerprint')
+  const visit = (headers) => get(port, '/' + token, headers)
+  try {
+    const first = await visit()
+    write('<p>two</p>')
+    time += 1600
+    const changed = await visit({ 'if-none-match': first.headers.etag })
+    const after = fs.statSync(file)
+    check('内容指纹：尺寸和 mtime 完全一样，刷新能拿到新内容和 ETag', before.size === after.size && before.mtimeMs === after.mtimeMs
+      && changed.status === 200 && changed.body.toString() === '<p>two</p>' && changed.headers.etag !== first.headers.etag && count === 2)
+    write('<p>bad</p>')
+    time += 1600
+    const fallback = await visit()
+    const status = pub.status('fingerprint')
+    check('文件改坏：沿用旧成品、旧 ETag，状态说明哪屏缺哪个组件', fallback.status === 200 && fallback.body.toString() === '<p>two</p>'
+      && fallback.headers.etag === changed.headers.etag && status.on && status.broken === 'missing' && status.brokenMsg === '新版本没发布：same-mtime.html 缺少 new-card 组件')
+    time += 6000
+    const unchanged = await visit({ 'if-none-match': changed.headers.etag })
+    check('出错的文件没再改：旧 ETag 仍有效，不重复打包', unchanged.status === 304 && count === 3)
+    fs.writeFileSync(component, '<p>fixed</p>')
+    time += 1600
+    const fixed = await visit({ 'if-none-match': changed.headers.etag })
+    const recovered = pub.status('fingerprint')
+    check('补上失败时才发现的新依赖：下次打开更新新版本并清掉原因', fixed.status === 200 && fixed.body.toString() === '<p>fixed</p>'
+      && fixed.headers.etag !== changed.headers.etag && count === 4 && !recovered.broken && !recovered.brokenMsg)
+  } finally {
+    pub.stop('fingerprint')
+  }
+}
+
+{
+  const root = fs.realpathSync(tmp)
+  const design = path.join(root, 'fingerprint-design')
+  const sibling = design + '-sibling'
+  fs.mkdirSync(design)
+  fs.mkdirSync(sibling)
+  const outside = path.join(sibling, 'asset.txt')
+  const link = path.join(design, 'linked.txt')
+  const big = path.join(design, 'oversize.txt')
+  fs.writeFileSync(outside, 'outside')
+  fs.symlinkSync(outside, link)
+  fs.writeFileSync(big, '')
+  fs.truncateSync(big, PACK_FILE_MAX + 1)
+  let time = Date.now()
+  let count = 0
+  const opened = []
+  const pub = make('ok', {
+    now: () => time,
+    build: () => ({ html: '<p>' + ++count + '</p>', deps: [link, big] }),
+  })
+  const open = fs.openSync
+  fs.openSync = function (file, ...args) {
+    if ([outside, link, big].includes(file)) opened.push(file)
+    return open.call(this, file, ...args)
+  }
+  try {
+    await pub.start('bounded', { root: design })
+    const { port, token } = pub._inspect('bounded')
+    const visit = () => get(port, '/' + token)
+    time += 1600
+    await visit()
+    check('公网指纹：首次打包和后续检查都不打开目录外软链接或超限文件', opened.length === 0 && count === 1, opened.join())
+
+    fs.truncateSync(big, 1)
+    time += 1600
+    const smaller = await visit()
+    check('超限文件缩小后自动重打，开始读取内容', smaller.body.toString() === '<p>2</p>' && opened.includes(big) && !opened.includes(outside))
+
+    fs.unlinkSync(link)
+    fs.writeFileSync(link, 'inside')
+    opened.length = 0
+    time += 1600
+    const replaced = await visit()
+    check('目录外软链接换回目录内文件后自动重打', replaced.body.toString() === '<p>3</p>' && opened.includes(link) && !opened.includes(outside))
+  } finally {
+    fs.openSync = open
+    pub.stop('bounded')
+  }
 }
 
 {
