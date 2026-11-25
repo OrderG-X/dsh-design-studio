@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createHub, injectPicker } from '../lib/serve.js'
 import { createHistory } from '../lib/history.js'
 import { createTracker, parseTarget } from '../lib/core.js'
@@ -176,9 +177,9 @@ const hub = createHub({ history })
 // ── 技能里的例子原样能跑（SKILL.md 最小例子、references/components.md 完整示例）──
 {
   const { expandComponents } = await import('../lib/components.js')
-  const here = path.dirname(new URL(import.meta.url).pathname)
+  const here = path.dirname(fileURLToPath(import.meta.url)) // Windows：URL 的 pathname 是 /D:/…
   for (const f of ['skills/ui-design/SKILL.md', 'skills/ui-design/references/components.md']) {
-    const md = fs.readFileSync(path.join(here, '..', f), 'utf8')
+    const md = fs.readFileSync(path.join(here, '..', f), 'utf8').replace(/\r\n/g, '\n') // Windows 签出可能是 CRLF
     const blocks = [...md.matchAll(/```html\n([\s\S]*?)```/g)].map((m) => m[1].replace(/^\s{3}/gm, ''))
     const ci = blocks.findIndex((b) => /<!-- components\/activity-card\.html -->/.test(b))
     const comp = blocks[ci] || ''
