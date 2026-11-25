@@ -509,7 +509,7 @@ try {
     await page(V(`(V('.ddp-homeback') || { click() {} }).click(), 1`))
     await until(V(`!V('.ddp-home')`), 5000)
     await sleep(1500)
-    await page(V(`V('.ddp-dock button[data-tip="调样式"]').click()`))
+    await page(V(`V('.ddp-dock button[data-tip="样式"]').click()`))
     await until(V(`!!V('.ddp-style')`), 5000)
     await sleep(500)
     await clickIn('a.html', 'a.pill')
@@ -538,7 +538,7 @@ try {
     await sleep(2500) // 文件变了，两屏在后台换一帧
     const bBg = await inPage(`document.querySelector('iframe.ddp-frame[src*="b.html"]')`, `getComputedStyle(document.querySelector('a.pill')).backgroundColor`)
     check(`调样式（${tag}）：没点的那一屏也跟着变了`, bBg === rgb, String(bBg))
-    await page(V(`V('.ddp-dock button[data-tip="调样式"]').click()`))
+    await page(V(`V('.ddp-dock button[data-tip="样式"]').click()`))
     await sleep(300)
     await say(`${word} 把设计做进项目里`)
     const req = await waitFor(() => got(), 20000)
@@ -749,14 +749,14 @@ try {
   await sleep(3000) // 这一轮结束后的自动体检
 
   // ③ 设计体检
-  const CHECK_BTN = `[...document.querySelectorAll('.ddp-dock button')].find((b) => /^(体检|Check)$/.test(b.dataset.tip || ''))`
+  const CHECK_BTN = `[...document.querySelectorAll('.ddp-dock button')].find((b) => /^(检查|Check)$/.test(b.dataset.tip || ''))`
   const BADGE = `(${CHECK_BTN}?.querySelector('.bdg')?.textContent || '')`
   check('工具栏有体检按钮', await until(`!!${CHECK_BTN}`, 10000))
   const badge = await until(BADGE, 15000)
   check('打开设计自动量了一下，按钮上标着 4', badge === '4', `「${badge}」`)
   await shot('1b-badge')
   await page(`${CHECK_BTN}.click()`)
-  const DONE = `(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') })()`
+  const DONE = `(() => { const p = document.querySelector('.ddp-check'); return p && !/正在检查|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') })()`
   check('体检面板出来、跑完', await until(DONE, 30000), await page(`document.querySelector('.ddp-check')?.innerText || '没有面板'`))
   const items = await page(`[...document.querySelectorAll('.ddp-check .ddp-ck .nm')].map((x) => x.textContent)`)
   console.log(`  （体检结果：${items.join(' ｜ ')}）`)
@@ -778,8 +778,8 @@ try {
   check('「让模型改」把清单放进输入框', asked, await page(composerText))
   if (asked) console.log(`  （输入框：${asked.replace(/\n/g, ' ⏎ ').slice(0, 260)}…）`)
   check('清单写明哪一屏、什么问题', /首页|home/.test(asked || '') && /对比度|contrast/i.test(asked || ''), asked)
-  const ckChip = await asChip('check', `体检 · ${((asked || '').match(/发现 (\d+) 个问题/) || [])[1]} 个问题`, /〔设计体检〕/)
-  check('体检清单在输入框里是一个标签「体检 · N 个问题」' + (chipDsh ? '' : '（旧版 DSH 插成字）'), ckChip.ok, ckChip.why)
+  const ckChip = await asChip('check', `检查 · ${((asked || '').match(/发现 (\d+) 个问题/) || [])[1]} 个问题`, /〔设计体检〕/)
+  check('检查清单在输入框里是一个标签「检查 · N 个问题」' + (chipDsh ? '' : '（旧版 DSH 插成字）'), ckChip.ok, ckChip.why)
   await page(`(() => { const el = document.querySelector('${composer}'); el.focus(); return true })()`)
   await enter()
   const end = Date.now() + 20000
@@ -787,20 +787,20 @@ try {
   check('发出去模型收到体检清单', fixAsk, JSON.stringify(llmLog.slice(-3)))
   if (chipDsh) {
     const bubble = await until(`(() => { const p = [...document.querySelectorAll('.ddp-pickpill[data-i="check"]')].pop(); return p && p.innerText })()`, 5000)
-    check('发出去的消息里也是「体检 · N 个问题」标签，不是一大段字', /^体检 · \d+ 个问题$/.test(bubble || '') && !/〔设计体检〕/.test(await page('document.body.innerText')), bubble)
+    check('发出去的消息里也是「检查 · N 个问题」标签，不是一大段字', /^检查 · \d+ 个问题$/.test(bubble || '') && !/〔设计体检〕/.test(await page('document.body.innerText')), bubble)
   }
 
   // ④ 模型改好首屏 → 这一轮完了自动再量，按钮上的数字没了；打开面板也是干净的
   const gone = await until(`!${BADGE}`, 20000)
   check('模型改完自动再量：按钮上的数字没了', gone, `还是「${await page(BADGE)}」`)
   await page(`${CHECK_BTN}.click()`)
-  const clean = await until(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.innerText) && !!p.querySelector('.ok') })()`, 30000)
+  const clean = await until(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在检查|Checking/.test(p.innerText) && !!p.querySelector('.ok') })()`, 30000)
   check('打开面板：没问题', clean, await page(`document.querySelector('.ddp-check')?.innerText || '没有面板'`))
   await shot('4-clean')
 
   // 面板开着，模型又改了购物车（改坏）→ 这一轮完了面板自己刷新；购物车那屏被面板挡着就挪出来
   await say('BREAK-CART 改一下购物车')
-  const cartIssues = await until(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') && p.querySelectorAll('.ddp-ck').length && /购物车/.test(p.querySelector('.bd').innerText) && p.querySelectorAll('.ddp-ck').length })()`, 30000)
+  const cartIssues = await until(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在检查|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') && p.querySelectorAll('.ddp-ck').length && /购物车/.test(p.querySelector('.bd').innerText) && p.querySelectorAll('.ddp-ck').length })()`, 30000)
   check('面板开着时模型改完，面板自己重新量（购物车出了问题）', cartIssues >= 2, await page(`document.querySelector('.ddp-check')?.innerText || '没有面板'`))
   await sleep(900) // 画布挪动的动画
   const seen = await page(`(() => {
@@ -862,8 +862,8 @@ try {
   }
   // 公网链接（#27，实验）：导出菜单进去，先说清楚是公网可见（有没有 cloudflared 给「生成链接」或「下载」）。
   // E2E_REAL_TUNNEL=1 时真开一条 Cloudflare 临时通道：链接打得开、是这套演示、关了马上失效（要联网，CI 不跑）
-  const pubItem = await page(openSheet('分享', 'share', '/公网链接|Public link/'))
-  check('分享面板有「公网链接」页签', pubItem)
+  const pubItem = await page(openSheet('分享', 'share', '/在线链接|Online link/'))
+  check('分享面板有「在线链接」页签', pubItem)
   const pubIntro = await until(`(() => { const p = document.querySelector('.ddp-pub'); return p && /不在身边|not nearby/.test(p.innerText) && [...p.querySelectorAll('.dd-bt')].map((b) => b.textContent).join('|') })()`, 8000)
   check('公网链接面板：先说清楚公网可见，给「生成链接」或「下载 cloudflared」', /生成链接|Create link|下载|Download/.test(pubIntro || ''), pubIntro)
   await shot('5-publink')
@@ -962,7 +962,7 @@ try {
     await page(`document.getElementById('e2e-ghost')?.remove()`)
     await sleep(500)
   }
-  await page(`document.querySelector('.ddp-dock button[data-tip="调样式"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="样式"]').click()`)
   const panelTip = await until(`((x) => /在页面上点一个元素/.test(x) && x)(document.querySelector('.ddp-style')?.innerText || '')`, 5000)
   await sleep(800) // 抽屉升起来、画布让出位置
   const aside = await page(`(() => { const d = document.querySelector('.dd-sheet'), f = document.querySelector('iframe.ddp-frame.cur'); if (!d || !f) return 'none'; const a = d.getBoundingClientRect(), b = f.getBoundingClientRect(); return a.left >= b.right - 1 || b.bottom <= a.top + 1 })()`)
@@ -1046,7 +1046,7 @@ try {
   const styChip = await asChip('style', '样式改动', /〔调样式〕/)
   check('调样式在输入框里是一个标签「样式改动」', styChip.ok, styChip.why)
   await shot('7-style')
-  await page(`document.querySelector('.ddp-dock button[data-tip="调样式"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="样式"]').click()`)
   await sleep(600)
   const after = await styleAttr('menu.html', 'a.go')
   check('调样式：退出 → 没写回的字号撤掉，写回的圆角还在', after !== null && /border-radius:\s*24px/.test(after) && !/font-size/.test(after) && !(await page(`!!document.querySelector('.ddp-style')`)), after)
@@ -1055,7 +1055,7 @@ try {
   // 回车写回文件，改字开着时不弹「已改好」，胶囊里多「这次改了 1 处 · 撤销」；点撤销 → 文件换回原样
   const menuFile = () => fs.readFileSync(path.join(DESIGN, 'menu.html'), 'utf8')
   const menu0 = menuFile()
-  await page(`document.querySelector('.ddp-dock button[data-tip="改字"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="文字"]').click()`)
   await until(`!!document.querySelector('.ddp-stage>.dd-edbar')`, 4000)
   await clickIn('menu.html', 'h1')
   const edOn = await until(`((b) => b && b.classList.contains('on') && b.innerText)(document.querySelector('.ddp-stage>.dd-edbar'))`, 4000)
@@ -1089,7 +1089,7 @@ try {
   const edGone = await until(`!document.querySelector('.ddp-stage>.dd-edbar .n')`, 4000)
   check('改字：点「撤销」→ 文件换回原样，「这次改了几处」跟着没了', edUndone && edGone, menuFile().slice(-200))
   await sleep(2000) // 文件变了，预览在后台换一帧
-  await page(`document.querySelector('.ddp-dock button[data-tip="改字"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="文字"]').click()`)
   await until(`!document.querySelector('.ddp-stage>.dd-edbar')`, 4000)
 
   // ⑦b 点选元素 → 输入框：DSH 0.2.1 起是一个短标签（悬停看详情，发出去是整段），更早的版本插成一段字
@@ -1129,15 +1129,15 @@ try {
   }
   // ⑦c 业务标注：开关关着没有按钮；开着：按钮带条数、面板和编号、卡片和编号互相定位、点选时编号收起
   // 1.0：业务标注并进「体检」面板的第二个页签；命令面板里有「业务标注」这条
-  const anToggle = palJs('业务标注')
-  if (!ANNOT) check('业务标注：开关关着时没有入口（命令面板里也没有）', !((await page(palRows('业务标注'))) || ['?']).some((x) => /业务标注/.test(x) && !/^「/.test(x)))  // 「业务标注」那行是「说给模型听」，不算入口
+  const anToggle = palJs('需求说明')
+  if (!ANNOT) check('业务标注：开关关着时没有入口（命令面板里也没有）', !((await page(palRows('需求说明'))) || ['?']).some((x) => /需求说明/.test(x) && !/^「/.test(x)))  // 「需求说明」那行是「说给模型听」，不算入口
   else {
     await page(CANVAS)
     await sleep(600)
-    const anCmd = await until(`(${palRows('业务标注')}).then((r) => (r || []).includes('业务标注'))`, 15000)
+    const anCmd = await until(`(${palRows('需求说明')}).then((r) => (r || []).includes('需求说明'))`, 15000)
     check('业务标注：命令面板里有「业务标注」', anCmd)
     await page(anToggle)
-    check('业务标注：开在「体检」面板的「业务标注」页签', await until(`((tb) => !!tb && tb.getAttribute('aria-selected') === 'true')([...document.querySelectorAll('.dd-sheet[data-sheet="check"] [role=tab]')].find((x) => /业务标注/.test(x.textContent)))`, 5000))
+    check('业务标注：开在「体检」面板的「业务标注」页签', await until(`((tb) => !!tb && tb.getAttribute('aria-selected') === 'true')([...document.querySelectorAll('.dd-sheet[data-sheet="check"] [role=tab]')].find((x) => /需求说明/.test(x.textContent)))`, 5000))
     const cards = await until(`document.querySelectorAll('.ddp-anp .ddp-ancard').length`, 5000)
     check('业务标注：点开出卡片', cards === ANNOTS.annotations.length, String(cards))
     const lost = await until(`[...document.querySelectorAll('.ddp-anp .ddp-ancard.lost')].map((x) => x.getAttribute('data-an')).join()`, 15000)
@@ -1231,7 +1231,7 @@ try {
     await until(`!!document.querySelector('.ddp-anp')`, 3000)
     await sleep(1200)
     await shot('6b-annot-single')
-    await page(`window.__anGone = 0; window.__anT = setInterval(() => { if (![...document.querySelectorAll('.dd-sheet [role=tab]')].some((x) => /业务标注/.test(x.textContent))) window.__anGone++ }, 30), 1`)
+    await page(`window.__anGone = 0; window.__anT = setInterval(() => { if (![...document.querySelectorAll('.dd-sheet [role=tab]')].some((x) => /需求说明/.test(x.textContent))) window.__anGone++ }, 30), 1`)
     await page(`document.querySelector('[data-an="menu-02"]').click(), 1`)
     check('业务标注：单页时点别的屏的卡片，换到那一屏', await until(`/菜单|menu/i.test((document.querySelector('.ddp-top .ddp-addr') || {}).textContent || '') || !!document.querySelector('iframe[src*="menu.html"]')`, 6000))
     await sleep(1500)
@@ -1258,9 +1258,9 @@ try {
   }
 
   // ⑧ 换风格：外观面板 →「换风格」→ 点一张卡
-  await page(`document.querySelector('.ddp-dock button[data-tip="外观"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="主题"]').click()`)
   await sleep(300)
-  await page(`[...document.querySelectorAll('.dd-sheet[data-sheet="look"] .dd-tabs [role=tab]')].find((x) => /换风格/.test(x.textContent)).click()`)
+  await page(`[...document.querySelectorAll('.dd-sheet[data-sheet="look"] .dd-tabs [role=tab]')].find((x) => /^风格/.test(x.textContent.trim())).click()`)
   const recN = await until(`document.querySelectorAll('.ddp-styles .ddp-sc').length`, 5000)
   await page(`[...document.querySelectorAll('.dd-lkbar .dd-seg button')].find((x) => /^全部/.test(x.textContent)).click()`)
   const cards = await until(`document.querySelectorAll('.ddp-styles .ddp-sc').length > 5 && document.querySelectorAll('.ddp-styles .ddp-sc').length`, 5000)
@@ -1290,7 +1290,7 @@ try {
     await mouse('mouseReleased', x1, y1)
   }
   const tool = (name) => page(`document.querySelector('.ddp-mk-tools button[title^="${name}"]').click()`)
-  await page(`document.querySelector('.ddp-dock button[data-tip="画笔"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="标注"]').click()`)
   const markOn = await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
   check('画笔标注：盖上画布，工具栏有七种笔 + 撤销 / 重做 / 清掉，颜色和粗细', markOn && await page(`document.querySelectorAll('.ddp-mk-tools > .ddp-btn').length`) === 10 &&
     await page(`document.querySelectorAll('.ddp-mk-sz .ddp-btn').length`) === 3 && await page(`!!document.querySelector('.ddp-mk-color')`), await page(`document.querySelector('.ddp-mark')?.innerText || '没有标注层'`))
@@ -1387,7 +1387,7 @@ try {
   // 画布上一笔自由线从一屏画到另一屏：窗口变窄画布换了行，两头各跟各的屏；取消后回单页
   await page(CANVAS)
   await sleep(900)
-  await page(`document.querySelector('.ddp-dock button[data-tip="画笔"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="标注"]').click()`)
   await until(`!!document.querySelector('.ddp-mark .cv')`, 5000)
   const twoAt = `(() => { const s = document.querySelector('.ddp-stage').getBoundingClientRect(); const c = document.querySelector('.ddp-mark .cv').getBoundingClientRect()
     return [...document.querySelectorAll('.ddp-stage iframe')].map((x, i) => [i, x.getBoundingClientRect()]).filter(([, r]) => r.width > 40 && r.height > 40 && r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1)
@@ -1526,10 +1526,10 @@ try {
   const m1 = JSON.parse((await frameUntil(PROBE, (v) => /menu\.html"/.test(v || ''))) || '{}')
   check('远程看：页面样式（设计变量的品牌色）、写回的圆角都在，picker 也在', m1.bg === 'rgb(107, 62, 38)' && /border-radius:\s*24px/.test(m1.style) && m1.picker, JSON.stringify(m1))
   check('远程看：<base> 指着这一屏原来的地址，页面里拿不到 DSH 的地址', /^http:\/\/127\.0\.0\.1:\d+\/menu\.html$/.test(m1.base || ''), m1.base)
-  await rpage(`document.querySelector('.ddp-dock button[data-tip="外观"]').click()`).catch(() => {})
+  await rpage(`document.querySelector('.ddp-dock button[data-tip="主题"]').click()`).catch(() => {})
   const toks = await runtil(`!!document.querySelector('.ddp-look [title^="--brand"]') && document.querySelector('.ddp-look').innerText`, 8000)
   check('远程看：页面和右侧栏说得上话（设计变量报上来了）', !!toks, await rpage(`document.querySelector('.ddp-look')?.innerText.slice(0, 200) || '没有外观面板'`).catch((e) => e.message))
-  await rpage(`document.querySelector('.ddp-dock button[data-tip="外观"]').click()`).catch(() => {})
+  await rpage(`document.querySelector('.ddp-dock button[data-tip="主题"]').click()`).catch(() => {})
   await sleep(400)
   {
     const { data } = await chrome.cdp('Page.captureScreenshot', { format: 'png' }, rs)
@@ -1542,7 +1542,7 @@ try {
   const c2 = JSON.parse((await frameUntil(PROBE, (v) => /拿铁 × 2/.test(v || ''), 20000)) || '{}')
   check('远程看：文件改了 → 跟着重新打包换上来', /cart\.html$/.test(c2.base || '') && /拿铁 × 2/.test(c2.text || ''), JSON.stringify(c2))
   await rpage(`${CHECK_BTN}.click()`).catch(() => {})
-  const rck = await runtil(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') && p.querySelectorAll('.ddp-ck').length })()`, 30000)
+  const rck = await runtil(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在检查|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') && p.querySelectorAll('.ddp-ck').length })()`, 30000)
   let rdiag = ''
   if (!(rck >= 2)) {
     const panel = await rpage(`document.querySelector('.ddp-check')?.innerText.slice(0, 300) || '没有面板'`).catch((e) => e.message)
@@ -1552,7 +1552,7 @@ try {
     await rpage(`document.querySelector('.dd-sheet .dd-sh .dd-x')?.click()`).catch(() => {})
     await sleep(400)
     await rpage(`${CHECK_BTN}.click()`).catch(() => {})
-    const again = await runtil(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在体检|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') && p.querySelectorAll('.ddp-ck').length })()`, 30000)
+    const again = await runtil(`(() => { const p = document.querySelector('.ddp-check'); return p && !/正在检查|Checking/.test(p.querySelector('.dd-sh .sub')?.textContent || '') && p.querySelectorAll('.ddp-ck').length })()`, 30000)
     rdiag = JSON.stringify({ panel, frames, inside, again })
   }
   check('远程看：体检照样量得出（改坏的购物车：浅灰小字）', rck >= 2, rdiag)
@@ -1560,7 +1560,7 @@ try {
   await sleep(400)
   const pngs = () => (fs.existsSync(path.join(DESIGN, 'exports')) ? fs.readdirSync(path.join(DESIGN, 'exports')).filter((f) => f.endsWith('.png')) : [])
   const pngBefore = pngs().length
-  await rpage(exportJs('img', '/ · 纯画面$/')).catch(() => {})
+  await rpage(exportJs('img', '/ · 无设备框$/')).catch(() => {})
   const exMsg = await runtil(`(document.body.innerText.match(/(已导出|导出失败)[^\\n]*/) || [''])[0]`, 30000)
   check('远程看：导出这一屏照样能导（沙盒里也画得出图），纯画面文件名带 -plain', /已导出/.test(exMsg || '') && pngs().length > pngBefore && pngs().some((x) => /-plain\.png$/.test(x)), `${exMsg} / ${pngs().join(',')}`)
   await chrome.cdp('Target.closeTarget', { targetId: rt }).catch(() => {})
@@ -1601,7 +1601,7 @@ try {
   await sleep(300)
   check('版本面板：侧栏窄时灵动条也在面板下面，「回到这一版」点得到', narrowVer && narrowVer.clear === true && narrowVer.hit === true, JSON.stringify(narrowVer))
   // 1.0 标题栏：标志、⊞ 屏名 ▾ ｜ 导出 ▾ ⋯ 转成代码；底下的灵动条也不能出框
-  const EN = { 分享: 'Share', 导出: 'Export', 转成代码: 'Build as code', 选择: 'Select', 改字: 'Text', 调样式: 'Style', 画笔: 'Draw', 试用: 'Play', 外观: 'Look', 体检: 'Check', 说一句或输命令: 'Ask or run a command', 和现在对比: 'Compare with now', 回到这一版: 'Restore this' }
+  const EN = { 分享: 'Share', 导出: 'Export', 转成代码: 'Build as code', 选择: 'Select', 文字: 'Text', 样式: 'Style', 标注: 'Annotate', 演示: 'Present', 主题: 'Theme', 检查: 'Check', 说一句或输命令: 'Ask or run a command', 和现在对比: 'Compare with now', 回到这一版: 'Restore this' }
   const navFit = (w, en) => page(`(async () => {
     const d = document.querySelector('.ddp'), css = d.style.cssText
     const lbs = [...document.querySelectorAll('.ddp-top .lb, .ddp-top .ddp-btn > span, .ddp-dock .ddp-tool > span, .ddp-dock .dd-cmd > span, .ddp-dock .dd-bt')].filter((x) => !x.children.length), old = lbs.map((x) => x.textContent)
@@ -1644,10 +1644,10 @@ try {
   await new Promise((r) => implSrv.listen(0, '127.0.0.1', r))
   IMPL_PORT = implSrv.address().port
   await say('IMPL-CMP 比一下菜单')
-  const implToast = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /模型刚和做出来的比过/.test(x)) || ''`, 60000)
+  const implToast = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /模型刚和实际页面比过/.test(x)) || ''`, 60000)
   await waitFor(() => cmpResults.length > 0, 10000)
-  check('和做出来的比：模型比完（拿到差异）→ 右侧栏提示「看对比」', /差异 \d/.test(cmpResults[0] || '') && /菜单/.test(implToast) && /和做出来的比/.test(implToast), `${implToast} / ${(cmpResults[0] || '').slice(0, 120)}`)
-  await page(`[...document.querySelectorAll('.ddp-toast button')].find((x) => x.textContent === '和做出来的比').click()`)
+  check('和做出来的比：模型比完（拿到差异）→ 右侧栏提示「看对比」', /差异 \d/.test(cmpResults[0] || '') && /菜单/.test(implToast) && /还原度对比/.test(implToast), `${implToast} / ${(cmpResults[0] || '').slice(0, 120)}`)
+  await page(`[...document.querySelectorAll('.ddp-toast button')].find((x) => x.textContent === '还原度对比').click()`)
   const implSrc = await until(`(() => { const f = document.querySelector('.ddp-icmp .im iframe'); return f && f.getAttribute('src') })()`, 15000)
   await sleep(1500)
   // 嵌进来的是做出来的那页（少一行菜单），走的是设计台的预览服务器（端口不是开发服务器自己的）
@@ -1673,7 +1673,7 @@ try {
   })()`)
   const lis = await implLis()
   await shot('impl-split')
-  check('和做出来的比：灵动条换成「地址 ｜ 拖线 / 叠加 / 并排 ｜ 差异 ｜ 重新比 ×」，拖线把手、两边标签', implView.url === `localhost:${IMPL_PORT}/menu.html` && /^差异 \d+(\.\d)?%$/.test(implView.score) && implView.knob && implView.tags === '设计稿|做出来的' && /^拖线\*\|叠加\|并排/.test(implView.tools) && !implView.pick, JSON.stringify(implView))
+  check('和做出来的比：灵动条换成「地址 ｜ 拖线 / 叠加 / 并排 ｜ 差异 ｜ 重新比 ×」，拖线把手、两边标签', implView.url === `localhost:${IMPL_PORT}/menu.html` && /^差异 \d+(\.\d)?%$/.test(implView.score) && implView.knob && implView.tags === '设计稿|实际页面' && /^卷帘\*\|叠加\|并排/.test(implView.tools) && !implView.pick, JSON.stringify(implView))
   check('和做出来的比：嵌进来的是做出来的那页（少一行菜单），经设计台的预览服务器', /^http:\/\/127\.0\.0\.1:\d+\/menu\.html$/.test(implSrc || '') && !(implSrc || '').includes(':' + IMPL_PORT + '/') && lis === 2, `${implSrc} / li=${lis}`)
   const ibar = (name) => page(`[...document.querySelectorAll('.ddp-ibar .ddp-imode button, .ddp-ibar .ddp-idiff')].find((x) => x.textContent === '${name}').click()`)
   await ibar('叠加')
@@ -1682,18 +1682,18 @@ try {
   await page(`(() => { const i = document.querySelector('.ddp-iop input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '80'); i.dispatchEvent(new Event('input', { bubbles: true })) })()`)
   await sleep(300)
   const ov2 = await page(`document.querySelector('.ddp-icmp.ov > .im').style.opacity`)
-  await ibar('反色')
+  await ibar('差异高亮')
   await sleep(300)
   const ov3 = await page(`(() => { const im = document.querySelector('.ddp-icmp.ov > .im'); return { blend: im.style.mixBlendMode, op: im.style.opacity, off: document.querySelector('.ddp-iop input').disabled } })()`)
   await shot('impl-overlay')
   check('和做出来的比：叠加 → 真页面半透明（默认 50%，拖到 80%）；反色 → 差值混合、透明度条停用', ov1 && ov1.op === '0.5' && ov1.range === '50' && ov2 === '0.8' && ov3.blend === 'difference' && ov3.off, JSON.stringify({ ov1, ov2, ov3 }))
-  await ibar('反色')
+  await ibar('差异高亮')
   await ibar('并排')
   await sleep(1500)
   const side = await page(`(() => { const s = [...document.querySelectorAll('.ddp-iside')]; return { n: s.length, impl: s[1] ? !!s[1].querySelector('.im iframe') : false, design: s[0] ? !!s[0].querySelector('.ly iframe') : false, gap: s[1] && s[0] ? Math.round(s[1].getBoundingClientRect().left - s[0].getBoundingClientRect().right) : -1 } })()`)
   await shot('impl-side')
   check('和做出来的比：并排 → 左设计稿、右做出来的，中间留空', side.n === 2 && side.impl && side.design && side.gap > 0, JSON.stringify(side))
-  await ibar('拖线')
+  await ibar('卷帘')
   await page(`[...document.querySelectorAll('.ddp-ibar .dd-bt')].find((x) => /重新比/.test(x.textContent)).click()`)
   const reSaid = await until(`[...document.querySelectorAll('.ddp-toast')].map((x) => x.textContent).find((x) => /比完了：差异/.test(x)) || ''`, 60000)
   const reTip = await until(`(() => { const s = document.querySelector('.ddp-ibar .ddp-iscore'); return s && /你点的/.test(s.getAttribute('data-tip-d') || '') && s.getAttribute('data-tip-d') })()`, 8000)
@@ -1719,14 +1719,14 @@ try {
   // 1.0.2：步骤条只认这次 DSH 里真写好的交接包；只是自己点了「重新比」、没交接过 → 停在第 1 步（和 1.0.1 一样）。走到后面几步的单元测试在 test-client
   const hoStep = await until(`(() => { const ls = [...document.querySelectorAll('.dd-sheet .dd-steps li')]; return ls.length === 3 && ls[0].classList.contains('on') && ls[0].getAttribute('aria-current') === 'step' && !ls[1].classList.contains('done') && !ls[2].classList.contains('on') })()`, 5000)
   check('1.0.2：没交接过、只是比过 → 转成代码的步骤条停在第 1 步', hoStep, await page(`[...document.querySelectorAll('.dd-sheet .dd-steps li')].map((x) => x.className + ':' + x.textContent).join(' | ')`))
-  await page(`[...document.querySelectorAll('.dd-sheet .dd-sf .dd-bt')].find((x) => /和做出来的比/.test(x.textContent)).click()`)
+  await page(`[...document.querySelectorAll('.dd-sheet .dd-sf .dd-bt')].find((x) => /还原度对比/.test(x.textContent)).click()`)
   const menuBack = await until(`(() => { const f = document.querySelector('.ddp-icmp .im iframe'); return f && f.getAttribute('src') })()`, 10000)
   // 对比开着导出这一屏：导出的就是比的那屏（设计稿那边登记给了右侧栏）
   await sleep(800)
   const pngB = pngs().length
   await page(openSheet('导出', 'export', '/图片/'))
-  const exLabel = await page(`(() => { const b = [...document.querySelectorAll('.dd-sheet .dd-opt')].find((x) => x.textContent.trim().endsWith(' · 纯画面')); return b ? b.textContent : '' })()`)
-  await page(exportJs('img', '/ · 纯画面$/'))
+  const exLabel = await page(`(() => { const b = [...document.querySelectorAll('.dd-sheet .dd-opt')].find((x) => x.textContent.trim().endsWith(' · 无设备框')); return b ? b.textContent : '' })()`)
+  await page(exportJs('img', '/ · 无设备框$/'))
   const exSaid = await until(`(document.body.innerText.match(/(已导出|导出失败)[^\\n]*/) || [''])[0]`, 30000)
   check('和做出来的比：对比开着也能导出这一屏（导出面板写的是比的那屏）', /已导出/.test(exSaid || '') && (pngs().length > pngB || pngs().some((f) => Date.now() - fs.statSync(path.join(DESIGN, 'exports', f)).mtimeMs < 30000)) && /菜单|menu/i.test(exLabel), `${exLabel} / ${exSaid}`)
   await page(closeSheet)
@@ -1749,7 +1749,7 @@ try {
   const PM = `document.querySelector('.ddp-top .dd-proj .dd-pj')`
   const pmMain = `(async () => { const b = ${PM}; if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') { b.click(); await new Promise((r) => setTimeout(r, 200)) } const bk = document.querySelector('.dd-pm .dd-mback'); if (bk) { bk.click(); await new Promise((r) => setTimeout(r, 150)) } return !!document.querySelector('.dd-pm') })()`
   const pmClose = `(() => { const b = ${PM}; if (b && b.getAttribute('aria-expanded') === 'true') b.click() })()`
-  const menuOpen = `(async () => { if (document.querySelector('.ddp-szrow')) return true; if (!(await ${pmMain})) return false; const it = [...document.querySelectorAll('.dd-pm [role=menuitem]')].find((x) => /^(画幅|Canvas)/.test(x.textContent)); if (it) it.click(); await new Promise((r) => setTimeout(r, 150)); return !!document.querySelector('.ddp-szrow') })()`
+  const menuOpen = `(async () => { if (document.querySelector('.ddp-szrow')) return true; if (!(await ${pmMain})) return false; const it = [...document.querySelectorAll('.dd-pm [role=menuitem]')].find((x) => /^(尺寸|Size)/.test(x.textContent)); if (it) it.click(); await new Promise((r) => setTimeout(r, 150)); return !!document.querySelector('.ddp-szrow') })()`
   const szRow0 = (await page(menuOpen)) && (await page(`document.querySelector('.ddp-szrow').innerText`))
   check('自定义画幅：屏名菜单里有「画幅」一行，写着现在的 1500×800（默认）', /1500×800/.test(szRow0 || '') && /默认/.test(szRow0 || ''), szRow0)
   // 菜单已开：点「自定义…」、填宽高、（截图）、点「好」
@@ -1789,22 +1789,22 @@ try {
   // 命令面板里「导出 PDF」：和原来菜单里直接点一样，先预检（有会被裁的先打开导出面板给看清单，同样的结果只拦一次）
   const openExport = async () => { await page(palJs('导出 PDF')) }
   await sleep(3500) // 等新文件进屏列表
-  await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单看').click()`)
+  await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单页查看').click()`)
   check('预检：切到单看，只挂着一屏', !!(await until(`document.querySelectorAll('iframe.ddp-frame.cur').length === 1`, 8000)), await page(`document.querySelectorAll('iframe.ddp-frame.cur').length`))
   // issue #14：导航里的「画布」排在「首页」后面，单看时点一下就回画布
   const navOrder = await page(`[...document.querySelectorAll('.ddp-top .dd-logo, .ddp-top .dd-cv')].map((b) => b.dataset.tip).join()`)
   await page(`document.querySelector('.ddp-top .dd-cv').click()`)
   const backCanvas = await until(`document.querySelectorAll('iframe.ddp-frame.cur').length >= 3 && document.querySelector('.ddp-top .dd-cv').classList.contains('on')`, 8000)
   check('导航：「画布」在「首页」后面，单看时点一下回画布', /^首页,画布/.test(navOrder) && !!backCanvas, navOrder)
-  await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单看').click()`)
+  await page(`[...document.querySelectorAll('.ddp-stage button, .ddp-stage [role=button]')].find((x) => x.textContent.trim() === '单页查看').click()`)
   await until(`document.querySelectorAll('iframe.ddp-frame.cur').length === 1`, 8000)
   const pdfBefore = pdfsNow().length
   await openExport()
-  const xoOpened = await until(`((el) => el && /比画幅大/.test(el.innerText) && /链接/.test(el.innerText))(document.querySelector('.ddp-xo'))`, 30000)
+  const xoOpened = await until(`((el) => el && /超出页面尺寸/.test(el.innerText) && /链接/.test(el.innerText))(document.querySelector('.ddp-xo'))`, 30000)
   check('预检：有内容会被裁，先给看清单，不直接导出', !!xoOpened && pdfsNow().length === pdfBefore, await page(`(document.querySelector('.ddp-xo') || {}).innerText || '没有面板'`))
   await until(`!document.querySelector('.ddp-ghost')`, 15000)
   const xoText = await page(`document.querySelector('.ddp-xo').innerText`)
-  check('预检：比画幅大 1 屏、死链接 2 个（href="#" 和指向不存在的文件）', /1 个页面比画幅大/.test(xoText) && /2 个链接/.test(xoText), xoText)
+  check('预检：比画幅大 1 屏、死链接 2 个（href="#" 和指向不存在的文件）', /1 个页面超出页面尺寸/.test(xoText) && /2 个链接/.test(xoText), xoText)
   await shot('10-export-options')
   await page(`(() => { const b = (t) => [...document.querySelectorAll('.ddp-xo .dd-chip, .ddp-xo .dd-seg > button')].find((x) => x.textContent === t).click(); b('16:9') })()`)
   await sleep(100)
@@ -1840,9 +1840,9 @@ try {
   await sleep(2500) // 等热更新换上新页面
   await page(openSheet('导出', 'export', '/PDF/'))
   await until(`!!document.querySelector('.ddp-xo')`, 8000)
-  await page(`[...document.querySelectorAll('.ddp-xo .dd-chip, .ddp-xo .dd-seg > button')].find((x) => x.textContent === '整页').click()`)
+  await page(`[...document.querySelectorAll('.ddp-xo .dd-chip, .ddp-xo .dd-seg > button')].find((x) => x.textContent === '完整长页').click()`)
   await sleep(100)
-  await page(`[...document.querySelectorAll('.ddp-xo .dd-chip, .ddp-xo .dd-seg > button')].find((x) => x.textContent === '跟随画幅').click()`)
+  await page(`[...document.querySelectorAll('.ddp-xo .dd-chip, .ddp-xo .dd-seg > button')].find((x) => x.textContent === '跟随页面尺寸').click()`)
   await sleep(100)
   await page(`[...document.querySelectorAll('.ddp-xo .dd-chip, .ddp-xo .dd-seg > button')].find((x) => x.textContent === '每页 1 屏').click()`)
   await sleep(100)
@@ -1888,8 +1888,8 @@ try {
   await shot('10-diagram')
   await page(openSheet('导出', 'export', '/图片/'))
   const dgMenu = await page(`[...document.querySelectorAll('.dd-sheet .dd-opt')].map((x) => x.textContent).join(' | ')`)
-  check('图表：导出图片的样式有「纯画面」、没有「整页长图」', /纯画面/.test(dgMenu) && !/整页长图/.test(dgMenu), dgMenu)
-  await page(exportJs('img', '/纯画面/'))
+  check('图表：导出图片的样式有「纯画面」、没有「整页长图」', /无设备框/.test(dgMenu) && !/整页长图/.test(dgMenu), dgMenu)
+  await page(exportJs('img', '/无设备框/'))
   const dgPng = () => { const d = path.join(DIAG, 'exports'); const f = fs.existsSync(d) && fs.readdirSync(d).find((x) => x.endsWith('.png')); return f ? path.join(d, f) : '' }
   const dgEnd = Date.now() + 60000
   while (Date.now() < dgEnd && !dgPng()) await sleep(400)
@@ -1914,7 +1914,7 @@ try {
   await sleep(1000)
   await inPage(webCur, 'scrollTo(0, 900), scrollY')
   const webW0 = await page(`${webCur}.clientWidth`), webH0 = await page(`${webCur}.clientHeight`)
-  await page(`document.querySelector('.ddp-dock button[data-tip="外观"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="主题"]').click()`)
   await until(`!!document.querySelector('.ddp-look')`, 5000)
   await sleep(800) // 面板淡入、缩放过渡
   // 1.0：宽过 1000 面板是右边一张（页面定住宽高、缩到它左边）；窄栏是底下的抽屉（宽度不变、页面在抽屉上面）
@@ -1922,7 +1922,7 @@ try {
   const webY = await inPage(webCur, 'scrollY')
   check('网页铺满单看、右边开着面板（#22）：页面宽高不变（不重排）、滚动位置不丢，整个在面板左边（不被挡）', webGeo.w === webW0 && webY === 900 && (webGeo.wide ? webGeo.h === webH0 && webGeo.right <= webGeo.panel : webGeo.bottom <= webGeo.top + 1), JSON.stringify({ webW0, webH0, webY, ...webGeo }))
   await shot('10-web-panel')
-  await page(`document.querySelector('.ddp-dock button[data-tip="外观"]').click()`)
+  await page(`document.querySelector('.ddp-dock button[data-tip="主题"]').click()`)
   await sleep(300)
   // 对比（#22）：开版本面板、点上一版、对比；版本面板开 / 关时页面宽高一样，开着时整个在面板左边
   await page(`document.querySelector('.ddp-isl.dd-mini').click()`)
@@ -1945,7 +1945,7 @@ try {
 
   // ⑨zf 自定义画幅 + 多尺寸（#23）：网页自定义成 1000×700 → 多尺寸并排的手机 / 平板 / 电脑后面多一档「自定义 · 1000」；关掉、恢复默认
   // 先在菜单里把「按画幅显示」关掉（铺满）：填了画幅要自动换回按画幅显示，单看就是 1000×700
-  const fitItem = `[...document.querySelectorAll('.ddp-menu [role=menuitemcheckbox]')].find((x) => /按画幅/.test(x.textContent))`
+  const fitItem = `[...document.querySelectorAll('.ddp-menu [role=menuitemcheckbox]')].find((x) => /按尺寸/.test(x.textContent))`
   for (let i = 0; i < 2; i++) { await page(pmMain); await page(`${fitItem}.click()`); await sleep(300) }
   await page(pmMain)
   const fillOff = await page(`${fitItem}.getAttribute('aria-checked')`)
@@ -2298,13 +2298,13 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     await page(`document.querySelector('.ddp-askpop') && document.querySelector('.ddp-ask button.chip[aria-haspopup=dialog]').click(), 1`)
     await page(`(() => { const m = document.querySelector('.ddp-askkinds .more'); if (m && m.getAttribute('aria-expanded') !== 'true') m.click(); return 1 })()`)
     await sleep(200)
-    await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
+    await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '自定义外壳').click(), 1`)
     const frRow = await until(`(() => { const r = document.querySelector('.ddp-askframes'); return r ? [...r.querySelectorAll('button')].map((b) => b.textContent.trim()) : null })()`, 8000)
     await page(`[...document.querySelectorAll('.ddp-askframes button')].find((b) => b.textContent.trim() === '示例弹窗')?.click(), 1`)
     const frOn = await page(`(() => { const b = [...document.querySelectorAll('.ddp-askframes button')].find((x) => x.textContent.trim() === '示例弹窗'); return !!b && b.getAttribute('aria-checked') === 'true' })()`)
-    check('首页「套外框」：下面列出外框库里的外框（新外框 + 示例弹窗），点了选上', JSON.stringify(frRow) === JSON.stringify(['新外框', '示例弹窗']) && frOn, JSON.stringify({ frRow, frOn }))
+    check('首页「套外框」：下面列出外框库里的外框（新外框 + 示例弹窗），点了选上', JSON.stringify(frRow) === JSON.stringify(['新外壳', '示例弹窗']) && frOn, JSON.stringify({ frRow, frOn }))
     await shot('11-home-frames')
-    await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '套外框').click(), 1`)
+    await page(`[...document.querySelectorAll('.ddp-askkinds button')].find((b) => b.textContent.trim() === '自定义外壳').click(), 1`)
     // 我的作品 › 外框 ⋯（1.0 补的入口）：改名（输入框，回车存进 frame.json）、删除（点两下，挪进外框库的 .trash）
     {
       const od = path.join(HOME, '.dsh', 'design-frames', 'old-side')
@@ -2325,15 +2325,15 @@ addEventListener('drop', (e) => { e.preventDefault(); document.body.setAttribute
     const fdemo = path.join(HOME, '.dsh', 'design-frames', 'demo-popup', 'frame.json')
     const renamed = await waitFor(() => { try { return JSON.parse(fs.readFileSync(fdemo, 'utf8')).name === '演示弹窗' } catch { return false } }, 5000)
     const renShown = await until(`[...document.querySelectorAll('.ddp-frm .nm b')].some((b) => b.textContent === '演示弹窗')`, 5000)
-    check('我的作品 › 外框 ⋯：菜单有「用这个外框做新设计 / 改名 / 在文件夹里显示 / 删除」，改名回车 → frame.json 和卡片都换成新名字', /用这个外框做新设计\|改名\|在文件夹里显示\|删除/.test(frMenuItems || '') && renGo === 'ok' && renamed && renShown, JSON.stringify({ frMenuItems, renGo, renamed, renShown }))
+    check('我的作品 › 外框 ⋯：菜单有「用这个外框做新设计 / 改名 / 在文件夹里显示 / 删除」，改名回车 → frame.json 和卡片都换成新名字', /用这个外壳做新设计\|改名\|在文件夹里显示\|删除/.test(frMenuItems || '') && renGo === 'ok' && renamed && renShown, JSON.stringify({ frMenuItems, renGo, renamed, renShown }))
     const delGo = await frMenu('旧侧栏', '删除')
     await page(`(() => { const b = document.querySelector('.ddp-frm .sure .dd-bt.danger'); if (b) b.click(); return !!b })()`)
-    const delGone = await until(`![...document.querySelectorAll('.ddp-frm .nm b')].some((b) => b.textContent === '旧侧栏') && /外框已删除/.test(document.body.innerText)`, 5000)
+    const delGone = await until(`![...document.querySelectorAll('.ddp-frm .nm b')].some((b) => b.textContent === '旧侧栏') && /外壳已删除/.test(document.body.innerText)`, 5000)
     let trashed = []
     try { trashed = fs.readdirSync(path.join(HOME, '.dsh', 'design-frames', '.trash')) } catch { /* 没挪 */ }
     check('我的作品 › 外框 ⋯ 删除：再点一下确认 → 卡片没了、提示「外框已删除」，文件夹挪进外框库的 .trash', delGo === 'ok' && delGone && trashed.length === 1, JSON.stringify({ delGo, delGone, trashed }))
     await shot('11b-works-frames')
-    await page(`(() => { const b = [...document.querySelectorAll('.ddp-libwrap [role=tab], .ddp-libwrap button')].find((x) => x.innerText.trim() === '开始'); if (b) b.click(); return !!b })()`)
+    await page(`(() => { const b = [...document.querySelectorAll('.ddp-libwrap [role=tab], .ddp-libwrap button')].find((x) => x.innerText.trim() === '首页'); if (b) b.click(); return !!b })()`)
     await until(`!document.querySelector('.ddp-libwrap')`, 3000)
   }
   await chrome.cdp('Emulation.setFocusEmulationEnabled', { enabled: false }, sessionId).catch(() => {})

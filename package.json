@@ -1,6 +1,6 @@
 {
   "name": "dsh-design-studio",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.mjs"

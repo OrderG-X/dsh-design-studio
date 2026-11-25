@@ -145,7 +145,7 @@ const homeView = body.comp({ ...body.opts.inject('sEmpty') })
 const bar = findEl(homeView, (el) => el.props && el.props.className === 'ddp-homebar')
 const barTabs = []
 findEl(bar, (el) => { if (el.type === 'button' && el.props && el.props.role === 'tab') barTabs.push(el); return false })
-check('首页：顶上四个页签，「开始」选中', barTabs.length === 4 && barTabs[0].props['aria-selected'] === true && text(barTabs[0]) === '开始', barTabs.map(text).join(','))
+check('首页：顶上四个页签，「首页」选中', barTabs.length === 4 && barTabs[0].props['aria-selected'] === true && text(barTabs[0]) === '首页', barTabs.map(text).join(','))
 const startBox = findEl(homeView, (el) => el.props && el.props.className === 'ddp-start')
 const kids = startBox ? [].concat(startBox.children || startBox.props.children || []).flat() : []
 const at = (cls) => kids.findIndex((k) => k && typeof k === 'object' && ((k.props && k.props.className === cls) || (typeof k.type === 'function' && k.type.name === cls)))
@@ -169,6 +169,23 @@ check('首页：有大输入框，「+」里两项（打开 HTML…、品牌…�
 homeAsk.props.onSend({ text: '做个面馆点单', kind: 'miniprogram', style: null })
 await new Promise((r) => setTimeout(r, 150))
 check('首页：发出去 = 放进输入框（带类型）+ 自动挑的风格卡 + 直接发', sent.length === 3 && sent[0].includes('做个面馆点单') && sent[0].includes('类型：小程序') && /^〔风格〕/.test(sent[1]) && /自动挑的/.test(sent[1]) && sent[2] === '<submit>', JSON.stringify(sent))
+{
+  const tree = homeAsk.type({ ...homeAsk.props, draft: { current: { kind: 'diagram', dg: 'framework' } } })
+  const row = findEl(tree, (el) => el.props && /ddp-askdg/.test(el.props.className || ''))
+  const btns = row ? [].concat(row.props.children || row.children || []).flat().filter((x) => x && x.props) : []
+  const ta = findEl(tree, (el) => el.type === 'textarea')
+  const kindRow = findEl(tree, (el) => el.props && el.props.className === 'ddp-askkinds')
+  check('首页：选了路线图·导图 → 下面一排五种图，挑着的那种亮，占位换成它的例子；类型行平时就有它', btns.length === 5 && btns.map(text).join('|') === '技术路线图（申报书）|研究框架图|架构图|思维导图|产品路线图' && btns[1].props['aria-checked'] === true && /研究框架图/.test(ta.props.placeholder) && /路线图·导图/.test(text(kindRow)), btns.map(text).join('|') + ' / ' + (ta && ta.props.placeholder))
+}
+// 路线图·导图：挑了「技术路线图（申报书）」→ 类型后面跟上具体哪种图；申报书那种不挑风格卡（用炫酷样式）
+sent.length = 0
+homeAsk.props.onSend({ text: '城市内涝预警课题', kind: 'diagram', style: null, dg: 'proposal' })
+await new Promise((r) => setTimeout(r, 150))
+check('首页：路线图·导图挑了具体哪种 → 类型行带上，申报书那种不附风格卡', sent.length === 2 && sent[0].includes('类型：路线图·导图 · 技术路线图（申报书）') && sent[1] === '<submit>', JSON.stringify(sent))
+sent.length = 0
+homeAsk.props.onSend({ text: '社区团购系统', kind: 'web', style: null, dg: 'arch' })
+await new Promise((r) => setTimeout(r, 150))
+check('首页：不是路线图·导图时，带过来的图种不算', sent[0] && sent[0].includes('类型：网页') && !sent[0].includes('架构图'), JSON.stringify(sent))
 // 输入框里本来就有引用标签（读不出纯文字）/ 分屏有两个输入框：只放进去，不替用户发
 for (const [name, eds] of [['有引用标签', [{ querySelector: () => ({}), children: [] }]], ['分屏两个输入框', [emptyEd, emptyEd]], ['找不到输入框', []]]) {
   globalThis.document = { querySelectorAll: () => eds }
@@ -653,6 +670,12 @@ const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, for
   const T = mod._test
   const kinds = await import('../lib/kinds.js')
   check('设计类型：右侧栏和服务端的类型、画幅、别名一样', JSON.stringify(T.KIND_LIST) === JSON.stringify(kinds.KINDS) && JSON.stringify(T.KIND_SIZE) === JSON.stringify(kinds.KIND_SIZE) && JSON.stringify(T.META_ALIAS) === JSON.stringify(kinds.META_ALIAS))
+  // 改过名的命令：旧叫法在命令面板里照样搜得到（别名挂在现在的键上，键得都在）
+  const oldMiss = Object.keys(T.KW_OLD).filter((k) => !(k in T.ZH) || !(k in T.EN))
+  const oldHas = (w) => Object.values(T.KW_OLD).some((v) => v.split(' ').includes(w))
+  check('命令面板：旧叫法（体检 / 外观 / 画笔 / 试用 / Play / 改字 / 调样式）还搜得到', !oldMiss.length && ['体检', '外观', '画笔', '试用', 'Play', '改字', '调样式', '公网链接', '和做出来的比'].every(oldHas), oldMiss.join())
+  // 申报书、研究框架图按图种 id 跳过风格卡，不看翻译后的字（中英文界面一样）
+  check('首页：哪种图跳过风格卡按 id 认（申报书、研究框架图）', T.DG_SUBS.filter((x) => x.prop).map((x) => x.id).join() === 'proposal,framework')
   const lack = T.KIND_LIST.flatMap((k) => [['KIND_KEY', T.KIND_KEY], ['FRAME', T.FRAME], ['SHOW_COLS', T.SHOW_COLS], ['ASK_EX', T.ASK_EX], ['图标', T.KIND_ICON]].filter(([, m]) => !m[k]).map(([n]) => `${n} 缺 ${k}`))
   if (T.ASK_KINDS.slice().sort().join() !== T.KIND_LIST.slice().sort().join()) lack.push('ASK_KINDS 和 KIND_LIST 不一样')
   for (const k of Object.keys(T.FIXED)) if (!T.KIND_LIST.includes(k)) lack.push('FIXED 里有不认识的 ' + k)
@@ -782,7 +805,7 @@ const { chipOf, makeT, ZH: LZ, EN: LE, formatCheck, formatTweaks, formatTpl, for
 const tZ = makeT({})
 const tE = makeT({ locale: { bind: () => (k) => LE[k] } })
 check('翻译：填进去的内容里有「{notes}」也原样保留', tZ('mkAsk', { path: '/d/project-{notes}/refs/m.png', where: 'home', notes: '' }).startsWith('〔标注〕/d/project-{notes}/refs/m.png\n这是'))
-check('中文 / 英文翻译都拿得到', tZ('chipMark') === '标注图' && tE('chipMark') === 'Markup' && LZ.chipOne === '1 个元素')
+check('中文 / 英文翻译都拿得到', tZ('chipMark') === '标注图' && tE('chipMark') === 'Annotation' && LZ.chipOne === '1 个元素')
 {
   // 两套文案一个不少，占位符也对得上（漏一边或写错 {名字} 时界面上会露出键名 / 花括号）
   const holes = (v) => [...String(v).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',')
@@ -871,7 +894,7 @@ check('标签：用户自己打的像开头的字不认', ['〔标注〕看看�
 const mkc = chipOf(tZ('mkAsk', { path: '/d/refs/markup-home.png', where: 'home', notes: tZ('mkNotes', { notes: '「这里改大」' }) }), tZ)
 check('标签：标注图的悬停卡片有图上写的字和文件名', JSON.stringify(mkc.items().filter((x) => x && x[1])) === JSON.stringify([['b', '标注图'], ['p', '「这里改大」'], ['span', 'home'], ['span', 'markup-home.png']]), JSON.stringify(mkc.items()))
 const ck = chipOf(formatCheck(tZ, [{ label: '首页', url: 'http://127.0.0.1:9/home.html', issues: [issue, issue, issue, issue, issue] }], fileSt), tZ)
-check('标签：体检写几个问题，悬停列前 4 个', ck.label === '体检 · 5 个问题' && ck.items().filter((x) => x && x[0] === 'span').length === 5, JSON.stringify(ck.items()))
+check('标签：体检写几个问题，悬停列前 4 个', ck.label === '检查 · 5 个问题' && ck.items().filter((x) => x && x[0] === 'span').length === 5, JSON.stringify(ck.items()))
 // 0.9.0 及以前插成字发出去的（没有固定收尾）：历史消息照原样显示，不收成标签
 const oldMsgs = [
   '把页面上的「a」改成「b」（只改这一处文字，别的不动）。\n文件：/d/home.html只改 home.html',
@@ -889,7 +912,7 @@ for (const [name, txt] of [['调样式', '[Style] ' + 'x (y): z. '.repeat(30000)
   check(`标签：超长一行（${name}，${Math.round(txt.length / 1000)}KB）不卡`, Date.now() - t1 < 300 && !r.length, `${Date.now() - t1}ms`)
 }
 const pillMk = slots.find((s) => s.opts.name === 'conversation.user.text.node').comp({ node: { data: { text: tZ('textAsk', { before: 'a', after: 'b', where: W }).trim() } } })
-check('标签：消息里的标签带种类（换图标）', pillMk.props['data-i'] === 'text' && text(pillMk) === '改字', JSON.stringify(pillMk.props))
+check('标签：消息里的标签带种类（换图标）', pillMk.props['data-i'] === 'text' && text(pillMk) === '文字修改', JSON.stringify(pillMk.props))
 
 const st2 = { target: { kind: 'file', file: '/d/home.html', root: '/d' } }
 const sa1 = formatStyleAsk(tZ, sty, st2).trim()
@@ -993,7 +1016,7 @@ check('画笔标注：橡皮不会擦掉离笔画有段距离的圈/框/箭头',
   const b1 = barOf({ url: '', turn: true, turnFor: 72000, tool: '' })
   check('生成中：状态胶囊说「在想」，计时按服务端说的这一轮开始了多久', !!b1 && b1.props.phase.text === '在想…' && text(b1).includes('1:12'), b1 && text(b1))
   const say = (x) => { const b = barOf({ url: '', turn: true, turnFor: 1000, ...x }); return b ? b.props.phase : null }
-  check('生成中：按调的工具说人话（体检 / 跑命令 / 看文件 / 认不出的）', say({ tool: 'check_design' }).text === '正在体检' && say({ tool: 'bash' }).text === '正在跑命令'
+  check('生成中：按调的工具说人话（体检 / 跑命令 / 看文件 / 认不出的）', say({ tool: 'check_design' }).text === '正在检查' && say({ tool: 'bash' }).text === '正在跑命令'
     && say({ tool: 'read_file' }).text === '正在看文件' && say({ tool: 'mystery_tool' }).text === '模型正在工作', JSON.stringify([say({ tool: 'check_design' }), say({ tool: 'bash' }), say({ tool: 'read_file' }), say({ tool: 'mystery_tool' })]))
   check('生成中：第一屏还没出来时写文件 = 正在做第 1 屏', say({ tool: 'write' }).text === '正在做第 1 屏')
   const w1 = say({ tool: 'write', writing: 'menu.html', lines: 120 })
